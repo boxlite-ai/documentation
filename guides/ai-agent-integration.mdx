@@ -20,17 +20,34 @@ This guide covers best practices for integrating BoxLite as a sandboxed executio
 
 ### Starter Configuration
 
-```python
-import boxlite
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import boxlite
 
-options = boxlite.BoxOptions(
-    image="python:slim",
-    cpus=2,
-    memory_mib=1024,
-    working_dir="/workspace",
-    security=boxlite.SecurityOptions.maximum(),
-)
-```
+    options = boxlite.BoxOptions(
+        image="python:slim",
+        cpus=2,
+        memory_mib=1024,
+        working_dir="/workspace",
+        security=boxlite.SecurityOptions.maximum(),
+    )
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from 'boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({
+      image: 'python:slim',
+      cpus: 2,
+      memoryMib: 1024,
+      workingDir: '/workspace',
+    });
+    ```
+  </Tab>
+</Tabs>
 
 ### Security Presets
 
@@ -60,34 +77,67 @@ security.network_enabled = False  # Disable network for strict isolation
 
 A single box can run many `exec()` calls. Each call spawns a new process inside the same VM. This avoids repeated VM boot overhead and is safe because the VM provides hardware isolation from the host.
 
-```python
-import asyncio
-import boxlite
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import asyncio
+    import boxlite
 
-async def main():
-    runtime = boxlite.Boxlite.default()
-    box = await runtime.create(boxlite.BoxOptions(
-        image="python:slim",
-        cpus=2,
-        memory_mib=1024,
-        security=boxlite.SecurityOptions.maximum(),
-    ))
+    async def main():
+        runtime = boxlite.Boxlite.default()
+        box = await runtime.create(boxlite.BoxOptions(
+            image="python:slim",
+            cpus=2,
+            memory_mib=1024,
+            security=boxlite.SecurityOptions.maximum(),
+        ))
 
-    try:
-        # Run agent tools concurrently in the same box
-        results = await asyncio.gather(
-            box.exec("python", ["-c", "print('task A')"]),
-            box.exec("python", ["-c", "print('task B')"]),
-            box.exec("python", ["-c", "print('task C')"]),
-        )
+        try:
+            # Run agent tools concurrently in the same box
+            results = await asyncio.gather(
+                box.exec("python", ["-c", "print('task A')"]),
+                box.exec("python", ["-c", "print('task B')"]),
+                box.exec("python", ["-c", "print('task C')"]),
+            )
 
-        for execution in results:
-            result = await execution.wait()
-            print(f"Exit code: {result.exit_code}")
-    finally:
-        await box.stop()
-        await runtime.remove(box.id)
-```
+            for execution in results:
+                result = await execution.wait()
+                print(f"Exit code: {result.exit_code}")
+        finally:
+            await box.stop()
+            await runtime.remove(box.id)
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from 'boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({
+      image: 'python:slim',
+      cpus: 2,
+      memoryMib: 1024,
+    });
+
+    try {
+      // Run agent tools concurrently in the same box
+      const [execA, execB, execC] = await Promise.all([
+        box.exec('python', ['-c', "print('task A')"]),
+        box.exec('python', ['-c', "print('task B')"]),
+        box.exec('python', ['-c', "print('task C')"]),
+      ]);
+
+      for (const execution of [execA, execB, execC]) {
+        const result = await execution.wait();
+        console.log(`Exit code: ${result.exitCode}`);
+      }
+    } finally {
+      await box.stop();
+      await runtime.remove(box.id);
+    }
+    ```
+  </Tab>
+</Tabs>
 
 **When to use:** Most AI agent scenarios. Keeps VM boot cost to one-time.
 
@@ -254,23 +304,51 @@ options = boxlite.BoxOptions(
 
 ### copy_in / copy_out
 
-```python
-runtime = boxlite.Boxlite.default()
-box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
+<Tabs>
+  <Tab title="Python">
+    ```python
+    runtime = boxlite.Boxlite.default()
+    box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
 
-# Copy file into box
-await box.copy_in("/host/script.py", "/workspace/script.py")
+    # Copy file into box
+    await box.copy_in("/host/script.py", "/workspace/script.py")
 
-# Run the script
-execution = await box.exec("python", ["/workspace/script.py"])
-result = await execution.wait()
+    # Run the script
+    execution = await box.exec("python", ["/workspace/script.py"])
+    result = await execution.wait()
 
-# Copy results out
-await box.copy_out("/workspace/output.json", "/host/output.json")
+    # Copy results out
+    await box.copy_out("/workspace/output.json", "/host/output.json")
 
-await box.stop()
-await runtime.remove(box.id)
-```
+    await box.stop()
+    await runtime.remove(box.id)
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from 'boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({ image: 'python:slim' });
+
+    // Copy file into box — use exec to write content
+    await box.exec('sh', ['-c', 'cat > /workspace/script.py'], {
+      stdin: 'print("hello")\n',
+    });
+
+    // Run the script
+    const execution = await box.exec('python', ['/workspace/script.py']);
+    const result = await execution.wait();
+
+    // Read output via exec
+    const output = await box.exec('cat', ['/workspace/output.json']);
+    const outputResult = await output.wait();
+
+    await box.stop();
+    await runtime.remove(box.id);
+    ```
+  </Tab>
+</Tabs>
 
 ### Inline Data via exec
 

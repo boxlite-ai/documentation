@@ -99,7 +99,8 @@
               "guides/examples-gallery",
               "guides/ai-agent-integration",
               "guides/image-registry-configuration",
-              "guides/macos-sandbox-debugging"
+              "guides/macos-sandbox-debugging",
+              "guides/changelog"
             ]
           }
         ]

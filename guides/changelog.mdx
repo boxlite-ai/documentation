@@ -1,0 +1,56 @@
+---
+title: "Changelog"
+description: "Version history and release notes for BoxLite."
+icon: "clock-rotate-left"
+---
+
+Track what's new, improved, and fixed in each BoxLite release.
+
+<Note>
+  For the complete list of commits and pre-release builds, see [GitHub Releases](https://github.com/boxlite-ai/boxlite/releases).
+</Note>
+
+## v0.4.4 — Python SDK stable release
+
+**Released:** 2025-01
+
+**Highlights:**
+- **Production-ready Python SDK** — async and sync APIs, five box types (SimpleBox, CodeBox, BrowserBox, ComputerBox, InteractiveBox)
+- **SecurityOptions presets** — `development()`, `standard()`, and `maximum()` for quick security configuration
+- **Metrics API** — real-time CPU, memory, disk, and network usage per box
+- **File transfer** — `copy_in()` and `copy_out()` for moving files between host and guest
+- **TTY resize** — `resize_tty()` for interactive terminal sessions
+
+**SDK versions in this release:**
+
+| SDK | Version |
+|-----|---------|
+| Python | 0.4.4 (stable) |
+| Node.js | 0.1.6 |
+| Rust | Native (core runtime) |
+| C | 0.2.0 |
+
+**Platform support:**
+- macOS Apple Silicon (Hypervisor.framework)
+- Linux x86_64 and ARM64 (KVM)
+- Windows via WSL2
+
+---
+
+## v0.3.x — Node.js SDK and BrowserBox
+
+**Highlights:**
+- **Node.js SDK** — TypeScript-first API with async disposal support
+- **BrowserBox** — Chromium, Firefox, and WebKit automation via CDP
+- **ComputerBox** — full desktop automation with mouse, keyboard, and screenshot APIs
+- **InteractiveBox** — PTY terminal sessions with stdin/stdout streaming
+
+---
+
+## v0.2.x — C SDK and networking
+
+**Highlights:**
+- **C SDK** — FFI bindings with JSON configuration and callback-based streaming
+- **Port forwarding** — TCP/UDP port mapping between host and guest via gvproxy
+- **Volume mounts** — virtiofs-based file sharing with read-only and read-write modes
+- **Image registry** — OCI image pulling with layer-level caching and deduplication

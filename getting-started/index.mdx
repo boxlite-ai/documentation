@@ -100,6 +100,84 @@ Unlike Docker, BoxLite doesn't require a daemon process. It's an embeddable libr
   </Card>
 </CardGroup>
 
+### Hello World
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+
+    ```python
+    import asyncio
+    import boxlite
+
+    async def main():
+        async with boxlite.SimpleBox() as box:
+            result = await box.exec("echo", "Hello from BoxLite!")
+            print(result.stdout)
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install boxlite
+    ```
+
+    ```typescript
+    import { SimpleBox } from 'boxlite';
+
+    const box = new SimpleBox({ image: 'alpine:latest' });
+    try {
+      const result = await box.exec('echo', 'Hello from BoxLite!');
+      console.log(result.stdout);
+    } finally {
+      await box.stop();
+    }
+    ```
+  </Tab>
+  <Tab title="Rust">
+    ```bash
+    cargo add boxlite
+    ```
+
+    ```rust
+    use boxlite::{BoxliteRuntime, BoxOptions, BoxCommand};
+
+    fn main() -> boxlite::BoxliteResult<()> {
+        let runtime = BoxliteRuntime::default_runtime();
+        let options = BoxOptions::new("alpine:latest");
+        let (id, litebox) = runtime.create(options)?;
+
+        let cmd = BoxCommand::new("echo").arg("Hello from BoxLite!");
+        let result = litebox.exec(cmd)?;
+        println!("{}", result.stdout());
+
+        runtime.remove(&id)?;
+        Ok(())
+    }
+    ```
+  </Tab>
+  <Tab title="C">
+    ```c
+    #include <boxlite.h>
+
+    int main() {
+        BoxliteRuntime *rt = boxlite_runtime_new(NULL);
+        const char *config = "{\"image\": \"alpine:latest\"}";
+        BoxliteBox *box = boxlite_create_box(rt, config);
+
+        boxlite_execute(box, "echo", "Hello from BoxLite!", NULL, NULL);
+
+        boxlite_stop_box(box);
+        boxlite_runtime_free(rt);
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
 | SDK | Status | Best For |
 |-----|--------|----------|
 | [Python](/getting-started/quickstart-python) | Stable (v0.4.4) | AI agents, scripting, rapid prototyping |
@@ -108,7 +186,7 @@ Unlike Docker, BoxLite doesn't require a daemon process. It's an embeddable libr
 | [C](/getting-started/quickstart-c) | v0.2.0 | C/C++ applications, system integration |
 | Go | Coming soon | -- |
 
-## Next Steps
+## Next steps
 
 ### Learn More
 

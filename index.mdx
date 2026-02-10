@@ -1,16 +1,119 @@
 ---
 title: "BoxLite Documentation"
-description: "BoxLite is an embeddable virtual machine runtime for secure, isolated code execution. Think of it as SQLite for sandboxing."
+description: "BoxLite lets you spin up lightweight VMs and run OCI containers inside them. Designed for AI agent sandboxes and multi-tenant code execution, where Docker alone isn't enough and full VM infrastructure is too heavy."
 icon: "house"
 ---
 
-Welcome to the BoxLite documentation. BoxLite is a lightweight, embeddable virtual machine runtime that provides hardware-level isolation without requiring a daemon or root privileges. Embed it directly in your application for secure, sandboxed code execution.
+Embed hardware-isolated sandboxes in your app — no daemon, no root, no Docker. BoxLite is a lightweight virtual machine runtime that gives every sandbox its own microVM with hardware-level isolation, yet embeds directly into your application as a library.
 
-<Note>
-  BoxLite v0.4.4 is stable and production-ready. It runs on **macOS** (Apple Silicon via Hypervisor.framework) and **Linux** (via KVM), with Windows support through WSL2.
-</Note>
+BoxLite v0.4.4 is stable and production-ready. It runs on **macOS** (Apple Silicon), **Linux** (KVM), and **Windows** (WSL2).
 
-## Explore the Documentation
+## Why BoxLite?
+
+<CardGroup cols={3}>
+  <Card title="No daemon required" icon="plug-circle-xmark">
+    Unlike Docker, BoxLite has no background process. Import the library, create a sandbox, and run code — all in-process.
+  </Card>
+  <Card title="Hardware-level isolation" icon="shield-halved">
+    Every sandbox runs in its own microVM backed by Apple Hypervisor.framework or KVM. Full kernel isolation, not just namespaces.
+  </Card>
+  <Card title="Multi-language SDKs" icon="code">
+    First-class support for Python, Node.js, Rust, and C. Async-native APIs with type safety across all SDKs.
+  </Card>
+</CardGroup>
+
+## Quick install
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+
+    ```python
+    import asyncio
+    import boxlite
+
+    async def main():
+        async with boxlite.SimpleBox() as box:
+            result = await box.exec("echo", "Hello from BoxLite!")
+            print(result.stdout)
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install boxlite
+    ```
+
+    ```typescript
+    import { SimpleBox } from 'boxlite';
+
+    const box = new SimpleBox({ image: 'alpine:latest' });
+    try {
+      const result = await box.exec('echo', 'Hello from BoxLite!');
+      console.log(result.stdout);
+    } finally {
+      await box.stop();
+    }
+    ```
+  </Tab>
+  <Tab title="Rust">
+    ```bash
+    cargo add boxlite
+    ```
+
+    ```rust
+    use boxlite::{BoxliteRuntime, BoxOptions, BoxCommand};
+
+    fn main() -> boxlite::BoxliteResult<()> {
+        let runtime = BoxliteRuntime::default_runtime();
+        let options = BoxOptions::new("alpine:latest");
+        let (id, litebox) = runtime.create(options)?;
+
+        let cmd = BoxCommand::new("echo").arg("Hello from BoxLite!");
+        let result = litebox.exec(cmd)?;
+        println!("{}", result.stdout());
+
+        runtime.remove(&id)?;
+        Ok(())
+    }
+    ```
+  </Tab>
+  <Tab title="C">
+    ```c
+    #include <boxlite.h>
+
+    int main() {
+        BoxliteRuntime *rt = boxlite_runtime_new(NULL);
+        const char *config = "{\"image\": \"alpine:latest\"}";
+        BoxliteBox *box = boxlite_create_box(rt, config);
+
+        boxlite_execute(box, "echo", "Hello from BoxLite!", NULL, NULL);
+
+        boxlite_stop_box(box);
+        boxlite_runtime_free(rt);
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## BoxLite vs alternatives
+
+| | BoxLite | Docker | E2B |
+|---|---|---|---|
+| **Isolation level** | Hardware (microVM) | OS (namespaces/cgroups) | Hardware (microVM) |
+| **Daemon required** | No | Yes (dockerd) | No (cloud API) |
+| **Root required** | No | Yes (or rootless mode) | No |
+| **Startup time** | ~150 ms | ~500 ms | ~500 ms (network) |
+| **Embeddable as library** | Yes | No (client/server) | No (SaaS) |
+| **Open source** | Yes (Apache 2.0) | Yes | Partial |
+| **Runs locally** | Yes | Yes | No (cloud only) |
+| **Multi-language SDKs** | Python, Node.js, Rust, C | CLI / REST API | Python, Node.js |
+
+## Explore the documentation
 
 <CardGroup cols={2}>
   <Card
@@ -43,7 +146,7 @@ Welcome to the BoxLite documentation. BoxLite is a lightweight, embeddable virtu
   </Card>
 </CardGroup>
 
-## Quick Links
+## Quick links
 
 <CardGroup cols={2}>
   <Card
