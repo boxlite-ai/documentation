@@ -1,45 +1,87 @@
-> **First-time setup**: This is a default AGENTS.md file. Customize it for your project's specific needs, including your preferred code languages, terminology, style guidelines, and content requirements.
+# BoxLite Documentation — Agent Instructions
 
-# Documentation agent instructions
+This is the official documentation site for **BoxLite**, built with Mintlify. BoxLite is a lightweight, embeddable VM runtime for secure, isolated code execution.
 
-IMPORTANT! When you start a session, remind the user that they have the default AGENTS.md file and they might want to customize it for their project.
+## Project Structure
 
-## Mintlify basics
+- `docs.json` — Mintlify config (navigation, theme, colors, logo). Check before making structural changes.
+- `index.mdx` — Home page
+- `getting-started/` — Quickstart guides (Python, Node.js, Rust, C)
+- `architecture/` — Architecture deep dives (components, security, networking)
+- `reference/` — SDK API reference (`python/`, `nodejs/`, `rust/`, `c/`)
+- `guides/` — How-to guides (build from source, examples, AI integration, etc.)
+- `development/` — Internal docs (CLI, Rust style guide)
+- `snippets/` — Reusable MDX snippets (included via `<Snippet file="..." />`)
+- `images/`, `logo/` — Static assets
 
-- Configuration lives in `docs.json` - check it before making structural changes
-- Use MDX format for documentation pages
-- Run `mint dev` locally to preview changes before committing
-- Run `mint broken-links` to check for broken links
+## Development Commands
 
-## Mintlify components
+```bash
+mint dev              # Local preview at http://localhost:3000
+mint broken-links     # Check for broken links
+mint update           # Update Mintlify CLI
+```
 
-Use Mintlify's built-in components for consistent formatting. See https://www.mintlify.com/docs/components for all available components.
+## Navigation
 
-## Style and formatting
+Navigation is defined in `docs.json` under `navigation.tabs` with 4 tabs:
+1. **Documentation** — Getting Started, Architecture, FAQ
+2. **SDK Reference** — Python, Node.js, Rust, C SDK reference pages
+3. **Guides** — How-to guides
+4. **Development** — CLI docs, Rust style guide
 
-- Use active voice and second person ("you")
-- Keep sentences concise - one idea per sentence
-- Use sentence case for headings
-- When referencing UI elements, use bold: Click **Settings**
-- Use code formatting for: file names, commands, paths, and code references
+Rules:
+- Never add a page to navigation without creating the `.mdx` file first
+- Never remove a page without checking for inbound links from other pages
+- Navigation order in `docs.json` determines sidebar order
 
-## Code examples
+## Writing Conventions
 
-- Include language identifiers in fenced code blocks
-- Add titles to code blocks when relevant: ```javascript filename.js
-- Show realistic parameter values, not placeholders like `foo` or `bar`
-- Include error handling for API examples
+### Frontmatter (required on every page)
+```yaml
+---
+title: "Page Title"
+description: "One-line description for SEO and navigation"
+sidebarTitle: "Short Nav Title"  # optional, if nav title differs
+---
+```
 
-## Content structure
+### Style
+- Active voice, second person ("you")
+- Sentence case for headings
+- Bold for UI elements: Click **Settings**
+- Code formatting for: file names, commands, paths, code references
+- One idea per sentence
+- Lead instructions with the goal, not the action
 
-- Add frontmatter (title, description) to every page
-- Use `sidebarTitle` in frontmatter if the nav title should differ from the page title
-- Include introductory context before diving into steps or details
-- Add "Next steps" or related links where helpful
+### Code Blocks
+- Always include language identifier: ` ```python `, ` ```bash `, etc.
+- Add filename title when relevant: ` ```python main.py `
+- Use realistic parameter values, not `foo`/`bar`
+- Include error handling in API examples
 
-## What to avoid
+### MDX Components
+Use Mintlify's built-in components — prefer them over raw HTML:
+- `<Card>`, `<CardGroup>` — navigation cards
+- `<Note>`, `<Warning>`, `<Tip>`, `<Info>` — callout boxes
+- `<Tabs>`, `<Tab>` — tabbed content (e.g., platform-specific instructions)
+- `<Snippet file="filename.mdx" />` — reusable content from `snippets/`
+- Full reference: https://mintlify.com/docs/components
 
-- Don't edit `docs.json` without understanding the navigation structure
-- Don't remove existing pages without checking for inbound links
+## Terminology
+
+Use these terms consistently:
+- **BoxLite** — product name (capital B, capital L)
+- **LiteBox** — the VM instance type
+- **box** — generic reference to a sandbox instance (lowercase)
+- **SimpleBox / CodeBox / BrowserBox** — Python SDK box types
+- **Guest Agent** — agent running inside the VM
+- **Jailer** — security isolation component
+- **ShimController** — process lifecycle manager
+
+## What to Avoid
+
+- Don't edit `docs.json` without understanding the full navigation structure
 - Don't use HTML when an MDX component exists for the same purpose
-- Don't add pages to navigation that don't exist yet
+- Don't add pages to navigation that don't have corresponding `.mdx` files
+- Don't alternate between synonyms for the same concept (pick one term, stick with it)
