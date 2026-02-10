@@ -4,26 +4,30 @@ description: "Lightweight micro-VM sandboxes for AI agents and secure code execu
 icon: "house"
 ---
 
-Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware isolation, sub-second boot, zero daemon — runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
+BoxLite lets you spin up lightweight Linux VMs and run OCI containers inside them — in milliseconds, from your own code, with no daemon and no root. Every sandbox is a real microVM with its own kernel, providing hardware-level isolation that containers can't match.
+
+Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
+
+## What is BoxLite?
+
+<CardGroup cols={3}>
+  <Card title="Embedded" icon="cube">
+    A library, not a service. Import it in Python, Node.js, Rust, or C — no daemon, no Docker, no external dependencies.
+  </Card>
+  <Card title="Hardware isolation" icon="shield-halved">
+    Each sandbox is a real microVM with its own Linux kernel. Full hardware isolation via KVM or Apple Hypervisor.framework.
+  </Card>
+  <Card title="Lightweight" icon="feather">
+    VMs boot in ~150ms with minimal overhead. Run hundreds of sandboxes on a single host.
+  </Card>
+</CardGroup>
 
 ## Quick start
 
 <Tabs>
-  <Tab title="BoxRun (CLI)">
-    ```bash
-    # Install
-    curl -fsSL https://boxlite.ai/boxrun/install | sh
-
-    # One command — create a VM and drop into a shell
-    boxrun shell ubuntu
-    ```
-  </Tab>
-  <Tab title="BoxLite (Python)">
-    ```bash
-    pip install boxlite
-    ```
-
+  <Tab title="Python">
     ```python
+    # pip install boxlite
     import asyncio
     import boxlite
 
@@ -35,13 +39,10 @@ Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware
     asyncio.run(main())
     ```
   </Tab>
-  <Tab title="BoxLite (Node.js)">
-    ```bash
-    npm install boxlite
-    ```
-
+  <Tab title="Node.js">
     ```typescript
-    import { SimpleBox } from 'boxlite';
+    // npm install @boxlite-ai/boxlite
+    import { SimpleBox } from '@boxlite-ai/boxlite';
 
     const box = new SimpleBox({ image: 'alpine:latest' });
     try {
@@ -53,3 +54,46 @@ Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware
     ```
   </Tab>
 </Tabs>
+
+## BoxRun — the platform layer
+
+**BoxRun** wraps BoxLite into a ready-to-use platform: CLI, REST API, web dashboard, and Python SDK — all in a single binary. No code required to get started.
+
+```bash
+curl -fsSL https://boxlite.ai/boxrun/install | sh
+boxrun shell ubuntu
+```
+
+BoxRun is built on BoxLite. Choose BoxRun when you want a server you can talk to over HTTP or CLI. Choose BoxLite when you want to embed sandboxing directly in your application code.
+
+## SDKs and platforms
+
+| SDK | Install | Status |
+|-----|---------|--------|
+| Python | `pip install boxlite` | Stable (v0.4.4) |
+| Node.js | `npm install @boxlite-ai/boxlite` | v0.1.6 |
+| Rust | `cargo add boxlite` | Native |
+| C | Link `libboxlite` | v0.2.0 |
+
+| Platform | Architecture | Requirements |
+|----------|-------------|-------------|
+| macOS | Apple Silicon | macOS 12+ |
+| Linux | x86_64 / ARM64 | KVM enabled |
+| Windows | WSL2 | KVM support |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/getting-started/index">
+    Install BoxLite and run your first sandbox in minutes.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/index">
+    Learn how BoxLite works under the hood — microVMs, the jailer, networking, and storage.
+  </Card>
+  <Card title="BoxRun reference" icon="terminal" href="/boxrun/cli">
+    CLI commands, REST API, Python SDK, and configuration for the BoxRun platform.
+  </Card>
+  <Card title="SDK reference" icon="book" href="/reference/index">
+    Full API reference for the Python, Node.js, Rust, and C SDKs.
+  </Card>
+</CardGroup>
