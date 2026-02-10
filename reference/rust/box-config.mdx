@@ -1,0 +1,328 @@
+---
+title: "Box Configuration"
+description: "Rust SDK box configuration and options"
+icon: "sliders"
+---
+
+## BoxOptions
+
+Options for constructing a box.
+
+```rust
+pub struct BoxOptions {
+    /// Number of CPUs (default: 2)
+    pub cpus: Option<u8>,
+
+    /// Memory in MiB (default: 512)
+    pub memory_mib: Option<u32>,
+
+    /// Disk size in GB for rootfs (sparse, grows as needed)
+    pub disk_size_gb: Option<u64>,
+
+    /// Working directory inside box
+    pub working_dir: Option<String>,
+
+    /// Environment variables
+    pub env: Vec<(String, String)>,
+
+    /// Root filesystem source
+    pub rootfs: RootfsSpec,
+
+    /// Volume mounts
+    pub volumes: Vec<VolumeSpec>,
+
+    /// Network isolation mode
+    pub network: NetworkSpec,
+
+    /// Port mappings
+    pub ports: Vec<PortSpec>,
+
+    /// Enable bind mount isolation (Linux only)
+    pub isolate_mounts: bool,
+
+    /// Auto-remove box when stopped (default: true)
+    pub auto_remove: bool,
+
+    /// Run independently of parent process (default: false)
+    pub detach: bool,
+
+    /// Security isolation options
+    pub security: SecurityOptions,
+}
+```
+
+### Example
+
+```rust
+use boxlite::runtime::options::{BoxOptions, RootfsSpec, VolumeSpec, PortSpec};
+
+let options = BoxOptions {
+    cpus: Some(4),
+    memory_mib: Some(2048),
+    rootfs: RootfsSpec::Image("python:3.11".to_string()),
+    env: vec![
+        ("PYTHONPATH".to_string(), "/app".to_string()),
+    ],
+    volumes: vec![
+        VolumeSpec {
+            host_path: "/home/user/project".to_string(),
+            guest_path: "/app".to_string(),
+            read_only: false,
+        },
+    ],
+    ports: vec![
+        PortSpec {
+            host_port: Some(8080),
+            guest_port: 80,
+            ..Default::default()
+        },
+    ],
+    auto_remove: false,  // Keep box after stop
+    detach: true,        // Run independently
+    ..Default::default()
+};
+```
+
+---
+
+## RootfsSpec
+
+How to populate the box root filesystem.
+
+```rust
+pub enum RootfsSpec {
+    /// Pull/resolve this registry image reference
+    Image(String),
+
+    /// Use already prepared rootfs at host path
+    RootfsPath(String),
+}
+
+impl Default for RootfsSpec {
+    fn default() -> Self {
+        Self::Image("alpine:latest".into())
+    }
+}
+```
+
+---
+
+## VolumeSpec
+
+Filesystem mount specification.
+
+```rust
+pub struct VolumeSpec {
+    /// Path on host
+    pub host_path: String,
+
+    /// Path inside guest
+    pub guest_path: String,
+
+    /// Mount as read-only
+    pub read_only: bool,
+}
+```
+
+---
+
+## NetworkSpec
+
+Network isolation options.
+
+```rust
+pub enum NetworkSpec {
+    /// Isolated network with gvproxy (default)
+    Isolated,
+    // Host,    // Future: share host network
+    // Custom,  // Future: custom network config
+}
+```
+
+---
+
+## PortSpec
+
+Port mapping specification (host to guest).
+
+```rust
+pub struct PortSpec {
+    /// Host port (None/0 = dynamically assigned)
+    pub host_port: Option<u16>,
+
+    /// Guest port to expose
+    pub guest_port: u16,
+
+    /// Protocol (TCP/UDP)
+    pub protocol: PortProtocol,
+
+    /// Bind IP (None = 0.0.0.0)
+    pub host_ip: Option<String>,
+}
+
+pub enum PortProtocol {
+    Tcp,  // default
+    Udp,
+}
+```
+
+---
+
+## SecurityOptions
+
+Security isolation options for a box.
+
+```rust
+pub struct SecurityOptions {
+    /// Enable jailer isolation (Linux: seccomp/namespaces, macOS: sandbox-exec)
+    pub jailer_enabled: bool,
+
+    /// Enable seccomp syscall filtering (Linux only)
+    pub seccomp_enabled: bool,
+
+    /// UID to drop to (Linux only). None = auto-allocate
+    pub uid: Option<u32>,
+
+    /// GID to drop to (Linux only). None = auto-allocate
+    pub gid: Option<u32>,
+
+    /// Create new PID namespace (Linux only)
+    pub new_pid_ns: bool,
+
+    /// Create new network namespace (Linux only)
+    pub new_net_ns: bool,
+
+    /// Base directory for chroot jails (Linux)
+    pub chroot_base: PathBuf,
+
+    /// Enable chroot isolation (Linux only)
+    pub chroot_enabled: bool,
+
+    /// Close inherited file descriptors
+    pub close_fds: bool,
+
+    /// Sanitize environment variables
+    pub sanitize_env: bool,
+
+    /// Environment variables to preserve
+    pub env_allowlist: Vec<String>,
+
+    /// Resource limits
+    pub resource_limits: ResourceLimits,
+
+    /// Custom sandbox profile (macOS only)
+    pub sandbox_profile: Option<PathBuf>,
+
+    /// Enable network in sandbox (macOS only)
+    pub network_enabled: bool,
+}
+```
+
+### Presets
+
+```rust
+// Development: minimal isolation for debugging
+let dev = SecurityOptions::development();
+// - jailer_enabled: false
+// - seccomp_enabled: false
+// - close_fds: false
+
+// Standard: recommended for most use cases
+let std = SecurityOptions::standard();
+// - jailer_enabled: true (Linux/macOS)
+// - seccomp_enabled: true (Linux)
+
+// Maximum: all isolation features
+let max = SecurityOptions::maximum();
+// - All isolation enabled
+// - uid/gid: 65534 (nobody)
+// - Resource limits applied
+```
+
+---
+
+## SecurityOptionsBuilder
+
+Fluent builder for security options.
+
+```rust
+use boxlite::runtime::options::{SecurityOptions, SecurityOptionsBuilder};
+
+let security = SecurityOptionsBuilder::standard()
+    .jailer_enabled(true)
+    .max_open_files(2048)
+    .max_file_size_bytes(1024 * 1024 * 512)  // 512 MiB
+    .max_processes(100)
+    .allow_env("MY_VAR")
+    .build();
+
+// Or via SecurityOptions::builder()
+let security = SecurityOptions::builder()
+    .jailer_enabled(true)
+    .seccomp_enabled(false)
+    .build();
+```
+
+### Builder Methods
+
+| Method | Description |
+|--------|-------------|
+| `new()` | Start from defaults |
+| `development()` | Start from dev preset |
+| `standard()` | Start from standard preset |
+| `maximum()` | Start from max preset |
+| `jailer_enabled(bool)` | Enable/disable jailer |
+| `seccomp_enabled(bool)` | Enable/disable seccomp |
+| `uid(u32)` | Set drop-to UID |
+| `gid(u32)` | Set drop-to GID |
+| `new_pid_ns(bool)` | Enable PID namespace |
+| `new_net_ns(bool)` | Enable network namespace |
+| `chroot_base(path)` | Set chroot base dir |
+| `chroot_enabled(bool)` | Enable chroot |
+| `close_fds(bool)` | Close inherited FDs |
+| `sanitize_env(bool)` | Sanitize environment |
+| `env_allowlist(vec)` | Set env allowlist |
+| `allow_env(var)` | Add to env allowlist |
+| `resource_limits(limits)` | Set all limits |
+| `max_open_files(n)` | RLIMIT_NOFILE |
+| `max_file_size_bytes(n)` | RLIMIT_FSIZE |
+| `max_processes(n)` | RLIMIT_NPROC |
+| `max_memory_bytes(n)` | RLIMIT_AS |
+| `max_cpu_time_seconds(n)` | RLIMIT_CPU |
+| `sandbox_profile(path)` | macOS sandbox profile |
+| `network_enabled(bool)` | macOS network access |
+| `build()` | Build SecurityOptions |
+
+---
+
+## ResourceLimits
+
+Resource limits for the jailed process.
+
+```rust
+pub struct ResourceLimits {
+    /// Max open file descriptors (RLIMIT_NOFILE)
+    pub max_open_files: Option<u64>,
+
+    /// Max file size in bytes (RLIMIT_FSIZE)
+    pub max_file_size: Option<u64>,
+
+    /// Max number of processes (RLIMIT_NPROC)
+    pub max_processes: Option<u64>,
+
+    /// Max virtual memory in bytes (RLIMIT_AS)
+    pub max_memory: Option<u64>,
+
+    /// Max CPU time in seconds (RLIMIT_CPU)
+    pub max_cpu_time: Option<u64>,
+}
+```
+
+---
+
+## See Also
+
+- [Rust SDK Overview](/reference/rust/index)
+- [Execution](/reference/rust/execution)
+- [Errors & Metrics](/reference/rust/errors-metrics)
+- [Architecture - Security](/architecture/security)

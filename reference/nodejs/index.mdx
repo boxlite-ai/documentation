@@ -1,0 +1,202 @@
+---
+title: "Node.js SDK"
+description: "BoxLite Node.js SDK reference"
+icon: "node-js"
+---
+
+Complete API reference for the BoxLite Node.js/TypeScript SDK.
+
+**Version:** 0.1.6
+**Node.js:** 18+
+**Platforms:** macOS (Apple Silicon), Linux (x86\_64, ARM64)
+
+## Overview
+
+The BoxLite Node.js SDK provides a TypeScript-first API for creating and managing lightweight virtual machine sandboxes. It supports multiple box types for different use cases -- from simple command execution to full desktop automation.
+
+```typescript
+import { JsBoxlite, SimpleBox, CodeBox, BrowserBox, ComputerBox } from 'boxlite';
+```
+
+## Installation
+
+Install the SDK via npm:
+
+```bash
+npm install boxlite
+```
+
+Or with yarn:
+
+```bash
+yarn add boxlite
+```
+
+<Note>
+  BoxLite requires Node.js 18 or later. The native binary is bundled for macOS (Apple Silicon) and Linux (x86\_64, ARM64).
+</Note>
+
+---
+
+## Runtime Management
+
+### `JsBoxlite` / `Boxlite`
+
+The main runtime for creating and managing boxes.
+
+```typescript
+import { JsBoxlite } from 'boxlite';
+// or use the wrapper classes
+import { SimpleBox } from 'boxlite';
+```
+
+#### Constructor
+
+```typescript
+new JsBoxlite(options: JsOptions)
+```
+
+#### Static Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `withDefaultConfig()` | `() => JsBoxlite` | Get runtime with default config (`~/.boxlite`) |
+| `initDefault()` | `(options: JsOptions) => void` | Initialize default runtime with custom options |
+
+#### Instance Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `create()` | `(options: JsBoxOptions, name?: string) => Promise<JsBox>` | Create a new box |
+| `listInfo()` | `() => Promise<JsBoxInfo[]>` | List all boxes |
+| `getInfo()` | `(idOrName: string) => Promise<JsBoxInfo \| null>` | Get box info |
+| `get()` | `(idOrName: string) => Promise<JsBox \| null>` | Get box handle |
+| `metrics()` | `() => Promise<JsRuntimeMetrics>` | Get runtime metrics |
+| `remove()` | `(idOrName: string, force?: boolean) => Promise<void>` | Remove a box |
+| `close()` | `() => void` | Close runtime (no-op) |
+
+#### Example
+
+```typescript
+// Default runtime
+const runtime = JsBoxlite.withDefaultConfig();
+
+// Custom runtime
+const runtime = new JsBoxlite({ homeDir: '/custom/path' });
+
+// Create a box
+const box = await runtime.create({
+  image: 'alpine:latest',
+  cpus: 2,
+  memoryMib: 512
+}, 'my-box');
+
+// List all boxes
+const boxes = await runtime.listInfo();
+boxes.forEach(info => console.log(`${info.id}: ${info.status}`));
+```
+
+---
+
+## Options
+
+### `JsOptions`
+
+Runtime configuration options.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `homeDir` | `string` | `~/.boxlite` | Base directory for runtime data |
+| `imageRegistries` | `string[]` | `[]` | Custom image registries for unqualified references |
+
+### `JsBoxOptions`
+
+Configuration options for creating a box.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `image` | `string` | - | OCI image URI |
+| `rootfsPath` | `string` | - | Pre-prepared rootfs directory (alternative to image) |
+| `cpus` | `number` | `1` | Number of CPU cores |
+| `memoryMib` | `number` | `512` | Memory limit in MiB |
+| `diskSizeGb` | `number` | - | Persistent disk size in GB |
+| `workingDir` | `string` | `"/root"` | Working directory inside container |
+| `env` | `JsEnvVar[]` | `[]` | Environment variables |
+| `volumes` | `JsVolumeSpec[]` | `[]` | Volume mounts |
+| `network` | `string` | `"isolated"` | Network mode |
+| `ports` | `JsPortSpec[]` | `[]` | Port mappings |
+| `autoRemove` | `boolean` | `false` | Auto cleanup when stopped |
+| `detach` | `boolean` | `false` | Survive parent process exit |
+
+#### `JsEnvVar`
+
+```typescript
+interface JsEnvVar {
+  key: string;
+  value: string;
+}
+```
+
+#### `JsVolumeSpec`
+
+```typescript
+interface JsVolumeSpec {
+  hostPath: string;    // Path on host
+  guestPath: string;   // Path in container
+  readOnly?: boolean;  // Default: false
+}
+```
+
+#### `JsPortSpec`
+
+```typescript
+interface JsPortSpec {
+  hostPort?: number;   // None = auto-assign
+  guestPort: number;   // Port inside container
+  protocol?: string;   // "tcp" or "udp" (default: "tcp")
+  hostIp?: string;     // Default: "0.0.0.0"
+}
+```
+
+---
+
+## Constants
+
+Default values used by BoxLite.
+
+### Resource Defaults
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DEFAULT_CPUS` | `1` | Default CPU cores |
+| `DEFAULT_MEMORY_MIB` | `512` | Default memory in MiB |
+
+### ComputerBox Defaults
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `COMPUTERBOX_CPUS` | `2` | Default CPUs |
+| `COMPUTERBOX_MEMORY_MIB` | `2048` | Default memory |
+| `COMPUTERBOX_DISPLAY_WIDTH` | `1024` | Screen width |
+| `COMPUTERBOX_DISPLAY_HEIGHT` | `768` | Screen height |
+| `COMPUTERBOX_GUI_HTTP_PORT` | `3000` | HTTP GUI port |
+| `COMPUTERBOX_GUI_HTTPS_PORT` | `3001` | HTTPS GUI port |
+| `DESKTOP_READY_TIMEOUT` | `60` | Ready timeout (seconds) |
+
+### BrowserBox Ports
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `BROWSERBOX_PORT_CHROMIUM` | `9222` | Chromium CDP port |
+| `BROWSERBOX_PORT_FIREFOX` | `9223` | Firefox CDP port |
+| `BROWSERBOX_PORT_WEBKIT` | `9224` | WebKit CDP port |
+
+---
+
+## See Also
+
+- [Getting Started with Node.js](/getting-started/quickstart-nodejs) -- Installation and quickstart
+- [Box Types](/reference/nodejs/box-types) -- SimpleBox, CodeBox, BrowserBox, ComputerBox, InteractiveBox
+- [Execution](/reference/nodejs/execution) -- Command execution and streams
+- [Errors & Metrics](/reference/nodejs/errors-metrics) -- Error handling and resource metrics
+- [Python SDK](/reference/python/index) -- Python SDK reference

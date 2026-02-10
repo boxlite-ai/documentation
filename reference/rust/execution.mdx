@@ -1,0 +1,179 @@
+---
+title: "Execution"
+description: "Rust SDK command execution reference"
+icon: "play"
+---
+
+## BoxCommand
+
+Command builder for running programs in a box.
+
+```rust
+use boxlite::BoxCommand;
+use std::time::Duration;
+
+let cmd = BoxCommand::new("python3")
+    .args(["-c", "print('hello')"])
+    .env("PYTHONPATH", "/app")
+    .timeout(Duration::from_secs(30))
+    .working_dir("/workspace")
+    .tty(true);
+```
+
+### Builder Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `new` | `fn new(command: impl Into<String>) -> Self` | Create command |
+| `arg` | `fn arg(self, arg: impl Into<String>) -> Self` | Add single argument |
+| `args` | `fn args<I, S>(self, args: I) -> Self` | Add multiple arguments |
+| `env` | `fn env(self, key: impl Into<String>, val: impl Into<String>) -> Self` | Set env var |
+| `timeout` | `fn timeout(self, timeout: Duration) -> Self` | Set run timeout |
+| `working_dir` | `fn working_dir(self, dir: impl Into<String>) -> Self` | Set working directory |
+| `tty` | `fn tty(self, enable: bool) -> Self` | Enable pseudo-terminal |
+
+---
+
+## Execution
+
+Handle to a running command.
+
+```rust
+use boxlite::BoxCommand;
+use futures::StreamExt;
+
+let mut run_handle = litebox.run(BoxCommand::new("ls").arg("-la")).await?;
+
+// Read stdout as stream
+let mut stdout = run_handle.stdout().unwrap();
+while let Some(line) = stdout.next().await {
+    println!("{}", line);
+}
+
+// Wait for completion
+let status = run_handle.wait().await?;
+println!("Exit code: {}", status.exit_code);
+```
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `id` | `fn id(&self) -> &ExecutionId` | Get run ID |
+| `stdin` | `fn stdin(&mut self) -> Option<ExecStdin>` | Take stdin stream (once) |
+| `stdout` | `fn stdout(&mut self) -> Option<ExecStdout>` | Take stdout stream (once) |
+| `stderr` | `fn stderr(&mut self) -> Option<ExecStderr>` | Take stderr stream (once) |
+| `wait` | `async fn wait(&mut self) -> BoxliteResult<ExecResult>` | Wait for completion |
+| `kill` | `async fn kill(&mut self) -> BoxliteResult<()>` | Send SIGKILL |
+| `signal` | `async fn signal(&self, signal: i32) -> BoxliteResult<()>` | Send signal |
+| `resize_tty` | `async fn resize_tty(&self, rows: u32, cols: u32) -> BoxliteResult<()>` | Resize PTY |
+
+---
+
+## ExecStdin
+
+Standard input stream (write-only).
+
+```rust
+pub struct ExecStdin {
+    // ...
+}
+
+impl ExecStdin {
+    /// Write data to stdin
+    pub async fn write(&mut self, data: &[u8]) -> BoxliteResult<()>;
+
+    /// Write all data to stdin
+    pub async fn write_all(&mut self, data: &[u8]) -> BoxliteResult<()>;
+}
+```
+
+### Example
+
+```rust
+let mut run_handle = litebox.run(BoxCommand::new("cat")).await?;
+
+// Get stdin handle
+let mut stdin = run_handle.stdin().unwrap();
+
+// Write data
+stdin.write(b"Hello from stdin!\n").await?;
+stdin.write_all(b"More data\n").await?;
+
+// Drop stdin to close (signals EOF to process)
+drop(stdin);
+
+let result = run_handle.wait().await?;
+```
+
+---
+
+## ExecStdout / ExecStderr
+
+Standard output/error streams (read-only). Implements `futures::Stream<Item = String>`.
+
+```rust
+use futures::StreamExt;
+
+let mut run_handle = litebox.run(BoxCommand::new("ls")).await?;
+
+// Read stdout
+let mut stdout = run_handle.stdout().unwrap();
+while let Some(line) = stdout.next().await {
+    println!("stdout: {}", line);
+}
+
+// Read stderr
+let mut stderr = run_handle.stderr().unwrap();
+while let Some(line) = stderr.next().await {
+    eprintln!("stderr: {}", line);
+}
+```
+
+### Concurrent Reading
+
+```rust
+use futures::StreamExt;
+use tokio::select;
+
+let mut run_handle = litebox.run(BoxCommand::new("my-command")).await?;
+let mut stdout = run_handle.stdout().unwrap();
+let mut stderr = run_handle.stderr().unwrap();
+
+loop {
+    select! {
+        Some(line) = stdout.next() => println!("stdout: {}", line),
+        Some(line) = stderr.next() => eprintln!("stderr: {}", line),
+        else => break,
+    }
+}
+```
+
+---
+
+## ExecResult
+
+Exit status of a process.
+
+```rust
+pub struct ExecResult {
+    /// Exit code (0 = success, negative = signal number)
+    pub exit_code: i32,
+}
+
+impl ExecResult {
+    /// Returns true if exit code was 0
+    pub fn success(&self) -> bool;
+
+    /// Get exit code
+    pub fn code(&self) -> i32;
+}
+```
+
+---
+
+## See Also
+
+- [Rust SDK Overview](/reference/rust/index)
+- [Box Configuration](/reference/rust/box-config)
+- [Errors & Metrics](/reference/rust/errors-metrics)

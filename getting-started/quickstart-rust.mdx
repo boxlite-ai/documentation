@@ -1,0 +1,107 @@
+---
+title: "Rust Quick Start"
+description: "Get up and running with BoxLite Rust crate in 5 minutes."
+icon: "gear"
+---
+
+## Installation
+
+Add BoxLite to your `Cargo.toml`:
+
+```toml
+[dependencies]
+boxlite = { git = "https://github.com/boxlite-labs/boxlite" }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+```
+
+## Basic Execution
+
+<Steps>
+  <Step title="Create a file src/main.rs">
+    ```rust
+    use boxlite::{BoxliteRuntime, BoxOptions, BoxCommand, RootfsSpec};
+    use futures::StreamExt;
+
+    #[tokio::main]
+    async fn main() -> Result<(), Box<dyn std::error::Error>> {
+        // Create runtime
+        let runtime = BoxliteRuntime::default_runtime();
+
+        // Create box
+        let options = BoxOptions {
+            rootfs: RootfsSpec::Image("alpine:latest".into()),
+            ..Default::default()
+        };
+        let (_, litebox) = runtime.create(options)?;
+
+        // Execute command
+        let mut execution = litebox
+            .exec(BoxCommand::new("echo").arg("Hello from BoxLite!"))
+            .await?;
+
+        // Stream stdout
+        let mut stdout = execution.stdout().unwrap();
+        while let Some(line) = stdout.next().await {
+            println!("{}", line);
+        }
+
+        Ok(())
+    }
+    ```
+  </Step>
+  <Step title="Run it">
+    ```bash
+    cargo run
+    ```
+  </Step>
+</Steps>
+
+## From Source (Development)
+
+For contributing or local development:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/boxlite-labs/boxlite.git
+    cd boxlite
+    ```
+  </Step>
+  <Step title="Initialize submodules">
+    <Warning>
+      This step is critical! The build will fail without submodules.
+    </Warning>
+
+    ```bash
+    git submodule update --init --recursive
+    ```
+  </Step>
+  <Step title="Install platform dependencies">
+    ```bash
+    make setup
+    ```
+  </Step>
+  <Step title="Build and test">
+    ```bash
+    # Build
+    cargo build
+
+    # Run tests
+    cargo test
+    ```
+  </Step>
+</Steps>
+
+See [CONTRIBUTING.md](https://github.com/boxlite-labs/boxlite/blob/main/CONTRIBUTING.md) for detailed build instructions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Documentation" icon="sitemap" href="/architecture/index">
+    Understand how BoxLite works -- Core components (Runtime, LiteBox, VMM, Portal), Image management and rootfs preparation, Host-guest communication protocol.
+  </Card>
+  <Card title="Rust API Reference" icon="book" href="/reference/rust/index">
+    Complete Rust API reference documentation.
+  </Card>
+</CardGroup>

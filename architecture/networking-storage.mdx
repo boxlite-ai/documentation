@@ -1,0 +1,170 @@
+---
+title: "Networking & Storage"
+description: "BoxLite's pluggable network backends, port forwarding, OCI image management, rootfs assembly, and volume types."
+icon: "network-wired"
+---
+
+## Network Backends
+
+BoxLite supports pluggable network backends for Box connectivity.
+
+**Location:** `boxlite/src/net/`
+
+### Backend Trait
+
+```rust
+pub trait NetworkBackend: Send + Sync {
+    fn start(&mut self) -> BoxliteResult<NetworkConfig>;
+    fn stop(&mut self) -> BoxliteResult<()>;
+    fn metrics(&self) -> NetworkMetrics;
+}
+```
+
+### Available Backends
+
+<Tabs>
+  <Tab title="gvproxy (Default)">
+    User-mode networking based on gVisor's network stack.
+
+    ```text
+    Box                    gvproxy                  Internet
+    ┌──────┐              ┌───────┐              ┌──────────┐
+    │ eth0 │◄────vsock───▶│       │◄────TCP/UDP─▶│          │
+    └──────┘              │ NAT   │              │ External │
+                          │ DHCP  │              │ Services │
+                          │ DNS   │              └──────────┘
+                          └───────┘
+    ```
+
+    **Features:**
+
+    - Full outbound internet access
+    - Port forwarding (TCP/UDP)
+    - Built-in DHCP and DNS
+    - Network metrics (bytes sent/received)
+  </Tab>
+  <Tab title="libslirp (Alternative)">
+    QEMU's user-mode networking stack.
+
+    **Use case:** Environments where gvproxy is not available.
+
+    <Info>
+      libslirp provides the same basic connectivity features but uses QEMU's networking
+      implementation rather than gVisor's stack.
+    </Info>
+  </Tab>
+</Tabs>
+
+### Network Configuration
+
+Boxes receive network configuration via DHCP:
+
+- IP address from virtual subnet
+- Default gateway
+- DNS servers (configurable, defaults to host resolvers)
+
+## Image Management
+
+BoxLite uses OCI-compatible container images with intelligent caching.
+
+**Location:** `boxlite/src/images/`
+
+### Components
+
+```text
+ImageManager
+├── ImageStore         # OCI blob storage and retrieval
+├── ImageStorage       # Layer extraction and caching
+└── Archive handlers   # TAR archive processing
+```
+
+### Image Pull Flow
+
+```text
+Registry (Docker Hub, GHCR, ECR, etc.)
+           │
+           ▼
+┌─────────────────────┐
+│   OCI Client        │  Pull manifest and layers
+└─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   ImageStore        │  Store blobs in ~/.boxlite/images/blobs/
+└─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   Layer Extraction  │  Extract to cached layer directories
+└─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   Rootfs Assembly   │  Combine layers for Box rootfs
+└─────────────────────┘
+```
+
+### Caching Strategy
+
+- **Blob-level caching**: Image layers stored by digest, shared across images
+- **Layer deduplication**: Common base layers (e.g., `debian:slim`) extracted once
+- **Copy-on-write**: Boxes share base layers, only modifications are per-Box
+
+## Rootfs Preparation
+
+**Location:** `boxlite/src/rootfs/`
+
+The rootfs builder assembles a container filesystem from OCI image layers:
+
+```text
+Image Layers          Rootfs Builder              Box Rootfs
+┌─────────┐          ┌─────────────┐          ┌─────────────┐
+│ Layer 1 │────┐     │             │          │ /bin        │
+├─────────┤    │     │  Extract &  │          │ /etc        │
+│ Layer 2 │────┼────▶│   Overlay   │─────────▶│ /usr        │
+├─────────┤    │     │             │          │ /var        │
+│ Layer N │────┘     └─────────────┘          │ ...         │
+└─────────┘                                   └─────────────┘
+```
+
+**Key operations:**
+
+- Layer extraction and overlay mounting
+- DNS configuration injection
+- Copy-on-write snapshot creation
+
+## Volume Management
+
+**Location:** `boxlite/src/volumes/`
+
+### Supported Volume Types
+
+| Type            | Description              | Use Case               |
+|-----------------|--------------------------|------------------------|
+| **virtiofs**    | Host directory mount     | Sharing files with Box |
+| **QCOW2 disk** | Copy-on-write disk image | Persistent storage     |
+
+### virtiofs
+
+virtiofs provides high-performance host directory mounting into the guest VM. Files written inside
+the Box are immediately visible on the host, and vice versa.
+
+<Note>
+  virtiofs requires the guest kernel to support the FUSE-based virtio-fs driver, which is included
+  in BoxLite's default guest kernel.
+</Note>
+
+### QCOW2 Disk Images
+
+QCOW2 (QEMU Copy-On-Write v2) disk images provide persistent block storage for Boxes.
+
+**Features:**
+
+- **Thin provisioning**: Disk space is allocated on write, not upfront
+- **Snapshot support**: Point-in-time snapshots of disk state
+- **Shared base images**: Multiple Boxes can share a common base image with independent writes
+
+<Info>
+  QCOW2 volumes persist across Box restarts. Use them for database storage, build caches, or any
+  data that must survive Box lifecycle events.
+</Info>

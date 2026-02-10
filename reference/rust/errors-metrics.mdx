@@ -1,0 +1,270 @@
+---
+title: "Errors & Metrics"
+description: "Rust SDK error types and metrics"
+icon: "chart-bar"
+---
+
+## BoxliteError
+
+Central error enum for all BoxLite operations.
+
+```rust
+pub enum BoxliteError {
+    /// Unsupported engine kind
+    UnsupportedEngine,
+
+    /// Engine reported an error
+    Engine(String),
+
+    /// Configuration error
+    Config(String),
+
+    /// Storage/filesystem error
+    Storage(String),
+
+    /// Image pull/resolve error
+    Image(String),
+
+    /// Host-guest communication error
+    Portal(String),
+
+    /// Network error
+    Network(String),
+
+    /// gRPC error
+    Rpc(String),
+
+    /// gRPC transport error
+    RpcTransport(String),
+
+    /// Internal error
+    Internal(String),
+
+    /// Command run error
+    Run(String),
+
+    /// Unsupported operation
+    Unsupported(String),
+
+    /// Box not found
+    NotFound(String),
+
+    /// Resource already exists
+    AlreadyExists(String),
+
+    /// Invalid state for operation
+    InvalidState(String),
+
+    /// Database error
+    Database(String),
+
+    /// Metadata parsing error
+    MetadataError(String),
+
+    /// Invalid argument
+    InvalidArgument(String),
+}
+```
+
+---
+
+## BoxliteResult
+
+Result type alias for BoxLite operations.
+
+```rust
+pub type BoxliteResult<T> = Result<T, BoxliteError>;
+```
+
+### Error Handling Example
+
+```rust
+use boxlite::BoxliteError;
+
+match runtime.create(options, None).await {
+    Ok(litebox) => println!("Created box: {}", litebox.id()),
+    Err(BoxliteError::Image(msg)) => eprintln!("Image error: {}", msg),
+    Err(BoxliteError::Config(msg)) => eprintln!("Config error: {}", msg),
+    Err(e) => eprintln!("Other error: {}", e),
+}
+```
+
+---
+
+## RuntimeMetrics
+
+Runtime-wide metrics (aggregate across all boxes).
+
+```rust
+let metrics = runtime.metrics().await;
+println!("Boxes created: {}", metrics.boxes_created_total());
+println!("Commands run: {}", metrics.total_commands_run());
+```
+
+### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `boxes_created_total()` | `u64` | Total boxes created |
+| `boxes_failed_total()` | `u64` | Total boxes that failed to start |
+| `num_running_boxes()` | `u64` | Currently running boxes |
+| `total_commands_run()` | `u64` | Total run() calls |
+| `total_run_errors()` | `u64` | Total run errors |
+
+---
+
+## BoxMetrics
+
+Per-box metrics (individual LiteBox statistics).
+
+```rust
+let metrics = litebox.metrics().await?;
+println!("Boot time: {:?}ms", metrics.guest_boot_duration_ms());
+println!("CPU: {:?}%", metrics.cpu_percent());
+println!("Memory: {:?} bytes", metrics.memory_bytes());
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commands_run_total` | `u64` | Commands on this box |
+| `run_errors_total` | `u64` | Run errors on this box |
+| `bytes_sent_total` | `u64` | Bytes sent (stdin) |
+| `bytes_received_total` | `u64` | Bytes received (stdout/stderr) |
+| `total_create_duration_ms` | `Option<u128>` | Total init time |
+| `guest_boot_duration_ms` | `Option<u128>` | Guest boot time |
+| `cpu_percent` | `Option<f32>` | CPU usage (0-100) |
+| `memory_bytes` | `Option<u64>` | Memory usage |
+| `network_bytes_sent` | `Option<u64>` | Network TX |
+| `network_bytes_received` | `Option<u64>` | Network RX |
+| `network_tcp_connections` | `Option<u64>` | Active TCP connections |
+| `network_tcp_errors` | `Option<u64>` | TCP connection errors |
+
+### Stage Timing
+
+| Field | Description |
+|-------|-------------|
+| `stage_filesystem_setup_ms` | Stage 1: Directory setup |
+| `stage_image_prepare_ms` | Stage 2: Image pull/extract |
+| `stage_guest_rootfs_ms` | Stage 3: Guest rootfs bootstrap |
+| `stage_box_config_ms` | Stage 4: Box config build |
+| `stage_box_spawn_ms` | Stage 5: Subprocess spawn |
+| `stage_container_init_ms` | Stage 6: Container init |
+
+---
+
+## Type Utilities
+
+### Bytes
+
+Semantic newtype for byte sizes.
+
+```rust
+use boxlite::runtime::types::Bytes;
+
+// Constructors
+let size = Bytes::from_bytes(1_000_000);
+let size = Bytes::from_kib(512);   // 512 * 1024
+let size = Bytes::from_mib(128);   // 128 * 1024²
+let size = Bytes::from_gib(2);     // 2 * 1024³
+
+// Accessors
+let bytes = size.as_bytes();
+let kib = size.as_kib();
+let mib = size.as_mib();
+
+// Display
+println!("{}", Bytes::from_mib(512));  // "512 MiB"
+```
+
+### Seconds
+
+Semantic newtype for durations.
+
+```rust
+use boxlite::runtime::types::Seconds;
+
+// Constructors
+let duration = Seconds::from_seconds(30);
+let duration = Seconds::from_minutes(5);   // 300 seconds
+let duration = Seconds::from_hours(1);     // 3600 seconds
+
+// Accessors
+let secs = duration.as_seconds();
+let mins = duration.as_minutes();
+
+// Display
+println!("{}", Seconds::from_minutes(30));  // "30 minutes"
+```
+
+### BoxID
+
+Box identifier in ULID format (26 characters, sortable).
+
+```rust
+use boxlite::runtime::types::BoxID;
+
+let id = BoxID::new();
+println!("Full: {}", id.as_str());   // "01HJK4TNRPQSXYZ8WM6NCVT9R5"
+println!("Short: {}", id.short());    // "01HJK4TN"
+
+// Validation
+let valid = BoxID::parse("01HJK4TNRPQSXYZ8WM6NCVT9R5");
+let invalid = BoxID::parse("too-short");  // None
+```
+
+### ContainerID
+
+Container identifier (64-char lowercase hex, OCI format).
+
+```rust
+use boxlite::runtime::types::ContainerID;
+
+let id = ContainerID::new();
+println!("Full: {}", id.as_str());   // 64 hex chars
+println!("Short: {}", id.short());    // 12 hex chars
+
+// Validation
+let valid = ContainerID::is_valid("a".repeat(64).as_str());  // true
+```
+
+---
+
+## Thread Safety
+
+All public types are `Send + Sync`:
+
+- `BoxliteRuntime` - safely shareable across threads
+- `LiteBox` - safely shareable across threads
+- `Execution` - Clone + shareable
+
+```rust
+use std::sync::Arc;
+use tokio::task;
+
+let runtime = Arc::new(BoxliteRuntime::with_defaults()?);
+
+let handles: Vec<_> = (0..4).map(|i| {
+    let rt = runtime.clone();
+    task::spawn(async move {
+        let box_opts = BoxOptions::default();
+        let litebox = rt.create(box_opts, None).await?;
+        // Each task has its own box
+        Ok::<_, BoxliteError>(litebox.id().clone())
+    })
+}).collect();
+
+for handle in handles {
+    let id = handle.await??;
+    println!("Created: {}", id);
+}
+```
+
+---
+
+## See Also
+
+- [Rust SDK Overview](/reference/rust/index)
+- [Box Configuration](/reference/rust/box-config)
+- [Execution](/reference/rust/execution)

@@ -1,0 +1,407 @@
+---
+title: "Native API"
+description: "C SDK native API functions"
+icon: "code"
+---
+
+The Native API (`boxlite_*`) provides full-featured, flexible control over BoxLite with JSON configuration, streaming output callbacks, and advanced features like volumes and networking.
+
+## Box Creation
+
+### boxlite_create_box
+
+Create and auto-start a box.
+
+```c
+BoxliteErrorCode boxlite_create_box(
+    CBoxliteRuntime* runtime,
+    const char* options_json,
+    CBoxHandle** out_box,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `options_json` | `const char*` | JSON-encoded BoxOptions |
+| `out_box` | `CBoxHandle**` | Output: box handle |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+#### Example
+
+```c
+// Minimal options (required fields)
+const char* options = "{"
+    "\"rootfs\":{\"Image\":\"alpine:3.19\"},"
+    "\"env\":[],\"volumes\":[],\"network\":\"Isolated\",\"ports\":[]"
+"}";
+
+CBoxHandle* box = NULL;
+if (boxlite_create_box(runtime, options, &box, &error) != Ok) {
+    fprintf(stderr, "Error: %s\n", error.message);
+    boxlite_error_free(&error);
+}
+```
+
+### boxlite_start_box
+
+Start or restart a stopped box.
+
+```c
+BoxliteErrorCode boxlite_start_box(
+    CBoxHandle* handle,
+    CBoxliteError* out_error
+);
+```
+
+### boxlite_stop_box
+
+Stop a running box.
+
+```c
+BoxliteErrorCode boxlite_stop_box(
+    CBoxHandle* handle,
+    CBoxliteError* out_error
+);
+```
+
+<Note>
+  Consumes the handle - do not use after calling.
+</Note>
+
+### boxlite_remove
+
+Remove a box.
+
+```c
+BoxliteErrorCode boxlite_remove(
+    CBoxliteRuntime* runtime,
+    const char* id_or_name,
+    int force,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `id_or_name` | `const char*` | Box ID (full or prefix) or name |
+| `force` | `int` | Non-zero to force remove running box |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+### boxlite_get
+
+Reattach to an existing box.
+
+```c
+BoxliteErrorCode boxlite_get(
+    CBoxliteRuntime* runtime,
+    const char* id_or_name,
+    CBoxHandle** out_handle,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `id_or_name` | `const char*` | Box ID (full or prefix) or name |
+| `out_handle` | `CBoxHandle**` | Output: box handle |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+### boxlite_box_id
+
+Get box ID string from handle.
+
+```c
+char* boxlite_box_id(CBoxHandle* handle);
+```
+
+<Warning>
+  Caller must free the returned string with `boxlite_free_string()`.
+</Warning>
+
+## Command Execution
+
+### boxlite_execute
+
+Execute a command with optional streaming output.
+
+```c
+BoxliteErrorCode boxlite_execute(
+    CBoxHandle* handle,
+    const char* command,
+    const char* args_json,
+    void (*callback)(const char* text, int is_stderr, void* user_data),
+    void* user_data,
+    int* out_exit_code,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `handle` | `CBoxHandle*` | Box handle |
+| `command` | `const char*` | Command to execute |
+| `args_json` | `const char*` | JSON array of arguments, e.g., `["arg1", "arg2"]` |
+| `callback` | function pointer | Optional streaming output callback |
+| `user_data` | `void*` | User data passed to callback |
+| `out_exit_code` | `int*` | Output: command exit code |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+#### Callback Signature
+
+```c
+void callback(const char* text, int is_stderr, void* user_data);
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `text` | Output text chunk |
+| `is_stderr` | `0` for stdout, `1` for stderr |
+| `user_data` | User data from `boxlite_execute` |
+
+#### Example
+
+```c
+void output_handler(const char* text, int is_stderr, void* data) {
+    FILE* stream = is_stderr ? stderr : stdout;
+    fprintf(stream, "%s", text);
+}
+
+int exit_code = 0;
+BoxliteErrorCode code = boxlite_execute(
+    box,
+    "python",
+    "[\"-c\", \"print('hello')\"]",
+    output_handler,
+    NULL,
+    &exit_code,
+    &error
+);
+
+if (code == Ok) {
+    printf("Exit code: %d\n", exit_code);
+}
+```
+
+## Lifecycle Functions
+
+### boxlite_runtime_shutdown
+
+Gracefully stop all running boxes.
+
+```c
+BoxliteErrorCode boxlite_runtime_shutdown(
+    CBoxliteRuntime* runtime,
+    int timeout,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `timeout` | `int` | Seconds: 0=default(10), -1=infinite, >0=custom |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+### boxlite_runtime_free
+
+Free a runtime instance.
+
+```c
+void boxlite_runtime_free(CBoxliteRuntime* runtime);
+```
+
+Safe to call with NULL. Automatically frees all boxes.
+
+## Discovery & Introspection
+
+### boxlite_list_info
+
+List all boxes as JSON.
+
+```c
+BoxliteErrorCode boxlite_list_info(
+    CBoxliteRuntime* runtime,
+    char** out_json,
+    CBoxliteError* out_error
+);
+```
+
+Returns JSON array. Caller must free `out_json` with `boxlite_free_string()`.
+
+### boxlite_get_info
+
+Get single box info as JSON.
+
+```c
+BoxliteErrorCode boxlite_get_info(
+    CBoxliteRuntime* runtime,
+    const char* id_or_name,
+    char** out_json,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `id_or_name` | `const char*` | Box ID (full or prefix) or name |
+| `out_json` | `char**` | Output: JSON string (caller must free with `boxlite_free_string()`) |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+### boxlite_box_info
+
+Get box info from handle as JSON.
+
+```c
+BoxliteErrorCode boxlite_box_info(
+    CBoxHandle* handle,
+    char** out_json,
+    CBoxliteError* out_error
+);
+```
+
+**Example JSON output:**
+
+```json
+{
+  "id": "01HJK4TNRPQSXYZ8WM6NCVT9R5",
+  "name": null,
+  "state": {
+    "status": "running",
+    "running": true,
+    "pid": 12345
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "image": "alpine:3.19",
+  "cpus": 2,
+  "memory_mib": 512
+}
+```
+
+## Complete Native API Example
+
+```c
+#include <stdio.h>
+#include "boxlite.h"
+
+void output_callback(const char* text, int is_stderr, void* user_data) {
+    FILE* stream = is_stderr ? stderr : stdout;
+    fprintf(stream, "%s", text);
+}
+
+int main() {
+    CBoxliteRuntime* runtime = NULL;
+    CBoxHandle* box = NULL;
+    CBoxliteError error = {0};
+
+    // Create runtime
+    if (boxlite_runtime_new(NULL, NULL, &runtime, &error) != Ok) {
+        fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+        boxlite_error_free(&error);
+        return 1;
+    }
+
+    // Create box with JSON configuration
+    const char* options = "{"
+        "\"rootfs\":{\"Image\":\"alpine:3.19\"},"
+        "\"env\":[],\"volumes\":[],\"network\":\"Isolated\",\"ports\":[]"
+    "}";
+
+    if (boxlite_create_box(runtime, options, &box, &error) != Ok) {
+        fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+        boxlite_error_free(&error);
+        boxlite_runtime_free(runtime);
+        return 1;
+    }
+
+    // Execute command with streaming output
+    int exit_code = 0;
+    const char* args = "[\"-la\", \"/\"]";
+
+    if (boxlite_execute(box, "/bin/ls", args, output_callback, NULL, &exit_code, &error) == Ok) {
+        printf("\nExit code: %d\n", exit_code);
+    } else {
+        fprintf(stderr, "Error: %s\n", error.message);
+        boxlite_error_free(&error);
+    }
+
+    // Cleanup
+    boxlite_runtime_free(runtime);
+    return 0;
+}
+```
+
+## Migration from v0.1.x
+
+### Error Handling Change
+
+**v0.1.x (old):**
+
+```c
+char* error = NULL;
+CBoxliteRuntime* runtime = boxlite_runtime_new(NULL, NULL, &error);
+if (!runtime) {
+    fprintf(stderr, "Error: %s\n", error);
+    boxlite_free_string(error);
+    return 1;
+}
+```
+
+**v0.2.0 (new):**
+
+```c
+CBoxliteRuntime* runtime = NULL;
+CBoxliteError error = {0};
+BoxliteErrorCode code = boxlite_runtime_new(NULL, NULL, &runtime, &error);
+if (code != Ok) {
+    fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+    boxlite_error_free(&error);
+    return 1;
+}
+```
+
+### Execute Change
+
+**v0.1.x:**
+
+```c
+int exit_code = boxlite_execute(box, "echo", "[\"hello\"]", callback, NULL, &error);
+if (exit_code < 0) {
+    // Error
+}
+```
+
+**v0.2.0:**
+
+```c
+int exit_code = 0;
+BoxliteErrorCode code = boxlite_execute(box, "echo", "[\"hello\"]", callback, NULL, &exit_code, &error);
+if (code != Ok) {
+    // Error
+}
+```
+
+### Migration Checklist
+
+- Replace `char* error = NULL` with `CBoxliteError error = {0}`
+- Initialize output pointers to NULL (e.g., `CBoxliteRuntime* runtime = NULL`)
+- Update all function calls to use output parameters
+- Replace return value checks with `BoxliteErrorCode` checks
+- Replace `boxlite_free_string(error)` with `boxlite_error_free(&error)`
+- Update JSON options to include all required fields

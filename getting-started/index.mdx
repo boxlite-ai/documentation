@@ -1,0 +1,180 @@
+---
+title: "Getting Started"
+description: "Get up and running with BoxLite in 5 minutes."
+icon: "rocket"
+---
+
+<Snippet file="prerequisites.mdx" />
+
+## System Requirements
+
+BoxLite requires a platform with hardware virtualization support:
+
+| Platform       | Architecture  | Requirements                        |
+|----------------|---------------|-------------------------------------|
+| macOS          | Apple Silicon | macOS 12+ (Monterey or later)       |
+| Linux          | x86_64        | KVM enabled (`/dev/kvm` accessible) |
+| Linux          | ARM64         | KVM enabled (`/dev/kvm` accessible) |
+| Windows (WSL2) | x86_64        | WSL2 with KVM support               |
+
+<Warning>
+  macOS Intel (x86_64) is **not supported** due to Hypervisor.framework stability issues.
+</Warning>
+
+## Verify Virtualization Support
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # Check macOS version (should be 12+)
+    sw_vers
+
+    # Check architecture (should be arm64)
+    uname -m
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    # Check if CPU supports virtualization (should show vmx or svm)
+    grep -E 'vmx|svm' /proc/cpuinfo
+
+    # Check if KVM is available (should exist and be accessible)
+    ls -l /dev/kvm
+
+    # If /dev/kvm doesn't exist, load KVM module
+    sudo modprobe kvm
+    sudo modprobe kvm_intel  # For Intel CPUs
+    sudo modprobe kvm_amd    # For AMD CPUs
+
+    # Add user to kvm group (may require logout/login)
+    sudo usermod -aG kvm $USER
+    ```
+  </Tab>
+  <Tab title="Windows (WSL2)">
+    ```bash
+    # Verify you're running WSL2 (should show "2")
+    wsl.exe -l -v
+
+    # Check if KVM is available
+    ls -l /dev/kvm
+
+    # Add user to kvm group
+    sudo usermod -aG kvm $USER
+
+    # Apply the new group membership (pick one):
+    newgrp kvm
+    # OR restart WSL from Windows PowerShell:
+    # wsl.exe --shutdown
+
+    # Verify group membership
+    id -nG | tr ' ' '\n' | grep -x kvm
+
+    # Verify KVM access
+    python3 -c "open('/dev/kvm','rb').close(); print('kvm ok')"
+    ```
+
+    <Note>
+      If you see "Timeout waiting for guest ready (30s)" errors, it's likely a KVM permission issue. Ensure your user is in the `kvm` group and restart WSL with `wsl.exe --shutdown`.
+    </Note>
+  </Tab>
+</Tabs>
+
+## No Daemon Required
+
+Unlike Docker, BoxLite doesn't require a daemon process. It's an embeddable library that runs directly in your application.
+
+## Choose Your SDK
+
+<CardGroup cols={2}>
+  <Card title="Python" icon="python" href="/getting-started/quickstart-python">
+    **Stable (v0.4.4)** -- AI agents, scripting, rapid prototyping
+  </Card>
+  <Card title="Node.js" icon="node-js" href="/getting-started/quickstart-nodejs">
+    **v0.1.6** -- Web services, TypeScript projects
+  </Card>
+  <Card title="Rust" icon="gear" href="/getting-started/quickstart-rust">
+    **Native** -- Performance-critical, embedded systems
+  </Card>
+  <Card title="C" icon="c" href="/getting-started/quickstart-c">
+    **v0.2.0** -- C/C++ applications, system integration
+  </Card>
+</CardGroup>
+
+| SDK | Status | Best For |
+|-----|--------|----------|
+| [Python](/getting-started/quickstart-python) | Stable (v0.4.4) | AI agents, scripting, rapid prototyping |
+| [Node.js](/getting-started/quickstart-nodejs) | v0.1.6 | Web services, TypeScript projects |
+| [Rust](/getting-started/quickstart-rust) | Native | Performance-critical, embedded systems |
+| [C](/getting-started/quickstart-c) | v0.2.0 | C/C++ applications, system integration |
+| Go | Coming soon | -- |
+
+## Next Steps
+
+### Learn More
+
+- **[Architecture](/architecture/index)** - How BoxLite works under the hood
+- **[How-to Guides](/guides/index)** - Practical usage guides
+- **[Reference](/reference/index)** - Complete API documentation
+- **[FAQ](/faq)** - Common questions and answers
+
+### Get Help
+
+- **[GitHub Issues](https://github.com/boxlite-labs/boxlite/issues)** - Bug reports and feature requests
+- **[GitHub Discussions](https://github.com/boxlite-labs/boxlite/discussions)** - Questions and community support
+
+## Troubleshooting
+
+### Installation Issues
+
+**Problem:** `pip install boxlite` fails
+
+**Solutions:**
+- Verify Python 3.10+: `python --version`
+- Update pip: `pip install --upgrade pip`
+- Check platform support (macOS ARM64, Linux x86_64/ARM64 only)
+
+### Runtime Issues
+
+**Problem:** "KVM not available" error on Linux
+
+**Solutions:**
+
+```bash
+# Check KVM module
+lsmod | grep kvm
+
+# Load KVM module
+sudo modprobe kvm kvm_intel  # or kvm_amd
+
+# Check /dev/kvm permissions
+ls -l /dev/kvm
+sudo chmod 666 /dev/kvm  # or add user to kvm group
+```
+
+**Problem:** Box fails to start
+
+**Solutions:**
+- Check disk space: `df -h ~/.boxlite`
+- Enable debug logging: `RUST_LOG=debug python script.py`
+- Verify image name: Try `docker pull <image>` to test
+- Check hypervisor: Ensure KVM (Linux) or Hypervisor.framework (macOS) is available
+
+### Performance Issues
+
+**Problem:** Box is slow
+
+**Solutions:**
+
+```python
+# Increase resource limits
+boxlite.BoxOptions(
+    cpus=4,          # More CPUs
+    memory_mib=4096, # More memory
+)
+
+# Check metrics
+metrics = await box.metrics()
+print(f"Memory: {metrics.memory_usage_bytes / (1024**2):.2f} MB")
+```
+
+For more troubleshooting help, see [FAQ & Troubleshooting](/faq).

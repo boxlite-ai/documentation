@@ -1,0 +1,316 @@
+---
+title: "Memory, JSON & Threading"
+description: "C SDK memory management, JSON utilities, and threading"
+icon: "microchip"
+---
+
+## Memory Management
+
+### Rules
+
+1. **All allocated strings must be freed**
+   - `boxlite_box_id()` -> `boxlite_free_string()`
+   - `boxlite_list_info()` -> `boxlite_free_string()`
+   - Info/metrics JSON -> `boxlite_free_string()`
+
+2. **Error structs must be freed**
+   - `CBoxliteError` -> `boxlite_error_free()`
+
+3. **Results must be freed**
+   - `CBoxliteExecResult` -> `boxlite_result_free()`
+
+4. **All cleanup functions are NULL-safe**
+
+### Functions
+
+#### boxlite_free_string
+
+Free a string allocated by BoxLite.
+
+```c
+void boxlite_free_string(char* str);
+```
+
+<Note>
+  Use this for any string returned by BoxLite API functions such as `boxlite_box_id()`, `boxlite_list_info()`, `boxlite_get_info()`, `boxlite_box_info()`, `boxlite_runtime_metrics()`, and `boxlite_box_metrics()`. Safe to call with NULL.
+</Note>
+
+#### boxlite_error_free
+
+Free error struct (message only - struct itself is stack-allocated).
+
+```c
+void boxlite_error_free(CBoxliteError* error);
+```
+
+Safe to call with NULL.
+
+#### boxlite_result_free
+
+Free an execution result.
+
+```c
+void boxlite_result_free(CBoxliteExecResult* result);
+```
+
+Safe to call with NULL.
+
+#### boxlite_simple_free
+
+Free a simple box (auto-stops and removes).
+
+```c
+void boxlite_simple_free(CBoxliteSimple* box);
+```
+
+Safe to call with NULL.
+
+#### boxlite_runtime_free
+
+Free a runtime instance.
+
+```c
+void boxlite_runtime_free(CBoxliteRuntime* runtime);
+```
+
+Safe to call with NULL. Automatically frees all boxes.
+
+### Memory Ownership Summary
+
+| Returned By | Free With |
+|-------------|-----------|
+| `boxlite_box_id()` | `boxlite_free_string()` |
+| `boxlite_list_info()` (out_json) | `boxlite_free_string()` |
+| `boxlite_get_info()` (out_json) | `boxlite_free_string()` |
+| `boxlite_box_info()` (out_json) | `boxlite_free_string()` |
+| `boxlite_runtime_metrics()` (out_json) | `boxlite_free_string()` |
+| `boxlite_box_metrics()` (out_json) | `boxlite_free_string()` |
+| `boxlite_simple_run()` (out_result) | `boxlite_result_free()` |
+| `CBoxliteError` (from any function) | `boxlite_error_free()` |
+| `boxlite_version()` | Do **not** free (static string) |
+
+## JSON Schema Reference
+
+### BoxOptions Schema
+
+```json
+{
+  "rootfs": {"Image": "alpine:3.19"},
+  "cpus": 2,
+  "memory_mib": 512,
+  "disk_size_gb": 10,
+  "working_dir": "/workspace",
+  "env": [["KEY", "value"], ["ANOTHER", "value"]],
+  "volumes": [
+    {
+      "host_path": "/host/data",
+      "guest_path": "/data",
+      "readonly": false
+    }
+  ],
+  "network": "Isolated",
+  "ports": [
+    {
+      "host_port": 8080,
+      "guest_port": 80,
+      "protocol": "Tcp"
+    }
+  ],
+  "auto_remove": true
+}
+```
+
+### Required Fields
+
+All BoxOptions JSON **must include** these fields:
+
+```json
+{
+  "rootfs": {"Image": "..."},
+  "env": [],
+  "volumes": [],
+  "network": "Isolated",
+  "ports": []
+}
+```
+
+<Warning>
+  Omitting any of the required fields will result in a JSON parsing error. Always include `rootfs`, `env`, `volumes`, `network`, and `ports` even if they are empty.
+</Warning>
+
+### Field Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `rootfs` | object | Required | Root filesystem source |
+| `cpus` | integer | 2 | Number of CPUs |
+| `memory_mib` | integer | 512 | Memory in MiB |
+| `disk_size_gb` | integer | null | Disk size in GB |
+| `working_dir` | string | null | Working directory |
+| `env` | array | Required | Environment variables as `[key, value]` pairs |
+| `volumes` | array | Required | Volume mounts |
+| `network` | string | Required | Network mode: `"Isolated"` |
+| `ports` | array | Required | Port mappings |
+| `auto_remove` | boolean | true | Remove box when stopped |
+
+### RootfsSpec
+
+```json
+{"Image": "python:3.11-slim"}
+```
+
+or
+
+```json
+{"RootfsPath": "/path/to/rootfs"}
+```
+
+### VolumeSpec
+
+```json
+{
+  "host_path": "/absolute/path/on/host",
+  "guest_path": "/path/in/guest",
+  "readonly": false
+}
+```
+
+### PortSpec
+
+```json
+{
+  "host_port": 8080,
+  "guest_port": 80,
+  "protocol": "Tcp"
+}
+```
+
+### Building JSON in C
+
+Since C has no native JSON support, here are common approaches for constructing BoxOptions JSON:
+
+#### String Concatenation
+
+```c
+const char* options = "{"
+    "\"rootfs\":{\"Image\":\"alpine:3.19\"},"
+    "\"env\":[],"
+    "\"volumes\":[],"
+    "\"network\":\"Isolated\","
+    "\"ports\":[]"
+"}";
+```
+
+#### Using snprintf for Dynamic Values
+
+```c
+char options[1024];
+snprintf(options, sizeof(options),
+    "{"
+    "\"rootfs\":{\"Image\":\"%s\"},"
+    "\"cpus\":%d,"
+    "\"memory_mib\":%d,"
+    "\"env\":[],"
+    "\"volumes\":[],"
+    "\"network\":\"Isolated\","
+    "\"ports\":[]"
+    "}",
+    image_name, num_cpus, memory_mib
+);
+```
+
+#### With Environment Variables
+
+```c
+char options[2048];
+snprintf(options, sizeof(options),
+    "{"
+    "\"rootfs\":{\"Image\":\"python:3.11-slim\"},"
+    "\"env\":[[\"API_KEY\",\"%s\"],[\"DEBUG\",\"1\"]],"
+    "\"volumes\":[],"
+    "\"network\":\"Isolated\","
+    "\"ports\":[]"
+    "}",
+    api_key
+);
+```
+
+#### With Volumes and Ports
+
+```c
+const char* options = "{"
+    "\"rootfs\":{\"Image\":\"nginx:alpine\"},"
+    "\"env\":[],"
+    "\"volumes\":[{\"host_path\":\"/var/www\",\"guest_path\":\"/usr/share/nginx/html\",\"readonly\":true}],"
+    "\"network\":\"Isolated\","
+    "\"ports\":[{\"host_port\":8080,\"guest_port\":80,\"protocol\":\"Tcp\"}]"
+"}";
+```
+
+## Thread Safety
+
+| Component | Thread Safety |
+|-----------|---------------|
+| `CBoxliteRuntime` | Thread-safe |
+| `CBoxHandle` | **NOT** thread-safe - do not share across threads |
+| `CBoxliteSimple` | **NOT** thread-safe - do not share across threads |
+| Callbacks | Invoked on the calling thread |
+
+<Tip>
+  The safe pattern is: share a single `CBoxliteRuntime` across threads, but have each thread create and manage its own box handles.
+</Tip>
+
+### Safe Multi-threaded Usage
+
+```c
+// CORRECT: Share runtime, create per-thread boxes
+void* thread_func(void* arg) {
+    CBoxliteRuntime* runtime = (CBoxliteRuntime*)arg;
+    CBoxliteError error = {0};
+    CBoxHandle* box = NULL;
+
+    const char* options = "{"
+        "\"rootfs\":{\"Image\":\"alpine:3.19\"},"
+        "\"env\":[],\"volumes\":[],\"network\":\"Isolated\",\"ports\":[]"
+    "}";
+
+    // Each thread creates its own box
+    boxlite_create_box(runtime, options, &box, &error);
+    // Use box in this thread only
+    boxlite_stop_box(box, &error);
+    return NULL;
+}
+
+CBoxliteRuntime* runtime;
+CBoxliteError error = {0};
+boxlite_runtime_new(NULL, NULL, &runtime, &error);
+
+pthread_t threads[4];
+for (int i = 0; i < 4; i++) {
+    pthread_create(&threads[i], NULL, thread_func, runtime);
+}
+
+for (int i = 0; i < 4; i++) {
+    pthread_join(threads[i], NULL);
+}
+
+boxlite_runtime_free(runtime);
+```
+
+### Callback Threading
+
+Callbacks passed to `boxlite_execute` are always invoked on the calling thread. This means:
+
+- You do not need to synchronize within the callback itself
+- The callback blocks the execution until it returns
+- Heavy processing in callbacks will slow down command execution
+
+```c
+// Callback runs on the same thread that called boxlite_execute
+void output_handler(const char* text, int is_stderr, void* data) {
+    // Safe to access thread-local data
+    // Safe to write to thread-local buffers
+    FILE* stream = is_stderr ? stderr : stdout;
+    fprintf(stream, "%s", text);
+}
+```

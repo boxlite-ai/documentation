@@ -1,0 +1,205 @@
+---
+title: "Architecture Overview"
+description: "Understand BoxLite's embedded virtual machine runtime architecture, core design philosophy, and system layers."
+icon: "building"
+---
+
+## Overview
+
+BoxLite is an embeddable virtual machine runtime that follows the SQLite philosophy: a library that
+can be embedded directly into applications without requiring a daemon or external service.
+
+<Note>
+  Throughout this documentation, we use **"Box"** to refer to an isolated execution
+  environment (the underlying implementation uses a lightweight VM). A Box provides hardware-level
+  isolation while presenting a simple, container-like interface.
+</Note>
+
+## Core Design Philosophy
+
+BoxLite is built around several key principles:
+
+- **Embedded library model** -- no daemon or external service required, just link and use
+- **Hardware-level isolation** -- each Box runs in a lightweight VM for strong security boundaries
+- **Container-like interface** -- familiar OCI image and exec workflows despite VM-backed isolation
+- **Lazy initialization** -- heavy work (image pulling, Box startup) is deferred until first use
+- **Defense-in-depth security** -- OS-level sandboxing layered on top of hardware virtualization
+
+## High-Level Architecture
+
+The architecture spans multiple layers: host runtime, subprocess isolation, OS-level sandboxing, and guest VM execution.
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│                        Host Application                            │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                    BoxliteRuntime                            │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐      │  │
+│  │  │ BoxManager  │  │ImageManager │  │ RuntimeMetrics  │      │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────────┘      │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                        LiteBox                               │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐      │  │
+│  │  │  Lifecycle  │  │    Exec     │  │    Metrics      │      │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────────┘      │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                   ShimController                             │  │
+│  │        (Spawns shim with jailer isolation)                   │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+                               │
+                     Spawns subprocess
+                               │
+                               ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                      JAILER BOUNDARY (OS Sandbox)                  │
+│  ╔══════════════════════════════════════════════════════════════╗  │
+│  ║                      Shim Process (boxlite-shim)             ║  │
+│  ║  - Seccomp filtering (Linux)                                 ║  │
+│  ║  - Namespace isolation (Linux)                               ║  │
+│  ║  - sandbox-exec (macOS)                                      ║  │
+│  ║  - Resource limits (cgroups/rlimits)                         ║  │
+│  ╚══════════════════════════════════════════════════════════════╝  │
+│                              │                                      │
+│                   Unix Socket / Vsock                               │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                     Box (Guest VM)                           │  │
+│  │  ┌────────────────────────────────────────────────────────┐  │  │
+│  │  │                  Guest Agent                           │  │  │
+│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐     │  │  │
+│  │  │  │  Guest   │  │Container │  │   Execution      │     │  │  │
+│  │  │  │  Service │  │  Service │  │    Service       │     │  │  │
+│  │  │  └──────────┘  └──────────┘  └──────────────────┘     │  │  │
+│  │  └────────────────────────────────────────────────────────┘  │  │
+│  │                              │                                │  │
+│  │                              ▼                                │  │
+│  │  ┌────────────────────────────────────────────────────────┐  │  │
+│  │  │               OCI Container Runtime                    │  │  │
+│  │  └────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+## Concurrency Model
+
+### Thread Safety
+
+- `BoxliteRuntime`: `Send + Sync`, safely shareable across threads
+- `LiteBox`: `Send + Sync`, handles can be passed between threads
+- Single `RwLock` protects all mutable runtime state
+- Metrics use `AtomicU64` for lock-free updates
+
+### Single Lock Design
+
+BoxLite uses one `RwLock` for all mutable state:
+
+- Eliminates nested locking complexity
+- Simplifies reasoning about concurrency
+- Filesystem lock prevents multiple runtimes using same `BOXLITE_HOME`
+
+### Async Design
+
+- All I/O operations are async (Tokio runtime)
+- Streaming operations use `futures::Stream`
+- gRPC uses tonic's async support
+
+## Error Handling
+
+All public APIs return `BoxliteResult<T>` which is an alias for `Result<T, BoxliteError>`.
+
+```rust
+pub enum BoxliteError {
+    UnsupportedEngine,
+    Engine(String),
+    Storage(String),
+    Image(String),
+    Portal(String),
+    Network(String),
+    Rpc(String),
+    RpcTransport(String),
+    Internal(String),
+    Execution(String),
+}
+```
+
+## Directory Layout
+
+Default home directory: `~/.boxlite`
+
+```text
+~/.boxlite/
+├── boxes/              # Per-Box runtime data
+│   └── {box-id}/
+│       ├── rootfs/     # Container rootfs
+│       └── config.json
+├── images/             # OCI image cache
+│   ├── blobs/          # Image layer blobs (by digest)
+│   └── index.json      # Image index
+├── init/               # Shared init rootfs
+│   └── rootfs/
+├── logs/               # Runtime logs
+│   └── boxlite.log     # Daily rotating log
+└── boxlite.lock        # Runtime lock file (prevents multiple instances)
+```
+
+## SDK Architecture
+
+BoxLite provides language-specific SDKs built on the core Rust library.
+
+```text
+┌─────────────────────────────────────────┐
+│           Host Application              │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│     Language SDK (Python, Node, C)      │
+│         (Native bindings)               │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│         BoxLite Core (Rust)             │
+└─────────────────────────────────────────┘
+```
+
+| SDK         | Technology     | Status      | Location       |
+|-------------|----------------|-------------|----------------|
+| **Python**  | PyO3 + maturin | Available   | `sdks/python/` |
+| **Node.js** | napi-rs        | In Progress | `sdks/node/`   |
+| **C**       | FFI + cbindgen | Available   | `sdks/c/`      |
+
+## Shared Library
+
+The `boxlite-shared` crate contains data types, error definitions, and constants shared between the
+host runtime, the shim, and the guest agent.
+
+**Location:** `boxlite-shared/`
+
+**Key Components:**
+
+- `BoxliteError`: Centralized error type
+- `Constants`: Shared constants (e.g. socket paths, default ports)
+- `Transport`: gRPC transport utilities
+
+## Explore the Architecture
+
+<CardGroup cols={3}>
+  <Card title="Core Components" icon="puzzle-piece" href="/architecture/components">
+    Deep dive into BoxliteRuntime, LiteBox, ShimController, Jailer, Guest Agent, and the VMM abstraction layer.
+  </Card>
+  <Card title="Security & Isolation" icon="shield-halved" href="/architecture/security">
+    Understand the defense-in-depth security model, OS-level sandboxing, and platform-specific isolation mechanisms.
+  </Card>
+  <Card title="Networking & Storage" icon="network-wired" href="/architecture/networking-storage">
+    Learn about network backends, port forwarding, image management, rootfs assembly, and volume types.
+  </Card>
+</CardGroup>

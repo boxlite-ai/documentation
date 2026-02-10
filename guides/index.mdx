@@ -1,0 +1,55 @@
+---
+title: "Guides"
+description: "Practical how-to guides for building, configuring, and integrating BoxLite into your projects."
+icon: "book-open"
+---
+
+BoxLite's how-to guides cover everything from building the project from source to integrating sandboxed execution into AI agent workflows. Each guide is self-contained and can be read independently.
+
+## All Guides
+
+<CardGroup cols={2}>
+  <Card
+    title="Building from Source"
+    icon="hammer"
+    href="/guides/building-from-source"
+  >
+    Clone the repository, install prerequisites, and build BoxLite for macOS or Linux using the provided Makefile targets and build scripts.
+  </Card>
+  <Card
+    title="Examples Gallery"
+    icon="images"
+    href="/guides/examples-gallery"
+  >
+    Browse nine comprehensive Python examples covering SimpleBox, CodeBox, BrowserBox, ComputerBox, lifecycle management, and more.
+  </Card>
+  <Card
+    title="AI Agent Integration"
+    icon="robot"
+    href="/guides/ai-agent-integration"
+  >
+    Best practices for using BoxLite as a sandboxed execution environment for AI agents — configuration, concurrency, timeouts, security, and file transfer.
+  </Card>
+  <Card
+    title="Image Registry Configuration"
+    icon="box-archive"
+    href="/guides/image-registry-configuration"
+  >
+    Configure BoxLite to pull OCI container images from custom registries, private enterprise registries, or local caching proxies.
+  </Card>
+  <Card
+    title="macOS Sandbox Debugging"
+    icon="apple"
+    href="/guides/macos-sandbox-debugging"
+  >
+    Debug macOS Seatbelt sandbox policy issues during development — real-time log monitoring, SBPL syntax, and common denial patterns.
+  </Card>
+</CardGroup>
+
+## Additional Topics
+
+The source README also covers networking, volume mounting, debugging, resource tuning, deployment patterns, and integration examples. These topics are woven into the guides above and the [Architecture](/architecture/index) and [SDK Reference](/reference/index) sections.
+
+<Tip>
+  New to BoxLite? Start with the [Getting Started](/getting-started/index) guide first, then come back here for deeper topics.
+</Tip>

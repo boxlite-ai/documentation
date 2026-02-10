@@ -1,0 +1,389 @@
+---
+title: "C SDK"
+description: "BoxLite C SDK reference - native bindings via FFI"
+icon: "c"
+---
+
+## Overview
+
+The C SDK provides C-compatible FFI bindings for integrating BoxLite into C/C++ applications.
+
+**Library**: `libboxlite`
+**Header**: `boxlite.h`
+**Version**: 0.2.0
+
+### API Styles
+
+The SDK provides two API styles:
+
+1. **Simple API** (`boxlite_simple_*`) - Convenience layer for common use cases
+   - No JSON required
+   - Auto-managed runtime
+   - Buffered command results
+
+2. **Native API** (`boxlite_*`) - Full-featured, flexible interface
+   - JSON configuration
+   - Streaming output callbacks
+   - Advanced features (volumes, networking, etc.)
+
+## Quick Start
+
+### Simple API (Recommended)
+
+```c
+#include <stdio.h>
+#include "boxlite.h"
+
+int main() {
+    CBoxliteSimple* box = NULL;
+    CBoxliteError error = {0};
+
+    // Create box (no JSON, auto-starts)
+    if (boxlite_simple_new("python:slim", 0, 0, &box, &error) != Ok) {
+        fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+        boxlite_error_free(&error);
+        return 1;
+    }
+
+    // Run command and get buffered result
+    const char* args[] = {"-c", "print('Hello from BoxLite!')", NULL};
+    CBoxliteExecResult* result = NULL;
+
+    if (boxlite_simple_run(box, "python", args, 2, &result, &error) == Ok) {
+        printf("Output: %s\n", result->stdout_text);
+        printf("Exit code: %d\n", result->exit_code);
+        boxlite_result_free(result);
+    }
+
+    boxlite_simple_free(box);  // Auto-cleanup
+    return 0;
+}
+```
+
+### Native API (Full Control)
+
+```c
+#include <stdio.h>
+#include "boxlite.h"
+
+void output_callback(const char* text, int is_stderr, void* user_data) {
+    FILE* stream = is_stderr ? stderr : stdout;
+    fprintf(stream, "%s", text);
+}
+
+int main() {
+    CBoxliteRuntime* runtime = NULL;
+    CBoxHandle* box = NULL;
+    CBoxliteError error = {0};
+
+    // Create runtime
+    if (boxlite_runtime_new(NULL, NULL, &runtime, &error) != Ok) {
+        fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+        boxlite_error_free(&error);
+        return 1;
+    }
+
+    // Create box with JSON configuration
+    const char* options = "{"
+        "\"rootfs\":{\"Image\":\"alpine:3.19\"},"
+        "\"env\":[],\"volumes\":[],\"network\":\"Isolated\",\"ports\":[]"
+    "}";
+
+    if (boxlite_create_box(runtime, options, &box, &error) != Ok) {
+        fprintf(stderr, "Error %d: %s\n", error.code, error.message);
+        boxlite_error_free(&error);
+        boxlite_runtime_free(runtime);
+        return 1;
+    }
+
+    // Execute command with streaming output
+    int exit_code = 0;
+    const char* args = "[\"-la\", \"/\"]";
+
+    if (boxlite_execute(box, "/bin/ls", args, output_callback, NULL, &exit_code, &error) == Ok) {
+        printf("\nExit code: %d\n", exit_code);
+    } else {
+        fprintf(stderr, "Error: %s\n", error.message);
+        boxlite_error_free(&error);
+    }
+
+    // Cleanup
+    boxlite_runtime_free(runtime);
+    return 0;
+}
+```
+
+### Building
+
+```bash
+# Compile with the BoxLite library
+gcc -I/path/to/boxlite/sdks/c/include \
+    -L/path/to/boxlite/target/release \
+    -lboxlite \
+    my_program.c -o my_program
+
+# macOS: Set library path
+export DYLD_LIBRARY_PATH=/path/to/boxlite/target/release:$DYLD_LIBRARY_PATH
+
+# Linux: Set library path
+export LD_LIBRARY_PATH=/path/to/boxlite/target/release:$LD_LIBRARY_PATH
+```
+
+## Runtime Functions
+
+### boxlite_version
+
+Get BoxLite version string.
+
+```c
+const char* boxlite_version(void);
+```
+
+Returns static string (do not free). Example: `"0.5.7"`.
+
+### boxlite_runtime_new
+
+Create a new runtime instance.
+
+```c
+BoxliteErrorCode boxlite_runtime_new(
+    const char* home_dir,
+    const char* registries_json,
+    CBoxliteRuntime** out_runtime,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `home_dir` | `const char*` | Path to BoxLite home. `NULL` = default (`~/.boxlite`) |
+| `registries_json` | `const char*` | JSON array of registries. `NULL` = `["docker.io"]` |
+| `out_runtime` | `CBoxliteRuntime**` | Output: runtime handle |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+#### Example
+
+```c
+CBoxliteRuntime* runtime = NULL;
+CBoxliteError error = {0};
+
+// Default configuration
+if (boxlite_runtime_new(NULL, NULL, &runtime, &error) != Ok) {
+    fprintf(stderr, "Error: %s\n", error.message);
+    boxlite_error_free(&error);
+    return 1;
+}
+
+// Custom registries
+const char* registries = "[\"ghcr.io\", \"docker.io\"]";
+if (boxlite_runtime_new("/var/lib/boxlite", registries, &runtime, &error) != Ok) {
+    // Handle error
+}
+```
+
+### boxlite_runtime_shutdown
+
+Gracefully stop all running boxes.
+
+```c
+BoxliteErrorCode boxlite_runtime_shutdown(
+    CBoxliteRuntime* runtime,
+    int timeout,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `runtime` | `CBoxliteRuntime*` | Runtime instance |
+| `timeout` | `int` | Seconds: 0=default(10), -1=infinite, >0=custom |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+### boxlite_runtime_free
+
+Free a runtime instance.
+
+```c
+void boxlite_runtime_free(CBoxliteRuntime* runtime);
+```
+
+Safe to call with NULL. Automatically frees all boxes.
+
+## Simple API
+
+The Simple API provides a streamlined interface for common use cases without JSON configuration.
+
+### boxlite_simple_new
+
+Create and auto-start a box with sensible defaults.
+
+```c
+BoxliteErrorCode boxlite_simple_new(
+    const char* image,
+    int cpus,
+    int memory_mib,
+    CBoxliteSimple** out_box,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `image` | `const char*` | OCI image reference (e.g., `"python:slim"`, `"alpine:3.19"`) |
+| `cpus` | `int` | Number of CPUs (0 = default: 2) |
+| `memory_mib` | `int` | Memory in MiB (0 = default: 512) |
+| `out_box` | `CBoxliteSimple**` | Output: created box handle |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+#### Returns
+
+`BoxliteErrorCode` - `Ok` on success, error code on failure.
+
+#### Example
+
+```c
+CBoxliteSimple* box = NULL;
+CBoxliteError error = {0};
+
+// Default resources
+if (boxlite_simple_new("alpine:3.19", 0, 0, &box, &error) != Ok) {
+    fprintf(stderr, "Error: %s\n", error.message);
+    boxlite_error_free(&error);
+    return 1;
+}
+
+// Custom resources
+if (boxlite_simple_new("python:slim", 4, 2048, &box, &error) != Ok) {
+    // Handle error
+}
+```
+
+### boxlite_simple_run
+
+Run a command and get buffered result.
+
+```c
+BoxliteErrorCode boxlite_simple_run(
+    CBoxliteSimple* box,
+    const char* command,
+    const char* const* args,
+    int argc,
+    CBoxliteExecResult** out_result,
+    CBoxliteError* out_error
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `box` | `CBoxliteSimple*` | Box handle from `boxlite_simple_new` |
+| `command` | `const char*` | Command to execute |
+| `args` | `const char* const*` | NULL-terminated array of arguments |
+| `argc` | `int` | Number of arguments (excluding NULL terminator) |
+| `out_result` | `CBoxliteExecResult**` | Output: execution result |
+| `out_error` | `CBoxliteError*` | Output: error information |
+
+#### Result Structure
+
+```c
+typedef struct CBoxliteExecResult {
+    int exit_code;       // Command exit code
+    char* stdout_text;   // Standard output
+    char* stderr_text;   // Standard error
+} CBoxliteExecResult;
+```
+
+#### Example
+
+```c
+const char* args[] = {"-c", "print('hello')", NULL};
+CBoxliteExecResult* result = NULL;
+
+if (boxlite_simple_run(box, "python", args, 2, &result, &error) == Ok) {
+    printf("stdout: %s\n", result->stdout_text);
+    printf("stderr: %s\n", result->stderr_text);
+    printf("exit: %d\n", result->exit_code);
+    boxlite_result_free(result);
+}
+```
+
+### boxlite_simple_free
+
+Free a simple box (auto-stops and removes).
+
+```c
+void boxlite_simple_free(CBoxliteSimple* box);
+```
+
+Safe to call with NULL.
+
+### boxlite_result_free
+
+Free an execution result.
+
+```c
+void boxlite_result_free(CBoxliteExecResult* result);
+```
+
+Safe to call with NULL.
+
+## Platform Requirements
+
+| Platform | Architecture | Status | Requirements |
+|----------|-------------|--------|--------------|
+| macOS | ARM64 (Apple Silicon) | Supported | macOS 11.0+, Hypervisor.framework |
+| macOS | x86_64 (Intel) | **Not supported** | N/A |
+| Linux | x86_64 | Supported | KVM enabled |
+| Linux | ARM64 (aarch64) | Supported | KVM enabled |
+| Windows | Any | Via WSL2 | WSL2 with KVM |
+
+## API Summary
+
+| Function | Description |
+|----------|-------------|
+| `boxlite_version()` | Get version string |
+| `boxlite_runtime_new()` | Create runtime |
+| `boxlite_runtime_shutdown()` | Graceful shutdown |
+| `boxlite_runtime_free()` | Free runtime |
+| `boxlite_runtime_metrics()` | Get runtime metrics |
+| `boxlite_create_box()` | Create box |
+| `boxlite_start_box()` | Start/restart box |
+| `boxlite_stop_box()` | Stop box |
+| `boxlite_remove()` | Remove box |
+| `boxlite_get()` | Reattach to box |
+| `boxlite_box_id()` | Get box ID |
+| `boxlite_box_info()` | Get box info |
+| `boxlite_box_metrics()` | Get box metrics |
+| `boxlite_execute()` | Execute command |
+| `boxlite_list_info()` | List all boxes |
+| `boxlite_get_info()` | Get box info by ID |
+| `boxlite_simple_new()` | Create simple box |
+| `boxlite_simple_run()` | Run command (simple) |
+| `boxlite_simple_free()` | Free simple box |
+| `boxlite_result_free()` | Free exec result |
+| `boxlite_free_string()` | Free string |
+| `boxlite_error_free()` | Free error |
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Native API" icon="code" href="/reference/c/native-api">
+    Box creation, command execution, and lifecycle functions for full control over BoxLite.
+  </Card>
+  <Card title="Memory, JSON & Threading" icon="microchip" href="/reference/c/memory-json-threading">
+    Memory management rules, JSON schema reference, and thread safety patterns.
+  </Card>
+  <Card title="Errors & Metrics" icon="chart-bar" href="/reference/c/errors-metrics">
+    Error codes, error handling patterns, and runtime/box metrics.
+  </Card>
+  <Card title="C Quick Start" icon="rocket" href="/getting-started/quickstart-c">
+    Get up and running with the C SDK in 5 minutes.
+  </Card>
+</CardGroup>

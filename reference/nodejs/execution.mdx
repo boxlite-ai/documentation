@@ -1,0 +1,189 @@
+---
+title: "Execution"
+description: "Node.js SDK command execution reference"
+icon: "play"
+---
+
+This page covers command execution in BoxLite -- the `JsExecution` handle, stdin/stdout/stderr streams, and the `ExecResult` wrapper type.
+
+---
+
+## JsExecution
+
+Handle for a running command. Returned by `JsBox.exec()`.
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `id()` | `() => Promise<string>` | Get execution ID |
+| `stdin()` | `() => Promise<JsExecStdin>` | Get stdin writer |
+| `stdout()` | `() => Promise<JsExecStdout>` | Get stdout reader |
+| `stderr()` | `() => Promise<JsExecStderr>` | Get stderr reader |
+| `wait()` | `() => Promise<JsExecResult>` | Wait for completion |
+| `kill()` | `() => Promise<void>` | Send SIGKILL |
+
+### Example
+
+```typescript
+const execution = await box.exec('ls', ['-la', '/']);
+
+// Read stdout
+const stdout = await execution.stdout();
+while (true) {
+  const line = await stdout.next();
+  if (line === null) break;
+  console.log(line);
+}
+
+// Wait for completion
+const result = await execution.wait();
+console.log(`Exit code: ${result.exitCode}`);
+```
+
+---
+
+## Streams
+
+### `JsExecStdin`
+
+Writer for sending input to a running process.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `write()` | `(data: Buffer) => Promise<void>` | Write bytes |
+| `writeString()` | `(text: string) => Promise<void>` | Write UTF-8 string |
+
+```typescript
+const stdin = await execution.stdin();
+await stdin.writeString('Hello, World!\n');
+await stdin.write(Buffer.from([10])); // newline
+```
+
+---
+
+### `JsExecStdout` / `JsExecStderr`
+
+Readers for streaming output.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `next()` | `() => Promise<string \| null>` | Read next line (null = EOF) |
+
+<Warning>
+  Each stream can only be consumed once. After iterating to EOF, subsequent calls return `null`.
+</Warning>
+
+```typescript
+const stdout = await execution.stdout();
+while (true) {
+  const line = await stdout.next();
+  if (line === null) break;
+  console.log(line);
+}
+```
+
+#### Reading stderr
+
+```typescript
+const stderr = await execution.stderr();
+while (true) {
+  const line = await stderr.next();
+  if (line === null) break;
+  console.error(line);
+}
+```
+
+---
+
+## JsExecResult
+
+Result of a completed execution. Returned by `JsExecution.wait()`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `exitCode` | `number` | Process exit code (0 = success) |
+
+```typescript
+const execution = await box.exec('grep', ['-r', 'TODO', '/src']);
+const result = await execution.wait();
+
+if (result.exitCode === 0) {
+  console.log('Pattern found');
+} else {
+  console.log('Pattern not found or error');
+}
+```
+
+---
+
+## ExecResult (wrapper)
+
+Higher-level result type returned by `SimpleBox.exec()`. This wraps the low-level `JsExecResult` with captured stdout and stderr.
+
+```typescript
+interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+```
+
+### Example
+
+```typescript
+import { SimpleBox } from 'boxlite';
+
+await using box = new SimpleBox({ image: 'alpine:latest' });
+
+const result = await box.exec('echo', 'Hello, World!');
+console.log(result.exitCode);  // 0
+console.log(result.stdout);    // "Hello, World!\n"
+console.log(result.stderr);    // ""
+```
+
+### Handling non-zero exit codes
+
+```typescript
+const result = await box.exec('ls', '/nonexistent');
+if (result.exitCode !== 0) {
+  console.error(`Command failed (exit ${result.exitCode}): ${result.stderr}`);
+}
+```
+
+---
+
+## Full Execution Lifecycle
+
+Here is a complete example showing the full lifecycle of a command execution using the low-level API:
+
+```typescript
+import { JsBoxlite } from 'boxlite';
+
+const runtime = JsBoxlite.withDefaultConfig();
+const box = await runtime.create({ image: 'alpine:latest' }, 'exec-demo');
+
+try {
+  // Start execution
+  const execution = await box.exec('cat', []);
+
+  // Write to stdin
+  const stdin = await execution.stdin();
+  await stdin.writeString('line 1\n');
+  await stdin.writeString('line 2\n');
+
+  // Read stdout in parallel
+  const stdout = await execution.stdout();
+  const lines: string[] = [];
+
+  // Kill the process after writing
+  await execution.kill();
+
+  // Wait for result
+  const result = await execution.wait();
+  console.log(`Exit code: ${result.exitCode}`);
+} finally {
+  await box.stop();
+  await runtime.remove('exec-demo');
+}
+```

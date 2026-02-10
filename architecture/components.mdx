@@ -1,0 +1,289 @@
+---
+title: "Core Components"
+description: "Detailed breakdown of BoxLite's core components including the runtime, Box handles, shim controller, guest agent, and VMM abstraction."
+icon: "puzzle-piece"
+---
+
+## BoxliteRuntime
+
+The main entry point for creating and managing Boxes. Holds all runtime state protected by a single
+`RwLock`.
+
+**Source:** `boxlite/src/runtime/`
+
+**Key responsibilities:**
+
+- Box lifecycle management (create, list, get, remove)
+- Image management (pull, cache)
+- Runtime-wide metrics collection
+- Filesystem layout management
+
+**State architecture:**
+
+```text
+RuntimeInnerImpl
+├── sync_state (RwLock)
+│   ├── BoxManager      # Tracks all Boxes and their states (Source: boxlite/src/management/box_manager.rs)
+│   └── ImageManager    # OCI image cache and management (Source: boxlite/src/management/image_manager.rs)
+└── non_sync_state (immutable)
+    ├── FilesystemLayout  # Directory structure (~/.boxlite)
+    ├── InitRootfs        # Shared init rootfs for guests
+    └── RuntimeMetrics    # Atomic counters (lock-free)
+```
+
+## LiteBox
+
+Individual Box handle providing execution capabilities. Supports lazy initialization -- heavy work (
+image pulling, Box startup) is deferred until first use.
+
+**Source:** `boxlite/src/litebox/`
+
+**Key responsibilities:**
+
+- Command execution (`exec`)
+- Metrics collection
+- Graceful shutdown
+
+**Lazy initialization flow:**
+
+<Steps>
+  <Step title="Create handle">
+    `runtime.create()` returns immediately with a handle
+  </Step>
+  <Step title="First API call triggers initialization">
+    First API call triggers the initialization pipeline
+  </Step>
+  <Step title="Pipeline executes">
+    Pipeline: image pull -> rootfs prep -> Box spawn -> guest ready
+  </Step>
+</Steps>
+
+## ShimController
+
+Universal subprocess-based Box controller. Spawns `boxlite-shim` binary in a subprocess to isolate
+Box process takeover from the host application.
+
+**Source:** `boxlite/src/vmm/controller/shim.rs`, `boxlite/src/bin/shim.rs`
+
+**Why subprocess isolation:**
+
+- libkrun performs process takeover (`krun_start_enter` never returns)
+- Subprocess ensures host application continues running
+- Clean process tree management
+- Enables jailer to sandbox the shim process
+
+## Portal (Host-Guest Communication)
+
+gRPC-based communication layer between host and guest.
+
+**Components:**
+
+- `GuestSession`: High-level facade for service interfaces
+- `Connection`: Lazy gRPC channel management
+- Service interfaces: `GuestInterface`, `ContainerInterface`, `ExecutionInterface`
+
+### Transport Flow
+
+```text
+Host Application
+      │
+      │ Unix Socket (/tmp/boxlite-{id}.sock)
+      ▼
+┌─────────────────┐
+│  libkrun vsock  │  (Unix socket ↔ vsock bridge)
+│     bridge      │
+└─────────────────┘
+      │
+      │ Vsock (port 2695)
+      ▼
+Guest Agent (gRPC Server)
+```
+
+### Protocol Definition
+
+Defined in `boxlite-shared/proto/boxlite/v1/service.proto`:
+
+```protobuf
+service Guest {
+  rpc Init(GuestInitRequest) returns (GuestInitResponse);
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}
+
+service Container {
+  rpc Init(ContainerInitRequest) returns (ContainerInitResponse);
+}
+
+service Execution {
+  rpc Exec(ExecRequest) returns (ExecResponse);
+  rpc Attach(AttachRequest) returns (stream ExecOutput);
+  rpc SendInput(stream ExecStdin) returns (SendInputAck);
+  rpc Wait(WaitRequest) returns (WaitResponse);
+  rpc Kill(KillRequest) returns (KillResponse);
+  rpc ResizeTty(ResizeTtyRequest) returns (ResizeTtyResponse);
+}
+```
+
+### Initialization Sequence
+
+```text
+Host                              Guest (Box)
+  │                                 │
+  │──── spawn Box subprocess ──────▶│
+  │                                 │
+  │◀─── ready notification ─────────│ (vsock connect to port 2696)
+  │                                 │
+  │──── Guest.Init ────────────────▶│ (mounts, rootfs, network)
+  │◀─── GuestInitResponse ──────────│
+  │                                 │
+  │──── Container.Init ────────────▶│ (OCI container setup)
+  │◀─── ContainerInitResponse ──────│
+  │                                 │
+  │──── Execution.Exec ────────────▶│ (run commands)
+  │◀─── streaming stdout/stderr ────│
+  │                                 │
+```
+
+## Guest Agent
+
+Runs inside the Box, receives commands from host via gRPC.
+
+**Source:** `guest/` (crate: `boxlite-guest`)
+
+**Services:**
+
+- `Guest`: Environment initialization (mounts, rootfs, network)
+- `Container`: OCI container lifecycle management (via libcontainer)
+- `Execution`: Command execution with streaming I/O
+
+**Guest-side modules:**
+
+- `container/`: OCI container lifecycle using libcontainer
+- `storage/`: Filesystem mounts and overlayfs management
+- `network.rs`: Virtual NIC configuration and DHCP
+
+## VMM Abstraction
+
+BoxLite uses a pluggable VMM (Virtual Machine Monitor) architecture for Box execution.
+
+**Location:** `boxlite/src/vmm/`
+
+### VMM Trait
+
+```rust
+pub trait Vmm {
+    fn create(&mut self, config: InstanceSpec) -> BoxliteResult<VmmInstance>;
+}
+```
+
+### VmmInstance
+
+Represents a configured Box ready to execute:
+
+```rust
+pub struct VmmInstance {
+    inner: Box<dyn VmmInstanceImpl>,
+}
+
+impl VmmInstance {
+    /// Transfer control to the Box (may never return)
+    pub fn enter(self) -> BoxliteResult<()>;
+}
+```
+
+### libkrun (Krun VMM)
+
+Current production VMM implementation using libkrun hypervisor.
+
+**Features:**
+
+- Hardware virtualization (macOS Hypervisor.framework, Linux KVM)
+- virtio-fs for filesystem sharing
+- virtio-blk for disk images
+- vsock for host-guest communication
+- Process takeover model (`krun_start_enter`)
+
+**Configuration flow:**
+
+<Steps>
+  <Step title="Create context">
+    Create libkrun context
+  </Step>
+  <Step title="Set resources">
+    Set Box resources (CPUs, memory)
+  </Step>
+  <Step title="Configure network">
+    Configure network (TSI or gvproxy)
+  </Step>
+  <Step title="Mount shares">
+    Mount virtiofs shares
+  </Step>
+  <Step title="Attach disks">
+    Attach disk images
+  </Step>
+  <Step title="Configure vsock">
+    Configure vsock ports
+  </Step>
+  <Step title="Set entrypoint">
+    Set guest entrypoint
+  </Step>
+  <Step title="Return instance">
+    Return `VmmInstance`
+  </Step>
+</Steps>
+
+### Adding New VMM Implementations
+
+To add a new VMM implementation:
+
+<Steps>
+  <Step title="Implement Vmm trait">
+    Implement the `Vmm` trait for your new backend
+  </Step>
+  <Step title="Implement VmmInstanceImpl">
+    Implement `VmmInstanceImpl` for the instance type
+  </Step>
+  <Step title="Register in factory">
+    Register in `VmmFactory`
+  </Step>
+  <Step title="Add variant">
+    Add a `VmmKind` variant
+  </Step>
+</Steps>
+
+## Metrics System
+
+BoxLite provides comprehensive metrics at runtime and per-Box levels.
+
+**Location:** `boxlite/src/metrics/`
+
+### Architecture
+
+```text
+┌─────────────────────────────────────────┐
+│            RuntimeMetrics               │
+│  ┌─────────────────────────────────┐   │
+│  │  AtomicU64 counters (lock-free) │   │
+│  │  - boxes_created                │   │
+│  │  - boxes_destroyed              │   │
+│  │  - total_exec_calls             │   │
+│  │  - total_bytes_transferred      │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────┐
+│            BoxMetrics (per-Box)         │
+│  - cpu_time_ms                          │
+│  - memory_usage_bytes                   │
+│  - exec_count                           │
+│  - network_bytes_sent                   │
+│  - network_bytes_received               │
+└─────────────────────────────────────────┘
+```
+
+### Design Principles
+
+- **Lock-free**: Uses `AtomicU64` for concurrent updates without synchronization
+- **Low overhead**: Metrics collection does not impact Box performance
+- **Hierarchical**: Runtime-wide aggregates plus per-Box details

@@ -1,0 +1,146 @@
+---
+title: "Security & Isolation"
+description: "BoxLite's defense-in-depth security model, OS-level sandboxing, syscall filtering, and platform-specific isolation mechanisms."
+icon: "shield-halved"
+---
+
+## Jailer (Security Isolation)
+
+The Jailer is a defense-in-depth security layer that sandboxes the shim process, inspired by
+Firecracker's jailer. It provides OS-level isolation on top of hardware virtualization.
+
+**Source:** `boxlite/src/jailer/`
+
+**Key responsibilities:**
+
+- OS-level process isolation for shim
+- Syscall filtering and sandboxing
+- Resource limit enforcement
+- Environment sanitization
+
+## Security Layers Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                              HOST OS                                │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                      JAILER BOUNDARY                          │  │
+│  │  ┌─────────────────────────────────────────────────────────┐  │  │
+│  │  │                  SHIM PROCESS (sandboxed)               │  │  │
+│  │  │  ┌───────────────────────────────────────────────────┐  │  │  │
+│  │  │  │              VM (libkrun/KVM)                     │  │  │  │
+│  │  │  │  ┌─────────────────────────────────────────────┐  │  │  │  │
+│  │  │  │  │            GUEST (untrusted)                │  │  │  │  │
+│  │  │  │  └─────────────────────────────────────────────┘  │  │  │  │
+│  │  │  └───────────────────────────────────────────────────┘  │  │  │
+│  │  └─────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Each layer provides independent protection. Even if the guest VM is compromised, the jailer boundary
+constrains what the shim process can do on the host.
+
+## Platform-Specific Isolation
+
+<Tabs>
+  <Tab title="Linux">
+    Linux provides the most comprehensive set of isolation primitives:
+
+    ### Namespace Isolation
+
+    - **Mount namespace**: Isolates filesystem mount points so the shim sees only its own mounts
+    - **PID namespace**: Isolates the process ID space; the shim cannot see host processes
+    - **Network namespace**: Isolates network interfaces and routing tables
+
+    ### Filesystem Isolation
+
+    - **Chroot/pivot_root**: Restricts the shim's view of the filesystem to a minimal directory tree
+    - Prevents access to host files outside the Box's working directory
+
+    ### Syscall Filtering
+
+    - **Seccomp BPF**: Berkeley Packet Filter programs that restrict which system calls the shim process can make
+    - Only the minimum required syscalls are permitted
+    - Unauthorized syscalls cause the process to be killed immediately
+
+    ### Privilege Dropping
+
+    - The shim process drops to an unprivileged user after setup
+    - Prevents privilege escalation even if a vulnerability is exploited
+
+    ### Resource Limits
+
+    - **cgroups v2**: Enforces CPU, memory, and I/O limits on the shim process
+    - Prevents a single Box from consuming all host resources
+  </Tab>
+  <Tab title="macOS">
+    macOS uses Apple's built-in sandboxing framework:
+
+    ### sandbox-exec (Seatbelt)
+
+    - Kernel-enforced sandboxing via Apple's Seatbelt framework
+    - Declarative sandbox profiles define allowed operations
+    - The kernel denies any operation not explicitly permitted in the profile
+
+    ### Resource Constraints
+
+    - **rlimits**: POSIX resource limits constrain the shim process
+    - Limits on open file descriptors, memory usage, and CPU time
+
+    <Info>
+      For detailed guidance on debugging macOS sandbox issues, see the
+      [macOS Sandbox Debugging](/guides/macos-sandbox-debugging) guide.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Security Configuration
+
+```rust
+use boxlite::SecurityOptions;
+
+// Maximum security (recommended for untrusted workloads)
+let security = SecurityOptions::maximum();
+
+// Custom configuration
+let security = SecurityOptions {
+    jailer_enabled: true,
+    seccomp_enabled: true,  // Linux only
+    chroot_enabled: true,   // Linux only
+    close_fds: true,
+    sanitize_env: true,
+    resource_limits: Some(ResourceLimits::default()),
+};
+```
+
+### Configuration Options
+
+| Option             | Description                                         | Platform |
+|--------------------|-----------------------------------------------------|----------|
+| `jailer_enabled`   | Enable the jailer sandbox around the shim process   | All      |
+| `seccomp_enabled`  | Enable seccomp BPF syscall filtering                | Linux    |
+| `chroot_enabled`   | Enable chroot/pivot_root filesystem isolation        | Linux    |
+| `close_fds`        | Close inherited file descriptors in the shim        | All      |
+| `sanitize_env`     | Strip environment variables before launching shim   | All      |
+| `resource_limits`  | Apply CPU, memory, and I/O resource constraints     | All      |
+
+<Warning>
+  Disabling the jailer or seccomp filtering reduces isolation strength. Only do so for
+  debugging purposes in trusted development environments. Always use `SecurityOptions::maximum()`
+  for untrusted workloads.
+</Warning>
+
+## Threat Model
+
+The security architecture is designed to defend against:
+
+- **Guest escape**: A compromised guest VM attempting to access the host
+- **Shim exploitation**: Vulnerabilities in the shim process being used to escalate privileges
+- **Resource exhaustion**: A Box consuming excessive host resources (CPU, memory, disk, network)
+- **Information leakage**: A Box accessing data from other Boxes or the host
+
+<Info>
+  For the complete threat model and security design rationale, see the source at
+  `boxlite/src/jailer/THREAT_MODEL.md`.
+</Info>

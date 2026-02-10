@@ -1,0 +1,348 @@
+---
+title: "Rust SDK"
+description: "BoxLite Rust SDK reference - the core implementation"
+icon: "gear"
+---
+
+## Overview
+
+The Rust SDK is the core implementation of BoxLite. It provides async-first APIs built on Tokio for creating and managing isolated VM environments.
+
+**Crate**: `boxlite`
+**Repository**: [github.com/boxlite-ai/boxlite](https://github.com/boxlite-ai/boxlite)
+
+---
+
+## BoxliteRuntime
+
+Main entry point for creating and managing boxes.
+
+```rust
+use boxlite::runtime::{BoxliteRuntime, BoxliteOptions, BoxOptions};
+
+// Create with default options
+let runtime = BoxliteRuntime::with_defaults()?;
+
+// Create with custom options
+let options = BoxliteOptions {
+    home_dir: PathBuf::from("/custom/boxlite"),
+    image_registries: vec!["ghcr.io/myorg".to_string()],
+};
+let runtime = BoxliteRuntime::new(options)?;
+
+// Use global default runtime
+let runtime = BoxliteRuntime::default_runtime();
+```
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `new` | `fn new(options: BoxliteOptions) -> BoxliteResult<Self>` | Create runtime with options |
+| `with_defaults` | `fn with_defaults() -> BoxliteResult<Self>` | Create with default options |
+| `default_runtime` | `fn default_runtime() -> &'static Self` | Get/create global singleton |
+| `try_default_runtime` | `fn try_default_runtime() -> Option<&'static Self>` | Get global if initialized |
+| `init_default_runtime` | `fn init_default_runtime(options: BoxliteOptions) -> BoxliteResult<()>` | Initialize global with options |
+| `create` | `async fn create(&self, options: BoxOptions, name: Option<String>) -> BoxliteResult<LiteBox>` | Create a new box |
+| `get` | `async fn get(&self, id_or_name: &str) -> BoxliteResult<Option<LiteBox>>` | Get box by ID or name |
+| `get_info` | `async fn get_info(&self, id_or_name: &str) -> BoxliteResult<Option<BoxInfo>>` | Get box info without handle |
+| `list_info` | `async fn list_info(&self) -> BoxliteResult<Vec<BoxInfo>>` | List all boxes |
+| `exists` | `async fn exists(&self, id_or_name: &str) -> BoxliteResult<bool>` | Check if box exists |
+| `metrics` | `async fn metrics(&self) -> RuntimeMetrics` | Get runtime-wide metrics |
+| `remove` | `async fn remove(&self, id_or_name: &str, force: bool) -> BoxliteResult<()>` | Remove box completely |
+
+### Example
+
+```rust
+use boxlite::runtime::{BoxliteRuntime, BoxOptions};
+use boxlite::BoxCommand;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let runtime = BoxliteRuntime::with_defaults()?;
+
+    // Create a box
+    let options = BoxOptions::default();
+    let litebox = runtime.create(options, Some("my-box".to_string())).await?;
+
+    // Run a command
+    let mut run = litebox.run(BoxCommand::new("echo").arg("Hello")).await?;
+    let result = run.wait().await?;
+
+    println!("Exit code: {}", result.exit_code);
+
+    // Stop the box
+    litebox.stop().await?;
+
+    Ok(())
+}
+```
+
+---
+
+## BoxliteOptions
+
+Runtime configuration options.
+
+```rust
+pub struct BoxliteOptions {
+    /// Home directory for runtime data (~/.boxlite by default)
+    pub home_dir: PathBuf,
+
+    /// Registries to search for unqualified image references
+    /// Empty list uses docker.io as implicit default
+    pub image_registries: Vec<String>,
+}
+```
+
+### Example
+
+```rust
+use boxlite::runtime::BoxliteOptions;
+use std::path::PathBuf;
+
+let options = BoxliteOptions {
+    home_dir: PathBuf::from("/var/lib/boxlite"),
+    image_registries: vec![
+        "ghcr.io/myorg".to_string(),
+        "docker.io".to_string(),
+    ],
+};
+// "alpine" → tries ghcr.io/myorg/alpine, then docker.io/alpine
+```
+
+---
+
+## Box Handle
+
+### LiteBox
+
+Handle to a box instance. Thin wrapper providing access to box operations.
+
+```rust
+pub struct LiteBox {
+    // ... internal fields
+}
+```
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `id` | `fn id(&self) -> &BoxID` | Get box ID |
+| `name` | `fn name(&self) -> Option<&str>` | Get optional box name |
+| `info` | `fn info(&self) -> BoxInfo` | Get box info (no VM init) |
+| `start` | `async fn start(&self) -> BoxliteResult<()>` | Start the box |
+| `run` | `async fn run(&self, command: BoxCommand) -> BoxliteResult<Execution>` | Run command |
+| `metrics` | `async fn metrics(&self) -> BoxliteResult<BoxMetrics>` | Get box metrics |
+| `stop` | `async fn stop(&self) -> BoxliteResult<()>` | Stop the box |
+
+#### Lifecycle
+
+- `start()` initializes VM for `Configured` or `Stopped` boxes
+- Idempotent: calling on `Running` box is a no-op
+- `run()` implicitly calls `start()` if needed
+- `stop()` terminates VM; box can be restarted
+
+#### Example
+
+```rust
+let litebox = runtime.create(BoxOptions::default(), None).await?;
+
+// Start explicitly (optional, run does this automatically)
+litebox.start().await?;
+
+// Check metrics
+let metrics = litebox.metrics().await?;
+println!("CPU: {:?}%", metrics.cpu_percent());
+
+// Stop when done
+litebox.stop().await?;
+```
+
+### BoxInfo
+
+Public metadata about a box (returned by list operations).
+
+```rust
+pub struct BoxInfo {
+    /// Unique box identifier (ULID)
+    pub id: BoxID,
+
+    /// User-defined name (optional)
+    pub name: Option<String>,
+
+    /// Current lifecycle status
+    pub status: BoxStatus,
+
+    /// Creation timestamp (UTC)
+    pub created_at: DateTime<Utc>,
+
+    /// Last state change timestamp (UTC)
+    pub last_updated: DateTime<Utc>,
+
+    /// Process ID of VMM subprocess (None if not running)
+    pub pid: Option<u32>,
+
+    /// Image reference or rootfs path
+    pub image: String,
+
+    /// Allocated CPU count
+    pub cpus: u8,
+
+    /// Allocated memory in MiB
+    pub memory_mib: u32,
+
+    /// User-defined labels
+    pub labels: HashMap<String, String>,
+}
+```
+
+### BoxStatus
+
+Lifecycle status of a box.
+
+```rust
+pub enum BoxStatus {
+    /// Cannot determine state (error recovery)
+    Unknown,
+
+    /// Created and persisted, VM not started
+    Configured,
+
+    /// Running and accepting commands
+    Running,
+
+    /// Shutting down gracefully (transient)
+    Stopping,
+
+    /// Not running, can be restarted
+    Stopped,
+}
+```
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `is_active` | `fn is_active(&self) -> bool` | True if VM process running |
+| `is_running` | `fn is_running(&self) -> bool` | True if Running |
+| `is_configured` | `fn is_configured(&self) -> bool` | True if Configured |
+| `is_stopped` | `fn is_stopped(&self) -> bool` | True if Stopped |
+| `is_transient` | `fn is_transient(&self) -> bool` | True if Stopping |
+| `can_start` | `fn can_start(&self) -> bool` | True if Configured or Stopped |
+| `can_stop` | `fn can_stop(&self) -> bool` | True if Running |
+| `can_remove` | `fn can_remove(&self) -> bool` | True if Configured, Stopped, or Unknown |
+| `can_run` | `fn can_run(&self) -> bool` | True if Configured, Running, or Stopped |
+
+#### State Machine
+
+```text
+create() → Configured (persisted to DB, no VM)
+start()  → Running (VM initialized)
+stop()   → Stopped (VM terminated, can restart)
+```
+
+### BoxState
+
+Dynamic box state (changes during lifecycle).
+
+```rust
+pub struct BoxState {
+    /// Current lifecycle status
+    pub status: BoxStatus,
+
+    /// Process ID (None if not running)
+    pub pid: Option<u32>,
+
+    /// Container ID (64-char hex)
+    pub container_id: Option<ContainerID>,
+
+    /// Last state change timestamp (UTC)
+    pub last_updated: DateTime<Utc>,
+
+    /// Lock ID for multiprocess-safe locking
+    pub lock_id: Option<LockId>,
+}
+```
+
+---
+
+## Complete Example
+
+```rust
+use boxlite::runtime::{BoxliteRuntime, BoxOptions};
+use boxlite::runtime::options::{RootfsSpec, SecurityOptions, VolumeSpec};
+use boxlite::BoxCommand;
+use futures::StreamExt;
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize runtime
+    let runtime = BoxliteRuntime::with_defaults()?;
+
+    // Configure box
+    let options = BoxOptions {
+        cpus: Some(2),
+        memory_mib: Some(1024),
+        rootfs: RootfsSpec::Image("python:3.11-slim".to_string()),
+        volumes: vec![
+            VolumeSpec {
+                host_path: "/home/user/code".to_string(),
+                guest_path: "/app".to_string(),
+                read_only: true,
+            },
+        ],
+        security: SecurityOptions::standard(),
+        ..Default::default()
+    };
+
+    // Create and name the box
+    let litebox = runtime.create(options, Some("python-sandbox".to_string())).await?;
+    println!("Created box: {}", litebox.id());
+
+    // Run Python code
+    let cmd = BoxCommand::new("python3")
+        .args(["-c", "import sys; print(f'Python {sys.version}')"])
+        .timeout(Duration::from_secs(30))
+        .working_dir("/app");
+
+    let mut run_handle = litebox.run(cmd).await?;
+
+    // Stream output
+    if let Some(mut stdout) = run_handle.stdout() {
+        while let Some(line) = stdout.next().await {
+            println!("{}", line);
+        }
+    }
+
+    // Check result
+    let result = run_handle.wait().await?;
+    if !result.success() {
+        eprintln!("Command failed with exit code: {}", result.exit_code);
+    }
+
+    // Check metrics
+    let metrics = litebox.metrics().await?;
+    if let Some(boot_ms) = metrics.guest_boot_duration_ms() {
+        println!("Boot time: {}ms", boot_ms);
+    }
+
+    // Cleanup
+    litebox.stop().await?;
+
+    Ok(())
+}
+```
+
+---
+
+## See Also
+
+- [Getting Started Guide](/getting-started/index)
+- [Architecture Overview](/architecture/index)
+- [Configuration Reference](/reference/index)
+- [Box Configuration](/reference/rust/box-config)
+- [Execution](/reference/rust/execution)
+- [Errors & Metrics](/reference/rust/errors-metrics)

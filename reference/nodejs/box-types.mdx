@@ -1,0 +1,395 @@
+---
+title: "Box Types"
+description: "Node.js SDK box types and configuration"
+icon: "cube"
+---
+
+BoxLite provides several specialized box types, each tailored for a specific use case. All box types share a common foundation built on the low-level `JsBox` handle.
+
+---
+
+## Box Handle
+
+### `JsBox`
+
+Handle to a running or stopped box.
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `string` | Unique box identifier (ULID) |
+| `name` | `string \| null` | User-defined name |
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `info()` | `() => JsBoxInfo` | Get box metadata (sync) |
+| `exec()` | `(cmd, args?, env?, tty?) => Promise<JsExecution>` | Execute command |
+| `stop()` | `() => Promise<void>` | Stop the box |
+| `metrics()` | `() => Promise<JsBoxMetrics>` | Get resource metrics |
+
+---
+
+### `JsBoxInfo`
+
+Metadata about a box.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique box identifier (ULID) |
+| `name` | `string \| undefined` | User-defined name |
+| `status` | `string` | Current status: `"Starting"`, `"Running"`, `"Stopped"`, etc. |
+| `createdAt` | `string` | Creation timestamp (ISO 8601) |
+| `lastUpdated` | `string` | Last state change (ISO 8601) |
+| `pid` | `number \| undefined` | Process ID (if running) |
+
+---
+
+### `BoxStatus`
+
+A box can be in one of the following states:
+
+| Status | Description |
+|--------|-------------|
+| `"Starting"` | Box is being initialized |
+| `"Running"` | Box is active and accepting commands |
+| `"Stopped"` | Box has been stopped |
+
+---
+
+## SimpleBox
+
+Context manager for basic command execution with automatic cleanup.
+
+```typescript
+import { SimpleBox } from 'boxlite';
+```
+
+### Constructor Options
+
+```typescript
+interface SimpleBoxOptions {
+  image?: string;         // Default: "python:slim"
+  memoryMib?: number;     // Memory in MiB
+  cpus?: number;          // CPU cores
+  runtime?: JsBoxlite;    // Runtime instance
+  name?: string;          // Box name
+  autoRemove?: boolean;   // Default: true
+  detach?: boolean;       // Default: false
+  workingDir?: string;    // Working directory
+  env?: Record<string, string>;  // Environment variables
+  volumes?: VolumeSpec[]; // Volume mounts
+  ports?: PortSpec[];     // Port mappings
+}
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `string` | Box ID (throws if not started) |
+| `name` | `string \| undefined` | Box name |
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `getId()` | `() => Promise<string>` | Get box ID (async) |
+| `getInfo()` | `() => Promise<JsBoxInfo>` | Get box info (async) |
+| `exec()` | `(cmd, ...args) => Promise<ExecResult>` | Execute and wait |
+| `stop()` | `() => Promise<void>` | Stop the box |
+| `[Symbol.asyncDispose]()` | `() => Promise<void>` | Async disposal |
+
+### Example
+
+```typescript
+// With async disposal (TypeScript 5.2+)
+await using box = new SimpleBox({ image: 'alpine:latest' });
+const result = await box.exec('echo', 'Hello!');
+console.log(result.stdout);
+
+// Manual cleanup
+const box = new SimpleBox({ image: 'alpine:latest' });
+try {
+  const result = await box.exec('ls', '-la');
+  console.log(result.stdout);
+} finally {
+  await box.stop();
+}
+```
+
+---
+
+## CodeBox
+
+Python code execution sandbox.
+
+```typescript
+import { CodeBox } from 'boxlite';
+```
+
+### Constructor Options
+
+```typescript
+interface CodeBoxOptions extends SimpleBoxOptions {
+  image?: string;  // Default: "python:slim"
+}
+```
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `run()` | `(code: string) => Promise<string>` | Execute Python code |
+| `runScript()` | `(scriptPath: string) => Promise<string>` | Run script file |
+| `installPackage()` | `(pkg: string) => Promise<string>` | pip install |
+| `installPackages()` | `(...pkgs: string[]) => Promise<string>` | Install multiple |
+
+### Example
+
+```typescript
+const codebox = new CodeBox({ memoryMib: 1024 });
+try {
+  await codebox.installPackage('requests');
+  const result = await codebox.run(`
+import requests
+print(requests.get('https://api.github.com/zen').text)
+  `);
+  console.log(result);
+} finally {
+  await codebox.stop();
+}
+```
+
+---
+
+## BrowserBox
+
+Browser automation with Chrome DevTools Protocol.
+
+```typescript
+import { BrowserBox, BrowserType } from 'boxlite';
+```
+
+### Constructor Options
+
+```typescript
+interface BrowserBoxOptions {
+  browser?: BrowserType;  // "chromium" | "firefox" | "webkit"
+  memoryMib?: number;     // Default: 2048
+  cpus?: number;          // Default: 2
+}
+```
+
+### `BrowserType`
+
+Supported browser types.
+
+```typescript
+type BrowserType = 'chromium' | 'firefox' | 'webkit';
+```
+
+### Browser CDP Ports
+
+| Browser | Port | Image |
+|---------|------|-------|
+| `chromium` | 9222 | `mcr.microsoft.com/playwright:v1.47.2-jammy` |
+| `firefox` | 9223 | `browserless/firefox:latest` |
+| `webkit` | 9224 | `browserless/webkit:latest` |
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `start()` | `(timeout?: number) => Promise<void>` | Start browser |
+| `endpoint()` | `() => string` | Get CDP endpoint URL |
+
+### Example
+
+```typescript
+import puppeteer from 'puppeteer-core';
+
+const browser = new BrowserBox({ browser: 'chromium' });
+try {
+  await browser.start();
+  const endpoint = browser.endpoint();  // "http://localhost:9222"
+
+  const instance = await puppeteer.connect({ browserURL: endpoint });
+  const page = await instance.newPage();
+  await page.goto('https://example.com');
+  console.log(await page.title());
+} finally {
+  await browser.stop();
+}
+```
+
+---
+
+## ComputerBox
+
+Desktop automation with full GUI environment.
+
+```typescript
+import { ComputerBox } from 'boxlite';
+```
+
+### Constructor Options
+
+```typescript
+interface ComputerBoxOptions {
+  cpus?: number;          // Default: 2
+  memoryMib?: number;     // Default: 2048
+  guiHttpPort?: number;   // Default: 3000
+  guiHttpsPort?: number;  // Default: 3001
+}
+```
+
+### Mouse Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `mouseMove()` | `(x: number, y: number) => Promise<void>` | Move cursor |
+| `leftClick()` | `() => Promise<void>` | Left click |
+| `rightClick()` | `() => Promise<void>` | Right click |
+| `middleClick()` | `() => Promise<void>` | Middle click |
+| `doubleClick()` | `() => Promise<void>` | Double click |
+| `tripleClick()` | `() => Promise<void>` | Triple click |
+| `leftClickDrag()` | `(startX, startY, endX, endY) => Promise<void>` | Drag |
+| `cursorPosition()` | `() => Promise<[number, number]>` | Get cursor pos |
+
+### Keyboard Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `type()` | `(text: string) => Promise<void>` | Type text |
+| `key()` | `(keySequence: string) => Promise<void>` | Press key(s) |
+
+#### Key Syntax Reference (xdotool format)
+
+| Key | Syntax |
+|-----|--------|
+| Enter | `Return` |
+| Tab | `Tab` |
+| Escape | `Escape` |
+| Backspace | `BackSpace` |
+| Delete | `Delete` |
+| Space | `space` |
+| Arrow keys | `Up`, `Down`, `Left`, `Right` |
+| Function keys | `F1`, `F2`, ... `F12` |
+| Page keys | `Page_Up`, `Page_Down`, `Home`, `End` |
+| Modifiers | `ctrl`, `alt`, `shift`, `super` |
+| Combinations | `ctrl+c`, `ctrl+shift+s`, `alt+Tab` |
+
+**Examples:**
+
+```typescript
+await desktop.key('Return');        // Press Enter
+await desktop.key('ctrl+c');        // Copy
+await desktop.key('ctrl+shift+s');  // Save As
+await desktop.key('alt+Tab');       // Switch window
+await desktop.key('ctrl+a Delete'); // Select all and delete
+```
+
+### Display Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `waitUntilReady()` | `(timeout?: number) => Promise<void>` | Wait for desktop |
+| `screenshot()` | `() => Promise<Screenshot>` | Capture screen |
+| `scroll()` | `(x, y, direction, amount?) => Promise<void>` | Scroll |
+| `getScreenSize()` | `() => Promise<[number, number]>` | Get dimensions |
+
+#### Screenshot Return Type
+
+```typescript
+interface Screenshot {
+  data: string;    // Base64-encoded PNG
+  width: number;   // 1024 (default)
+  height: number;  // 768 (default)
+  format: 'png';
+}
+```
+
+#### Scroll Directions
+
+| Direction | Description |
+|-----------|-------------|
+| `"up"` | Scroll up |
+| `"down"` | Scroll down |
+| `"left"` | Scroll left |
+| `"right"` | Scroll right |
+
+### Example
+
+```typescript
+const desktop = new ComputerBox({ cpus: 4, memoryMib: 4096 });
+try {
+  await desktop.waitUntilReady(60);
+
+  // Take screenshot
+  const screenshot = await desktop.screenshot();
+  console.log(`${screenshot.width}x${screenshot.height}`);
+
+  // GUI interaction
+  await desktop.mouseMove(100, 200);
+  await desktop.leftClick();
+  await desktop.type('Hello, World!');
+  await desktop.key('Return');
+
+  // Access via browser: http://localhost:3000
+} finally {
+  await desktop.stop();
+}
+```
+
+---
+
+## InteractiveBox
+
+Interactive terminal sessions with PTY support.
+
+```typescript
+import { InteractiveBox } from 'boxlite';
+```
+
+### Constructor Options
+
+```typescript
+interface InteractiveBoxOptions extends SimpleBoxOptions {
+  shell?: string;        // Default: "/bin/sh"
+  tty?: boolean;         // undefined = auto-detect
+}
+```
+
+#### TTY Mode
+
+| Value | Behavior |
+|-------|----------|
+| `undefined` | Auto-detect from stdin |
+| `true` | Force TTY with I/O forwarding |
+| `false` | No I/O forwarding |
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `start()` | `() => Promise<void>` | Start PTY session |
+| `wait()` | `() => Promise<void>` | Wait for shell exit |
+
+### Example
+
+```typescript
+const box = new InteractiveBox({
+  image: 'alpine:latest',
+  shell: '/bin/sh',
+  tty: true
+});
+try {
+  await box.start();
+  await box.wait();  // Blocks until shell exits
+} finally {
+  await box.stop();
+}
+```

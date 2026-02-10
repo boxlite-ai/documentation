@@ -1,122 +1,136 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "BoxLite",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#6D28D9",
+    "light": "#8B5CF6",
+    "dark": "#5B21B6"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
               "index",
-              "quickstart",
-              "development"
+              "getting-started/index",
+              "getting-started/quickstart-python",
+              "getting-started/quickstart-nodejs",
+              "getting-started/quickstart-rust",
+              "getting-started/quickstart-c"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Architecture",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "architecture/index",
+              "architecture/components",
+              "architecture/security",
+              "architecture/networking-storage"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "FAQ",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "faq"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "SDK Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "reference/index"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Python SDK",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "reference/python/index",
+              "reference/python/box-types",
+              "reference/python/execution",
+              "reference/python/errors-metrics"
+            ]
+          },
+          {
+            "group": "Node.js SDK",
+            "pages": [
+              "reference/nodejs/index",
+              "reference/nodejs/box-types",
+              "reference/nodejs/execution",
+              "reference/nodejs/errors-metrics"
+            ]
+          },
+          {
+            "group": "Rust SDK",
+            "pages": [
+              "reference/rust/index",
+              "reference/rust/box-config",
+              "reference/rust/execution",
+              "reference/rust/errors-metrics"
+            ]
+          },
+          {
+            "group": "C SDK",
+            "pages": [
+              "reference/c/index",
+              "reference/c/native-api",
+              "reference/c/memory-json-threading",
+              "reference/c/errors-metrics"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/index",
+              "guides/building-from-source",
+              "guides/examples-gallery",
+              "guides/ai-agent-integration",
+              "guides/image-registry-configuration",
+              "guides/macos-sandbox-debugging"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "development/cli",
+              "development/rust-style"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    ]
   },
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/boxlite-ai/boxlite"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/boxlite-ai"
     }
   }
 }

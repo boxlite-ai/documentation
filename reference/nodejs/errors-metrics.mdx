@@ -1,0 +1,229 @@
+---
+title: "Errors & Metrics"
+description: "Node.js SDK error handling and metrics"
+icon: "chart-bar"
+---
+
+This page covers BoxLite's error types for structured error handling and the metrics API for monitoring runtime and per-box resource usage.
+
+---
+
+## Error Types
+
+```typescript
+import { BoxliteError, ExecError, TimeoutError, ParseError } from 'boxlite';
+```
+
+### Exception Hierarchy
+
+```text
+BoxliteError (base)
++-- ExecError       # Command failed
++-- TimeoutError    # Operation timeout
++-- ParseError      # Output parsing failed
+```
+
+---
+
+### `BoxliteError`
+
+Base error class for all BoxLite errors. All specific error types extend this class.
+
+```typescript
+try {
+  await box.exec('invalid-command');
+} catch (err) {
+  if (err instanceof BoxliteError) {
+    console.error('BoxLite error:', err.message);
+  }
+}
+```
+
+<Tip>
+  Always catch `BoxliteError` as a fallback when you want to handle any BoxLite-specific error generically.
+</Tip>
+
+---
+
+### `ExecError`
+
+Command execution failed (non-zero exit code).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `command` | `string` | Failed command |
+| `exitCode` | `number` | Non-zero exit code |
+| `stderr` | `string` | Standard error output |
+
+```typescript
+try {
+  await box.exec('false');
+} catch (err) {
+  if (err instanceof ExecError) {
+    console.error(`Command: ${err.command}`);
+    console.error(`Exit code: ${err.exitCode}`);
+    console.error(`Stderr: ${err.stderr}`);
+  }
+}
+```
+
+---
+
+### `TimeoutError`
+
+Operation exceeded time limit.
+
+```typescript
+try {
+  await desktop.waitUntilReady(5);
+} catch (err) {
+  if (err instanceof TimeoutError) {
+    console.error('Desktop did not become ready');
+  }
+}
+```
+
+---
+
+### `ParseError`
+
+Failed to parse command output.
+
+```typescript
+try {
+  const pos = await desktop.cursorPosition();
+} catch (err) {
+  if (err instanceof ParseError) {
+    console.error('Failed to parse cursor position');
+  }
+}
+```
+
+---
+
+### Comprehensive Error Handling
+
+Here is a pattern for handling all BoxLite error types:
+
+```typescript
+import { BoxliteError, ExecError, TimeoutError, ParseError } from 'boxlite';
+
+try {
+  const result = await box.exec('some-command');
+} catch (err) {
+  if (err instanceof ExecError) {
+    console.error(`Command "${err.command}" failed with exit code ${err.exitCode}`);
+    console.error(`Stderr: ${err.stderr}`);
+  } else if (err instanceof TimeoutError) {
+    console.error('Operation timed out:', err.message);
+  } else if (err instanceof ParseError) {
+    console.error('Failed to parse output:', err.message);
+  } else if (err instanceof BoxliteError) {
+    console.error('BoxLite error:', err.message);
+  } else {
+    throw err;  // Re-throw unknown errors
+  }
+}
+```
+
+---
+
+## Metrics
+
+BoxLite provides two levels of metrics: runtime-wide metrics and per-box metrics.
+
+### `JsRuntimeMetrics`
+
+Runtime-wide metrics covering all boxes managed by a runtime instance.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `boxesCreatedTotal` | `number` | Total boxes created |
+| `boxesFailedTotal` | `number` | Boxes that failed during creation |
+| `numRunningBoxes` | `number` | Currently running boxes |
+| `totalCommandsExecuted` | `number` | Total commands executed |
+| `totalExecErrors` | `number` | Total execution errors |
+
+```typescript
+const metrics = await runtime.metrics();
+console.log(`Boxes created: ${metrics.boxesCreatedTotal}`);
+console.log(`Running: ${metrics.numRunningBoxes}`);
+```
+
+---
+
+### `JsBoxMetrics`
+
+Per-box resource metrics for monitoring individual box usage.
+
+#### Counter Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commandsExecutedTotal` | `number` | Commands executed on this box |
+| `execErrorsTotal` | `number` | Execution errors on this box |
+| `bytesSentTotal` | `number` | Bytes sent via stdin |
+| `bytesReceivedTotal` | `number` | Bytes received via stdout/stderr |
+
+#### Resource Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cpuPercent` | `number \| undefined` | CPU usage (0.0-100.0) |
+| `memoryBytes` | `number \| undefined` | Memory usage in bytes |
+| `networkBytesSent` | `number \| undefined` | Network bytes sent |
+| `networkBytesReceived` | `number \| undefined` | Network bytes received |
+| `networkTcpConnections` | `number \| undefined` | Current TCP connections |
+| `networkTcpErrors` | `number \| undefined` | Total TCP errors |
+
+#### Timing Fields (milliseconds)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalCreateDurationMs` | `number \| undefined` | Total create time |
+| `guestBootDurationMs` | `number \| undefined` | Guest agent ready time |
+| `stageFilesystemSetupMs` | `number \| undefined` | Directory setup time |
+| `stageImagePrepareMs` | `number \| undefined` | Image pull/prepare time |
+| `stageGuestRootfsMs` | `number \| undefined` | Rootfs bootstrap time |
+| `stageBoxConfigMs` | `number \| undefined` | Configuration build time |
+| `stageBoxSpawnMs` | `number \| undefined` | Subprocess spawn time |
+| `stageContainerInitMs` | `number \| undefined` | Container init time |
+
+#### Example
+
+```typescript
+const metrics = await box.metrics();
+console.log(`CPU: ${metrics.cpuPercent}%`);
+console.log(`Memory: ${(metrics.memoryBytes || 0) / (1024 * 1024)} MB`);
+console.log(`Boot time: ${metrics.guestBootDurationMs}ms`);
+```
+
+---
+
+### Monitoring Dashboard Example
+
+Here is a more complete example that polls both runtime and box metrics:
+
+```typescript
+import { JsBoxlite, SimpleBox } from 'boxlite';
+
+const runtime = JsBoxlite.withDefaultConfig();
+
+// Create a box
+await using box = new SimpleBox({
+  image: 'alpine:latest',
+  runtime
+});
+
+// Run some commands
+await box.exec('echo', 'hello');
+await box.exec('sleep', '1');
+
+// Check runtime metrics
+const runtimeMetrics = await runtime.metrics();
+console.log('--- Runtime Metrics ---');
+console.log(`Total boxes created: ${runtimeMetrics.boxesCreatedTotal}`);
+console.log(`Running boxes: ${runtimeMetrics.numRunningBoxes}`);
+console.log(`Commands executed: ${runtimeMetrics.totalCommandsExecuted}`);
+console.log(`Exec errors: ${runtimeMetrics.totalExecErrors}`);
+```

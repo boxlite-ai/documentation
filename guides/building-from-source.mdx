@@ -1,0 +1,218 @@
+---
+title: "Building from Source"
+description: "Clone the BoxLite repository, install prerequisites, and build the runtime, SDKs, and guest binaries from source."
+icon: "hammer"
+---
+
+This guide walks you through building BoxLite from source on macOS (Apple Silicon) and Linux (x86_64 / ARM64).
+
+## Prerequisites
+
+- **Rust 1.75+** (stable toolchain)
+- **macOS** (Apple Silicon) or **Linux** (x86_64/ARM64) with KVM
+- **Python 3.10+** (for Python SDK development)
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/boxlite-labs/boxlite.git
+    cd boxlite
+    ```
+  </Step>
+  <Step title="Initialize submodules">
+    ```bash
+    git submodule update --init --recursive
+    ```
+  </Step>
+  <Step title="Install platform dependencies">
+    ```bash
+    make setup
+    ```
+  </Step>
+  <Step title="Build the Python SDK for local development">
+    ```bash
+    make dev:python
+    ```
+  </Step>
+</Steps>
+
+## Makefile Targets
+
+BoxLite uses a Makefile to orchestrate all builds. Below is a complete reference of available targets.
+
+| Target | Description |
+|---|---|
+| `make setup` | Install platform-specific dependencies |
+| `make guest` | Cross-compile guest binary (musl static) |
+| `make shim` | Build boxlite-shim binary |
+| `make runtime` | Build complete BoxLite runtime |
+| `make dev:python` | Local Python SDK development |
+| `make dist:python` | Build portable Python wheels |
+| `make clean` | Clean build artifacts |
+
+## Platform Support
+
+<Tabs>
+  <Tab title="macOS">
+    | Architecture | Hypervisor |
+    |---|---|
+    | ARM64 (Apple Silicon) | Hypervisor.framework |
+
+    macOS builds use Apple's native Hypervisor.framework. Only Apple Silicon (ARM64) is supported. Intel Macs are **not** supported.
+
+    The platform setup script is located at `scripts/setup/macos.sh`.
+  </Tab>
+  <Tab title="Linux (x86_64)">
+    | Architecture | Hypervisor |
+    |---|---|
+    | x86_64 | KVM |
+
+    Requires KVM support. Verify with:
+
+    ```bash
+    ls -l /dev/kvm
+    grep -E 'vmx|svm' /proc/cpuinfo
+    ```
+
+    The platform setup script is located at `scripts/setup/ubuntu.sh`.
+  </Tab>
+  <Tab title="Linux (ARM64)">
+    | Architecture | Hypervisor |
+    |---|---|
+    | ARM64 | KVM |
+
+    Requires KVM support on ARM64 hardware. The setup scripts for Linux ARM64 are the same as x86_64 (`scripts/setup/ubuntu.sh`).
+  </Tab>
+</Tabs>
+
+## Build Scripts
+
+Build scripts are located in the `scripts/` directory:
+
+```text
+scripts/
+├── setup/              # Platform-specific setup
+│   ├── macos.sh
+│   ├── ubuntu.sh
+│   ├── manylinux.sh
+│   └── musllinux.sh
+├── build/              # Build scripts
+│   ├── guest.sh        # Guest binary (cross-compile)
+│   ├── shim.sh         # Shim binary
+│   └── build-runtime.sh
+├── package/            # Packaging scripts
+└── common.sh           # Shared utilities
+```
+
+### Building Individual Components
+
+<Steps>
+  <Step title="Build the guest binary">
+    The guest binary is cross-compiled as a static musl binary:
+
+    ```bash
+    make guest
+    ```
+
+    This runs `scripts/build/guest.sh` under the hood.
+  </Step>
+  <Step title="Build the shim binary">
+    The shim is the host-side process that manages the VM:
+
+    ```bash
+    make shim
+    ```
+
+    This runs `scripts/build/shim.sh`.
+  </Step>
+  <Step title="Build the complete runtime">
+    Build all components together:
+
+    ```bash
+    make runtime
+    ```
+
+    This runs `scripts/build/build-runtime.sh`, which builds the guest, shim, and runtime library.
+  </Step>
+</Steps>
+
+### Building Python Wheels
+
+To build distributable Python wheels (for publishing or CI):
+
+```bash
+make dist:python
+```
+
+For local development (editable install):
+
+```bash
+make dev:python
+```
+
+### Cleaning Build Artifacts
+
+```bash
+make clean
+```
+
+This removes all compiled binaries, intermediate build files, and generated artifacts.
+
+## Debugging Build Issues
+
+<Note>
+  If you encounter build failures, enable debug logging to get more detail:
+
+  ```bash
+  RUST_LOG=debug make runtime
+  ```
+</Note>
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Rust version too old">
+    BoxLite requires Rust 1.75 or newer. Check your version with:
+
+    ```bash
+    rustc --version
+    ```
+
+    Update with:
+
+    ```bash
+    rustup update stable
+    ```
+  </Accordion>
+  <Accordion title="KVM not available (Linux)">
+    Verify KVM is accessible:
+
+    ```bash
+    ls -l /dev/kvm
+    ```
+
+    If the device does not exist, enable hardware virtualization in your BIOS/UEFI settings. If it exists but is not accessible, check permissions:
+
+    ```bash
+    sudo usermod -aG kvm $USER
+    ```
+
+    Log out and back in for the group change to take effect.
+  </Accordion>
+  <Accordion title="macOS version too old">
+    BoxLite requires macOS 12 (Monterey) or later for Hypervisor.framework support. Check your version:
+
+    ```bash
+    sw_vers
+    ```
+  </Accordion>
+  <Accordion title="Submodule initialization failed">
+    If submodules fail to initialize, try a clean clone:
+
+    ```bash
+    git clone --recursive https://github.com/boxlite-labs/boxlite.git
+    ```
+  </Accordion>
+</AccordionGroup>

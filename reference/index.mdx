@@ -1,0 +1,581 @@
+---
+title: "SDK Reference"
+description: "Complete API reference for all BoxLite SDKs"
+icon: "book"
+---
+
+Complete reference for BoxLite APIs, configuration, and error handling.
+
+## SDK API References
+
+Complete API documentation for each SDK:
+
+| SDK | Description |
+|-----|-------------|
+| **Python** | Async/sync API, box types, metrics |
+| **Node.js** | TypeScript definitions, box types, CDP endpoints |
+| **Rust** | Core runtime, stream APIs, security options |
+| **C** | FFI bindings, JSON API, callback streaming |
+
+<CardGroup cols={2}>
+  <Card title="Python SDK" icon="python" href="/reference/python/index">
+    Async and sync APIs, box types, code execution, metrics. Python 3.10+.
+  </Card>
+  <Card title="Node.js SDK" icon="node-js" href="/reference/nodejs/index">
+    TypeScript definitions, box types, CDP endpoints for browser automation.
+  </Card>
+  <Card title="Rust SDK" icon="rust" href="/reference/rust/index">
+    Core runtime, stream APIs, security options. Native performance.
+  </Card>
+  <Card title="C SDK" icon="c" href="/reference/c/index">
+    FFI bindings, JSON API, callback streaming for system-level integration.
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Python API
+
+For complete Python API documentation, see **[Python API Reference](/reference/python/index)**.
+
+**Key Classes:**
+
+| Class | Description |
+|-------|-------------|
+| `Boxlite` | Main runtime for creating and managing boxes |
+| `Box` | Handle to a running or stopped box |
+| `SimpleBox` | Context manager for basic execution |
+| `CodeBox` | Specialized box for Python code execution |
+| `BrowserBox` | Box configured for browser automation |
+| `ComputerBox` | Box with desktop automation capabilities |
+| `InteractiveBox` | Box for interactive shell sessions |
+
+### Node.js API
+
+For complete Node.js API documentation, see **[Node.js API Reference](/reference/nodejs/index)**.
+
+**Key Classes:**
+
+| Class | Description |
+|-------|-------------|
+| `SimpleBox` | Basic container for command execution |
+| `CodeBox` | Python code execution sandbox |
+| `BrowserBox` | Browser automation with CDP endpoint |
+| `ComputerBox` | Desktop automation (14 methods) |
+| `InteractiveBox` | PTY terminal sessions |
+
+### Rust API
+
+For complete Rust API documentation, see **[Rust API Reference](/reference/rust/index)**.
+
+**Core Types:**
+
+```rust
+use boxlite::{
+    BoxliteRuntime,  // Main runtime
+    BoxOptions,       // Box configuration
+    LiteBox,          // Box handle
+    BoxCommand,       // Command builder
+    RootfsSpec,       // Rootfs specification
+    VolumeSpec,       // Volume mount specification
+    PortSpec,         // Port forwarding specification
+};
+```
+
+### C API
+
+For complete C API documentation, see **[C API Reference](/reference/c/index)**.
+
+**Functions:**
+
+| Function | Description |
+|----------|-------------|
+| `boxlite_runtime_new` | Create runtime instance |
+| `boxlite_create_box` | Create a new box |
+| `boxlite_execute` | Run command with streaming |
+| `boxlite_stop_box` | Stop and free box |
+
+## SDK Feature Comparison
+
+| Feature | Python | Node.js | Rust | C |
+|---------|--------|---------|------|---|
+| Async API | Yes | Yes | Yes | Callback-based |
+| Sync API | Yes (greenlet) | No | Yes (blocking) | Yes |
+| SimpleBox | Yes | Yes | Yes | Yes |
+| CodeBox | Yes | Yes | No | No |
+| BrowserBox | Yes | Yes | No | No |
+| ComputerBox | Yes | Yes | No | No |
+| InteractiveBox | Yes | Yes | No | No |
+| Streaming I/O | Yes | Yes | Yes | Yes |
+| Metrics | Yes | Yes | Yes | Yes |
+| Type Safety | Type hints | TypeScript | Native | Manual |
+
+## Configuration Reference
+
+### BoxOptions Parameters
+
+Complete reference for box configuration options.
+
+#### `image: String`
+
+OCI image URI to use for the box rootfs.
+
+**Format:** `[registry/]repository[:tag]`
+
+**Default:** `"python:slim"` (for Python SDK convenience wrappers)
+
+**Examples:**
+
+```python
+# Docker Hub (default registry)
+image="python:3.11-slim"
+image="alpine:latest"
+image="ubuntu:22.04"
+
+# GitHub Container Registry
+image="ghcr.io/owner/repo:tag"
+
+# Amazon ECR
+image="123456.dkr.ecr.us-east-1.amazonaws.com/repo:tag"
+
+# Google Container Registry
+image="gcr.io/project/image:tag"
+```
+
+<Note>
+Images are pulled on first use and cached in `~/.boxlite/images/`. Layer-level caching ensures fast subsequent starts. For private registries, use registry-specific authentication (Docker credentials, etc.).
+</Note>
+
+#### `cpus: int`
+
+Number of CPU cores allocated to the box.
+
+**Default:** 1
+
+**Range:** 1 to host CPU count
+
+**Example:**
+
+```python
+cpus=2  # 2 CPU cores
+cpus=4  # 4 CPU cores
+```
+
+<Note>
+CPU scheduling is proportional (shares-based). It does not reserve physical cores, just scheduling weight. Monitor actual usage with `box.metrics().cpu_time_ms`.
+</Note>
+
+#### `memory_mib: int`
+
+Memory limit in mebibytes (MiB).
+
+**Default:** 512
+
+**Range:** 128 to 65536 (64 GiB)
+
+**Example:**
+
+```python
+memory_mib=1024   # 1 GB
+memory_mib=2048   # 2 GB
+memory_mib=4096   # 4 GB
+```
+
+<Note>
+1 MiB = 1024 KiB = 1,048,576 bytes. Minimum 128 MiB is required for most images. Out of memory kills the box process. Monitor with `box.metrics().memory_usage_bytes`.
+</Note>
+
+#### `disk_size_gb: int | None`
+
+Create a persistent QCOW2 disk image.
+
+**Default:** `None` (ephemeral storage only)
+
+**Range:** 1 to 1024 (1 TB)
+
+**Example:**
+
+```python
+disk_size_gb=None   # Ephemeral (default)
+disk_size_gb=10     # 10 GB persistent disk
+disk_size_gb=100    # 100 GB persistent disk
+```
+
+<Note>
+Disk persists across stop/restart. Stored at `~/.boxlite/boxes/{box-id}/disk.qcow2`. Uses copy-on-write (thin provisioned). Deleted when box is removed.
+</Note>
+
+#### `working_dir: str`
+
+Working directory for command execution inside the box.
+
+**Default:** `"/root"`
+
+**Example:**
+
+```python
+working_dir="/app"
+working_dir="/home/user/project"
+```
+
+<Note>
+Directory must exist in the container image. Commands execute with this as `$PWD`.
+</Note>
+
+#### `env: List[Tuple[str, str]]`
+
+Environment variables as (key, value) pairs.
+
+**Default:** `[]` (inherit from image)
+
+**Example:**
+
+```python
+env=[
+    ("DATABASE_URL", "postgresql://localhost/db"),
+    ("API_KEY", "secret"),
+    ("DEBUG", "true"),
+    ("PATH", "/custom/bin:/usr/bin:/bin"),  # Override PATH
+]
+```
+
+<Note>
+Variables are appended to the image environment. Use to override image defaults (e.g., `PATH`). Sensitive values (API keys, passwords) are visible in box metadata.
+</Note>
+
+#### `volumes: List[Tuple[str, str, str]]`
+
+Volume mounts as (host_path, guest_path, mode) tuples.
+
+**Format:** `(host_path, guest_path, "ro"|"rw")`
+
+**Default:** `[]` (no mounts)
+
+**Example:**
+
+```python
+volumes=[
+    # Read-only mount (data input)
+    ("/host/config", "/etc/app/config", "ro"),
+
+    # Read-write mount (data output)
+    ("/host/data", "/mnt/data", "rw"),
+
+    # Home directory mount
+    (os.path.expanduser("~/Documents"), "/mnt/docs", "ro"),
+]
+```
+
+<Note>
+Uses virtiofs for high-performance file sharing. Host path must exist before box creation. Guest path is created automatically if missing. Changes to `rw` mounts are visible on host immediately.
+</Note>
+
+#### `ports: List[Tuple[int, int, str]]`
+
+Port forwarding as (host_port, guest_port, protocol) tuples.
+
+**Format:** `(host_port, guest_port, "tcp"|"udp")`
+
+**Default:** `[]` (no port forwarding)
+
+**Example:**
+
+```python
+ports=[
+    (8080, 80, "tcp"),      # HTTP
+    (8443, 443, "tcp"),     # HTTPS
+    (5432, 5432, "tcp"),    # PostgreSQL
+    (53, 53, "udp"),        # DNS
+    (3000, 8000, "tcp"),    # Custom mapping
+]
+```
+
+<Note>
+Uses gvproxy for NAT port mapping. Host port must be available (not in use). Multiple boxes can forward to same host port (error if conflict). Supports both TCP and UDP protocols.
+</Note>
+
+#### `auto_remove: bool`
+
+Automatically remove box when stopped.
+
+**Default:** `True`
+
+**Example:**
+
+```python
+auto_remove=True   # Auto cleanup (default)
+auto_remove=False  # Manual cleanup required
+```
+
+<Note>
+When `True`, box is removed when context exits or `stop()` is called. When `False`, box persists after stop and can be restarted with `runtime.get(box_id)`. Manual cleanup is done with `await box.remove()`.
+</Note>
+
+### Runtime Options
+
+#### `home_dir: str`
+
+Base directory for BoxLite runtime data.
+
+**Default:** `~/.boxlite`
+
+**Override:** Set `BOXLITE_HOME` environment variable
+
+**Structure:**
+
+```text
+~/.boxlite/
+├── images/       # OCI image cache (blobs, index.json)
+├── boxes/        # Per-box data (config.json, disk.qcow2)
+├── init/         # Shared guest rootfs
+├── logs/         # Runtime logs
+├── gvproxy/      # Network backend binaries
+├── lock          # Filesystem lock file
+└── db/           # SQLite databases (boxes.db, images.db)
+```
+
+**Example:**
+
+```python
+# Custom home directory
+runtime = boxlite.Boxlite(boxlite.Options(home_dir="/custom/path"))
+```
+
+### Environment Variables
+
+#### `BOXLITE_HOME`
+
+Override default runtime home directory.
+
+**Default:** `~/.boxlite`
+
+**Example:**
+
+```bash
+export BOXLITE_HOME=/custom/boxlite
+python script.py
+```
+
+#### `RUST_LOG`
+
+Enable debug logging for troubleshooting.
+
+**Levels:** `trace`, `debug`, `info`, `warn`, `error`
+
+**Example:**
+
+```bash
+# Debug logging
+RUST_LOG=debug python script.py
+
+# Trace logging (very verbose)
+RUST_LOG=trace python script.py
+
+# Module-specific logging
+RUST_LOG=boxlite::runtime=debug python script.py
+```
+
+#### `BOXLITE_TMPDIR`
+
+Override temporary directory for BoxLite operations.
+
+**Default:** System temp directory (`/tmp` on Linux/macOS)
+
+**Example:**
+
+```bash
+export BOXLITE_TMPDIR=/custom/tmp
+python script.py
+```
+
+## Error Codes & Handling
+
+For a detailed breakdown of error types and handling patterns, see the error documentation for each SDK:
+
+- [Python SDK Errors & Metrics](/reference/python/errors-metrics)
+
+### Error Types
+
+BoxLite uses a centralized error enum with specific variants for different error categories.
+
+| Error | Description |
+|-------|-------------|
+| `UnsupportedEngine` | Platform or hypervisor not supported |
+| `Engine(String)` | Hypervisor or VM engine error |
+| `Config(String)` | Invalid box configuration |
+| `Storage(String)` | Filesystem or disk operation error |
+| `Image(String)` | OCI image pull or extraction error |
+| `Portal(String)` | Host-guest communication error (gRPC over vsock) |
+| `Network(String)` | Network configuration or connectivity error |
+| `Execution(String)` | Command execution error |
+| `Internal(String)` | Internal BoxLite error |
+| `NotFound(String)` | Box or resource not found |
+| `AlreadyExists(String)` | Box or resource already exists |
+| `InvalidState(String)` | Box is in wrong state for requested operation |
+
+### Error Handling Pattern (Python)
+
+```python
+import boxlite
+
+async def safe_execution():
+    try:
+        async with boxlite.SimpleBox(image="python:slim") as box:
+            result = await box.exec("python", "script.py")
+
+            # Check exit code
+            if result.exit_code != 0:
+                print(f"Command failed: {result.stderr}")
+                return
+
+    except Exception as e:
+        # All BoxLite errors are raised as Python exceptions
+        print(f"Error: {e}")
+
+        # Enable debug logging for details
+        # RUST_LOG=debug python script.py
+```
+
+### Error Handling Pattern (Rust)
+
+```rust
+use boxlite::{BoxliteRuntime, BoxliteError, BoxliteResult};
+
+fn main() -> BoxliteResult<()> {
+    let runtime = BoxliteRuntime::default_runtime();
+
+    match runtime.create(options) {
+        Ok((box_id, litebox)) => {
+            // Success
+        }
+        Err(BoxliteError::UnsupportedEngine) => {
+            eprintln!("Platform not supported");
+            return Err(BoxliteError::UnsupportedEngine);
+        }
+        Err(BoxliteError::Image(msg)) => {
+            eprintln!("Image error: {}", msg);
+            // Handle image-specific error
+        }
+        Err(e) => {
+            eprintln!("Unexpected error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+```
+
+## File Formats
+
+### QCOW2 Disk Images
+
+BoxLite uses QCOW2 (QEMU Copy-On-Write version 2) for persistent disks.
+
+**Location:** `~/.boxlite/boxes/{box-id}/disk.qcow2`
+
+**Features:**
+- Thin provisioning (sparse allocation)
+- Copy-on-write snapshots
+- Compression support
+
+**Tools:**
+
+```bash
+# Inspect QCOW2 image
+qemu-img info ~/.boxlite/boxes/{box-id}/disk.qcow2
+
+# Convert to raw (if needed)
+qemu-img convert -f qcow2 -O raw disk.qcow2 disk.raw
+```
+
+### OCI Image Cache
+
+BoxLite caches OCI images at the layer level for fast starts.
+
+**Location:** `~/.boxlite/images/`
+
+**Structure:**
+
+```text
+~/.boxlite/images/
+├── blobs/
+│   └── sha256/
+│       ├── abc123...  # Layer blob
+│       ├── def456...  # Layer blob
+│       └── ...
+└── index.json         # Image index
+```
+
+<Note>
+Blob-level deduplication across images means shared base layers (e.g., `python:3.11` and `python:3.12`) are stored only once.
+</Note>
+
+**Clearing Cache:**
+
+```bash
+# Clear all cached images
+rm -rf ~/.boxlite/images/*
+
+# Images will be re-pulled on next use
+```
+
+### Box Configuration
+
+Box metadata and state are stored as JSON.
+
+**Location:** `~/.boxlite/boxes/{box-id}/config.json`
+
+**Example:**
+
+```json
+{
+  "id": "01JJNH8...",
+  "image": "python:slim",
+  "cpus": 2,
+  "memory_mib": 1024,
+  "volumes": [
+    {
+      "host_path": "/host/data",
+      "guest_path": "/mnt/data",
+      "read_only": true
+    }
+  ],
+  "ports": [
+    {
+      "host_port": 8080,
+      "guest_port": 80,
+      "protocol": "tcp"
+    }
+  ],
+  "created_at": "2025-01-15T10:30:00Z",
+  "status": "running"
+}
+```
+
+<Warning>
+Do not manually edit box configuration files. They are managed by BoxLite and manual changes may cause unexpected behavior.
+</Warning>
+
+### SQLite Databases
+
+BoxLite uses SQLite for metadata persistence.
+
+**Locations:**
+- `~/.boxlite/db/boxes.db` - Box registry and metadata
+- `~/.boxlite/db/images.db` - Image cache index
+
+**Tools:**
+
+```bash
+# Inspect database
+sqlite3 ~/.boxlite/db/boxes.db ".tables"
+sqlite3 ~/.boxlite/db/boxes.db "SELECT * FROM boxes;"
+
+# Backup
+cp ~/.boxlite/db/boxes.db ~/backup/boxes.db.backup
+```
+
+<Warning>
+Do not manually modify the SQLite databases. Data corruption may result. Corruption recovery: delete and recreate from box config files.
+</Warning>

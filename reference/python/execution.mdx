@@ -1,0 +1,302 @@
+---
+title: "Execution"
+description: "Python SDK command execution reference"
+icon: "play"
+---
+
+BoxLite provides a streaming execution model for running commands inside boxes. Commands are executed asynchronously with separate access to stdout, stderr, and stdin streams.
+
+## Execution
+
+### `boxlite.Execution`
+
+Represents a running command execution. Returned by `box.exec()`.
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `stdout()` | `() -> ExecStdout` | Get stdout stream (async iterator) |
+| `stderr()` | `() -> ExecStderr` | Get stderr stream (async iterator) |
+| `stdin()` | `() -> ExecStdin` | Get stdin writer |
+| `wait()` | `() -> ExecResult` | Wait for completion (async) |
+| `kill()` | `(signal: int = 9) -> None` | Send signal to process (async) |
+| `resize_tty()` | `(rows: int, cols: int) -> None` | Resize PTY terminal for executions started with `tty=True` (async) |
+
+#### Example
+
+```python
+# Execute with streaming output
+execution = await box.exec("python", ["-c", "for i in range(5): print(i)"])
+
+# Stream stdout
+async for line in execution.stdout():
+    print(f"Output: {line}")
+
+# Wait for completion
+result = await execution.wait()
+print(f"Exit code: {result.exit_code}")
+```
+
+### Streaming Output
+
+You can stream stdout and stderr independently for real-time output processing.
+
+```python
+# Execute a long-running command
+execution = await box.exec("python", ["-c", """
+import time
+import sys
+
+for i in range(10):
+    print(f"Progress: {i}/10")
+    sys.stdout.flush()
+    time.sleep(1)
+
+print("Done!")
+"""])
+
+# Stream stdout in real-time
+async for line in execution.stdout():
+    print(f"[stdout] {line}")
+
+# Get final result
+result = await execution.wait()
+print(f"Exit code: {result.exit_code}")
+```
+
+### Streaming with stderr
+
+```python
+execution = await box.exec("python", ["-c", """
+import sys
+print("Normal output")
+print("Error output", file=sys.stderr)
+print("More normal output")
+"""])
+
+# Stream both stdout and stderr
+import asyncio
+
+async def read_stdout():
+    async for line in execution.stdout():
+        print(f"[stdout] {line}")
+
+async def read_stderr():
+    async for line in execution.stderr():
+        print(f"[stderr] {line}")
+
+await asyncio.gather(read_stdout(), read_stderr())
+result = await execution.wait()
+```
+
+### Interactive Input
+
+```python
+# Start an interactive process
+execution = await box.exec("cat")
+stdin = execution.stdin()
+
+# Send data to stdin
+await stdin.send_input(b"Hello\n")
+await stdin.send_input(b"World\n")
+
+# Close stdin to signal EOF (process will complete)
+# Wait for completion
+result = await execution.wait()
+```
+
+### Killing a Process
+
+```python
+import asyncio
+
+# Start a long-running process
+execution = await box.exec("sleep", ["3600"])
+
+# Kill after 5 seconds
+await asyncio.sleep(5)
+await execution.kill()  # Sends SIGKILL (9) by default
+
+# Or send a specific signal
+await execution.kill(signal=15)  # SIGTERM
+
+result = await execution.wait()
+```
+
+### TTY Resizing
+
+For executions started with `tty=True`, you can dynamically resize the terminal.
+
+```python
+execution = await box.exec("bash", tty=True)
+
+# Resize the terminal
+await execution.resize_tty(rows=40, cols=120)
+
+# Send commands
+stdin = execution.stdin()
+await stdin.send_input(b"ls -la\n")
+```
+
+## ExecStdout / ExecStderr
+
+### `boxlite.ExecStdout` / `boxlite.ExecStderr`
+
+Async iterators for streaming output line by line.
+
+```python
+# Stream stdout line by line
+stdout = execution.stdout()
+async for line in stdout:
+    print(line)
+
+# Stream stderr
+stderr = execution.stderr()
+async for line in stderr:
+    print(f"Error: {line}", file=sys.stderr)
+```
+
+<Warning>
+Each stream can only be iterated once. After iteration, the stream is consumed.
+</Warning>
+
+## ExecStdin
+
+### `boxlite.ExecStdin`
+
+Writer for sending input to a running process.
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `send_input()` | `(data: bytes) -> None` | Write bytes to stdin (async) |
+
+#### Example
+
+```python
+# Interactive input
+execution = await box.exec("cat")
+stdin = execution.stdin()
+
+# Send data
+await stdin.send_input(b"Hello\n")
+await stdin.send_input(b"World\n")
+
+# Wait for completion
+result = await execution.wait()
+```
+
+## ExecResult
+
+### `boxlite.ExecResult`
+
+Result of a completed execution.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `exit_code` | `int` | Process exit code (0 = success) |
+
+<Note>
+For higher-level APIs (`SimpleBox.exec()`), the result also includes `stdout` and `stderr` strings, allowing you to access the full output without streaming.
+</Note>
+
+### Example
+
+```python
+# Low-level API (Box.exec)
+execution = await box.exec("echo", ["hello"])
+result = await execution.wait()
+print(result.exit_code)  # 0
+
+# High-level API (SimpleBox.exec)
+async with SimpleBox(image="python:slim") as box:
+    result = await box.exec("echo", "hello")
+    print(result.exit_code)  # 0
+    print(result.stdout)     # "hello\n"
+    print(result.stderr)     # ""
+```
+
+## Common Patterns
+
+### Run and Capture Output
+
+The simplest pattern for running a command and capturing its output.
+
+```python
+async with SimpleBox(image="python:slim") as box:
+    result = await box.exec("python", "-c", "print('Hello!')")
+
+    if result.exit_code == 0:
+        print(f"Output: {result.stdout}")
+    else:
+        print(f"Error: {result.stderr}")
+```
+
+### Stream Large Output
+
+For commands that produce large amounts of output, use streaming to avoid memory issues.
+
+```python
+execution = await box.exec("find", ["/", "-type", "f"])
+
+line_count = 0
+async for line in execution.stdout():
+    line_count += 1
+    if "important" in line:
+        print(f"Found: {line}")
+
+result = await execution.wait()
+print(f"Processed {line_count} lines")
+```
+
+### Pipeline Pattern
+
+Run multiple commands in sequence, passing output between them.
+
+```python
+async with SimpleBox(image="python:slim") as box:
+    # Write data
+    await box.exec("bash", "-c", "echo 'line1\nline2\nline3' > /tmp/data.txt")
+
+    # Process data
+    result = await box.exec("bash", "-c", "cat /tmp/data.txt | sort | uniq")
+    print(result.stdout)
+```
+
+### Environment Variables per Execution
+
+Pass environment variables to specific command executions.
+
+```python
+async with SimpleBox(image="python:slim") as box:
+    result = await box.exec(
+        "python", "-c", "import os; print(os.environ['MY_VAR'])",
+        env=[("MY_VAR", "hello")]
+    )
+    print(result.stdout)  # "hello\n"
+```
+
+### Timeout with Kill
+
+Implement a timeout for long-running commands.
+
+```python
+import asyncio
+
+async with SimpleBox(image="python:slim") as box:
+    execution = await box.exec("sleep", ["3600"])
+
+    try:
+        result = await asyncio.wait_for(execution.wait(), timeout=10.0)
+    except asyncio.TimeoutError:
+        await execution.kill()
+        print("Command timed out and was killed")
+```
+
+## See Also
+
+- [Python SDK Overview](/reference/python/index) - Runtime management, BoxOptions
+- [Box Types](/reference/python/box-types) - SimpleBox, CodeBox, and other box types
+- [Errors & Metrics](/reference/python/errors-metrics) - Exception handling for execution errors
