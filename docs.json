@@ -9,47 +9,41 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "tabs": [
+    "groups": [
       {
-        "tab": "Documentation",
-        "groups": [
-          {
-            "group": "Getting Started",
-            "pages": [
-              "index",
-              "getting-started/index",
-              "getting-started/quickstart-python",
-              "getting-started/quickstart-nodejs",
-              "getting-started/quickstart-rust",
-              "getting-started/quickstart-c"
-            ]
-          },
-          {
-            "group": "Architecture",
-            "pages": [
-              "architecture/index",
-              "architecture/components",
-              "architecture/security",
-              "architecture/networking-storage"
-            ]
-          },
-          {
-            "group": "FAQ",
-            "pages": [
-              "faq"
-            ]
-          }
+        "group": "Getting Started",
+        "pages": [
+          "index",
+          "getting-started/index",
+          "boxrun/index",
+          "getting-started/quickstart-python",
+          "getting-started/quickstart-nodejs",
+          "getting-started/quickstart-rust",
+          "getting-started/quickstart-c"
         ]
       },
       {
-        "tab": "SDK Reference",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "reference/index"
-            ]
-          },
+        "group": "Architecture",
+        "pages": [
+          "architecture/index",
+          "architecture/components",
+          "architecture/security",
+          "architecture/networking-storage"
+        ]
+      },
+      {
+        "group": "BoxRun",
+        "pages": [
+          "boxrun/cli",
+          "boxrun/python-sdk",
+          "boxrun/rest-api",
+          "boxrun/configuration"
+        ]
+      },
+      {
+        "group": "SDK Reference",
+        "pages": [
+          "reference/index",
           {
             "group": "Python SDK",
             "pages": [
@@ -89,32 +83,21 @@
         ]
       },
       {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/index",
-              "guides/building-from-source",
-              "guides/examples-gallery",
-              "guides/ai-agent-integration",
-              "guides/image-registry-configuration",
-              "guides/macos-sandbox-debugging",
-              "guides/changelog"
-            ]
-          }
+        "group": "Guides",
+        "pages": [
+          "guides/index",
+          "guides/ai-agent-integration",
+          "guides/examples-gallery",
+          "guides/building-from-source",
+          "guides/image-registry-configuration",
+          "guides/macos-sandbox-debugging",
+          "guides/changelog"
         ]
       },
       {
-        "tab": "Development",
-        "groups": [
-          {
-            "group": "Development",
-            "pages": [
-              "development/cli",
-              "development/rust-style"
-            ]
-          }
+        "group": "FAQ",
+        "pages": [
+          "faq"
         ]
       }
     ]

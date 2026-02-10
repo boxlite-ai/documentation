@@ -1,31 +1,24 @@
 ---
-title: "BoxLite Documentation"
-description: "BoxLite lets you spin up lightweight VMs and run OCI containers inside them. Designed for AI agent sandboxes and multi-tenant code execution, where Docker alone isn't enough and full VM infrastructure is too heavy."
+title: "Documentation"
+description: "Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware isolation, sub-second boot, zero daemon."
 icon: "house"
 ---
 
-Embed hardware-isolated sandboxes in your app — no daemon, no root, no Docker. BoxLite is a lightweight virtual machine runtime that gives every sandbox its own microVM with hardware-level isolation, yet embeds directly into your application as a library.
+Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware isolation, sub-second boot, zero daemon — runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
 
-BoxLite v0.4.4 is stable and production-ready. It runs on **macOS** (Apple Silicon), **Linux** (KVM), and **Windows** (WSL2).
-
-## Why BoxLite?
-
-<CardGroup cols={3}>
-  <Card title="No daemon required" icon="plug-circle-xmark">
-    Unlike Docker, BoxLite has no background process. Import the library, create a sandbox, and run code — all in-process.
-  </Card>
-  <Card title="Hardware-level isolation" icon="shield-halved">
-    Every sandbox runs in its own microVM backed by Apple Hypervisor.framework or KVM. Full kernel isolation, not just namespaces.
-  </Card>
-  <Card title="Multi-language SDKs" icon="code">
-    First-class support for Python, Node.js, Rust, and C. Async-native APIs with type safety across all SDKs.
-  </Card>
-</CardGroup>
-
-## Quick install
+## Quick start
 
 <Tabs>
-  <Tab title="Python">
+  <Tab title="BoxRun (CLI)">
+    ```bash
+    # Install
+    curl -fsSL https://boxlite.ai/boxrun/install | sh
+
+    # One command — create a VM and drop into a shell
+    boxrun shell ubuntu
+    ```
+  </Tab>
+  <Tab title="BoxLite (Python)">
     ```bash
     pip install boxlite
     ```
@@ -42,7 +35,7 @@ BoxLite v0.4.4 is stable and production-ready. It runs on **macOS** (Apple Silic
     asyncio.run(main())
     ```
   </Tab>
-  <Tab title="Node.js">
+  <Tab title="BoxLite (Node.js)">
     ```bash
     npm install boxlite
     ```
@@ -59,112 +52,4 @@ BoxLite v0.4.4 is stable and production-ready. It runs on **macOS** (Apple Silic
     }
     ```
   </Tab>
-  <Tab title="Rust">
-    ```bash
-    cargo add boxlite
-    ```
-
-    ```rust
-    use boxlite::{BoxliteRuntime, BoxOptions, BoxCommand};
-
-    fn main() -> boxlite::BoxliteResult<()> {
-        let runtime = BoxliteRuntime::default_runtime();
-        let options = BoxOptions::new("alpine:latest");
-        let (id, litebox) = runtime.create(options)?;
-
-        let cmd = BoxCommand::new("echo").arg("Hello from BoxLite!");
-        let result = litebox.exec(cmd)?;
-        println!("{}", result.stdout());
-
-        runtime.remove(&id)?;
-        Ok(())
-    }
-    ```
-  </Tab>
-  <Tab title="C">
-    ```c
-    #include <boxlite.h>
-
-    int main() {
-        BoxliteRuntime *rt = boxlite_runtime_new(NULL);
-        const char *config = "{\"image\": \"alpine:latest\"}";
-        BoxliteBox *box = boxlite_create_box(rt, config);
-
-        boxlite_execute(box, "echo", "Hello from BoxLite!", NULL, NULL);
-
-        boxlite_stop_box(box);
-        boxlite_runtime_free(rt);
-        return 0;
-    }
-    ```
-  </Tab>
 </Tabs>
-
-## BoxLite vs alternatives
-
-| | BoxLite | Docker | E2B |
-|---|---|---|---|
-| **Isolation level** | Hardware (microVM) | OS (namespaces/cgroups) | Hardware (microVM) |
-| **Daemon required** | No | Yes (dockerd) | No (cloud API) |
-| **Root required** | No | Yes (or rootless mode) | No |
-| **Startup time** | ~150 ms | ~500 ms | ~500 ms (network) |
-| **Embeddable as library** | Yes | No (client/server) | No (SaaS) |
-| **Open source** | Yes (Apache 2.0) | Yes | Partial |
-| **Runs locally** | Yes | Yes | No (cloud only) |
-| **Multi-language SDKs** | Python, Node.js, Rust, C | CLI / REST API | Python, Node.js |
-
-## Explore the documentation
-
-<CardGroup cols={2}>
-  <Card
-    title="Getting Started"
-    icon="rocket"
-    href="/getting-started/index"
-  >
-    Install BoxLite and run your first sandboxed box in minutes. Quickstart guides are available for Python, Node.js, Rust, and C.
-  </Card>
-  <Card
-    title="Architecture"
-    icon="sitemap"
-    href="/architecture/index"
-  >
-    Understand how BoxLite works under the hood — microVM isolation, hypervisor abstraction, networking, and storage.
-  </Card>
-  <Card
-    title="Guides"
-    icon="book"
-    href="/guides/index"
-  >
-    Practical how-to guides covering AI agent integration, building from source, image registry configuration, and more.
-  </Card>
-  <Card
-    title="SDK Reference"
-    icon="terminal"
-    href="/reference/index"
-  >
-    Complete API reference for the Python, Node.js, Rust, and C SDKs — box types, execution, errors, and metrics.
-  </Card>
-</CardGroup>
-
-## Quick links
-
-<CardGroup cols={2}>
-  <Card
-    title="FAQ & Troubleshooting"
-    icon="circle-question"
-    href="/faq"
-  >
-    Answers to common questions and solutions for frequent issues.
-  </Card>
-  <Card
-    title="Contributing"
-    icon="code-pull-request"
-    href="https://github.com/boxlite-ai/boxlite/blob/main/CONTRIBUTING.md"
-  >
-    Learn how to contribute to BoxLite — development setup, running tests, and the pull request process.
-  </Card>
-</CardGroup>
-
-<Tip>
-  New to BoxLite? Start with the [Getting Started](/getting-started/index) guide to install the SDK and launch your first sandboxed box in under five minutes.
-</Tip>

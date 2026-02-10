@@ -1,14 +1,51 @@
 ---
 title: "Getting Started"
-description: "Get up and running with BoxLite in 5 minutes."
+description: "Choose the right path to get up and running — BoxRun for a ready-to-use platform, or BoxLite SDKs for embedding sandboxing in your application."
 icon: "rocket"
 ---
 
 <Snippet file="prerequisites.mdx" />
 
-## System Requirements
+## Choose your path
 
-BoxLite requires a platform with hardware virtualization support:
+<CardGroup cols={2}>
+  <Card title="BoxRun — Platform" icon="server" href="/boxrun/index">
+    **Fastest way to start.** Install a single binary and get a CLI, REST API, web dashboard, and Python SDK. No code required to try it out.
+
+    ```bash
+    curl -fsSL https://boxlite.ai/boxrun/install | sh
+    boxrun shell ubuntu
+    ```
+  </Card>
+  <Card title="BoxLite — Library" icon="cube" href="/getting-started/quickstart-python">
+    **Embed in your app.** Import the library, create a sandbox, and run code — all in-process. SDKs for Python, Node.js, Rust, and C.
+
+    ```bash
+    pip install boxlite
+    ```
+  </Card>
+</CardGroup>
+
+## BoxLite SDK quickstarts
+
+<CardGroup cols={2}>
+  <Card title="Python" icon="python" href="/getting-started/quickstart-python">
+    **Stable (v0.4.4)** — AI agents, scripting, rapid prototyping
+  </Card>
+  <Card title="Node.js" icon="node-js" href="/getting-started/quickstart-nodejs">
+    **v0.1.6** — Web services, TypeScript projects
+  </Card>
+  <Card title="Rust" icon="gear" href="/getting-started/quickstart-rust">
+    **Native** — Performance-critical, embedded systems
+  </Card>
+  <Card title="C" icon="c" href="/getting-started/quickstart-c">
+    **v0.2.0** — C/C++ applications, system integration
+  </Card>
+</CardGroup>
+
+## System requirements
+
+BoxLite requires hardware virtualization support:
 
 | Platform       | Architecture  | Requirements                        |
 |----------------|---------------|-------------------------------------|
@@ -20,8 +57,6 @@ BoxLite requires a platform with hardware virtualization support:
 <Warning>
   macOS Intel (x86_64) is **not supported** due to Hypervisor.framework stability issues.
 </Warning>
-
-## Verify Virtualization Support
 
 <Tabs>
   <Tab title="macOS">
@@ -78,181 +113,3 @@ BoxLite requires a platform with hardware virtualization support:
     </Note>
   </Tab>
 </Tabs>
-
-## No Daemon Required
-
-Unlike Docker, BoxLite doesn't require a daemon process. It's an embeddable library that runs directly in your application.
-
-## Choose Your SDK
-
-<CardGroup cols={2}>
-  <Card title="Python" icon="python" href="/getting-started/quickstart-python">
-    **Stable (v0.4.4)** -- AI agents, scripting, rapid prototyping
-  </Card>
-  <Card title="Node.js" icon="node-js" href="/getting-started/quickstart-nodejs">
-    **v0.1.6** -- Web services, TypeScript projects
-  </Card>
-  <Card title="Rust" icon="gear" href="/getting-started/quickstart-rust">
-    **Native** -- Performance-critical, embedded systems
-  </Card>
-  <Card title="C" icon="c" href="/getting-started/quickstart-c">
-    **v0.2.0** -- C/C++ applications, system integration
-  </Card>
-</CardGroup>
-
-### Hello World
-
-<Tabs>
-  <Tab title="Python">
-    ```bash
-    pip install boxlite
-    ```
-
-    ```python
-    import asyncio
-    import boxlite
-
-    async def main():
-        async with boxlite.SimpleBox() as box:
-            result = await box.exec("echo", "Hello from BoxLite!")
-            print(result.stdout)
-
-    asyncio.run(main())
-    ```
-  </Tab>
-  <Tab title="Node.js">
-    ```bash
-    npm install boxlite
-    ```
-
-    ```typescript
-    import { SimpleBox } from 'boxlite';
-
-    const box = new SimpleBox({ image: 'alpine:latest' });
-    try {
-      const result = await box.exec('echo', 'Hello from BoxLite!');
-      console.log(result.stdout);
-    } finally {
-      await box.stop();
-    }
-    ```
-  </Tab>
-  <Tab title="Rust">
-    ```bash
-    cargo add boxlite
-    ```
-
-    ```rust
-    use boxlite::{BoxliteRuntime, BoxOptions, BoxCommand};
-
-    fn main() -> boxlite::BoxliteResult<()> {
-        let runtime = BoxliteRuntime::default_runtime();
-        let options = BoxOptions::new("alpine:latest");
-        let (id, litebox) = runtime.create(options)?;
-
-        let cmd = BoxCommand::new("echo").arg("Hello from BoxLite!");
-        let result = litebox.exec(cmd)?;
-        println!("{}", result.stdout());
-
-        runtime.remove(&id)?;
-        Ok(())
-    }
-    ```
-  </Tab>
-  <Tab title="C">
-    ```c
-    #include <boxlite.h>
-
-    int main() {
-        BoxliteRuntime *rt = boxlite_runtime_new(NULL);
-        const char *config = "{\"image\": \"alpine:latest\"}";
-        BoxliteBox *box = boxlite_create_box(rt, config);
-
-        boxlite_execute(box, "echo", "Hello from BoxLite!", NULL, NULL);
-
-        boxlite_stop_box(box);
-        boxlite_runtime_free(rt);
-        return 0;
-    }
-    ```
-  </Tab>
-</Tabs>
-
-| SDK | Status | Best For |
-|-----|--------|----------|
-| [Python](/getting-started/quickstart-python) | Stable (v0.4.4) | AI agents, scripting, rapid prototyping |
-| [Node.js](/getting-started/quickstart-nodejs) | v0.1.6 | Web services, TypeScript projects |
-| [Rust](/getting-started/quickstart-rust) | Native | Performance-critical, embedded systems |
-| [C](/getting-started/quickstart-c) | v0.2.0 | C/C++ applications, system integration |
-| Go | Coming soon | -- |
-
-## Next steps
-
-### Learn More
-
-- **[Architecture](/architecture/index)** - How BoxLite works under the hood
-- **[How-to Guides](/guides/index)** - Practical usage guides
-- **[Reference](/reference/index)** - Complete API documentation
-- **[FAQ](/faq)** - Common questions and answers
-
-### Get Help
-
-- **[GitHub Issues](https://github.com/boxlite-labs/boxlite/issues)** - Bug reports and feature requests
-- **[GitHub Discussions](https://github.com/boxlite-labs/boxlite/discussions)** - Questions and community support
-
-## Troubleshooting
-
-### Installation Issues
-
-**Problem:** `pip install boxlite` fails
-
-**Solutions:**
-- Verify Python 3.10+: `python --version`
-- Update pip: `pip install --upgrade pip`
-- Check platform support (macOS ARM64, Linux x86_64/ARM64 only)
-
-### Runtime Issues
-
-**Problem:** "KVM not available" error on Linux
-
-**Solutions:**
-
-```bash
-# Check KVM module
-lsmod | grep kvm
-
-# Load KVM module
-sudo modprobe kvm kvm_intel  # or kvm_amd
-
-# Check /dev/kvm permissions
-ls -l /dev/kvm
-sudo chmod 666 /dev/kvm  # or add user to kvm group
-```
-
-**Problem:** Box fails to start
-
-**Solutions:**
-- Check disk space: `df -h ~/.boxlite`
-- Enable debug logging: `RUST_LOG=debug python script.py`
-- Verify image name: Try `docker pull <image>` to test
-- Check hypervisor: Ensure KVM (Linux) or Hypervisor.framework (macOS) is available
-
-### Performance Issues
-
-**Problem:** Box is slow
-
-**Solutions:**
-
-```python
-# Increase resource limits
-boxlite.BoxOptions(
-    cpus=4,          # More CPUs
-    memory_mib=4096, # More memory
-)
-
-# Check metrics
-metrics = await box.metrics()
-print(f"Memory: {metrics.memory_usage_bytes / (1024**2):.2f} MB")
-```
-
-For more troubleshooting help, see [FAQ & Troubleshooting](/faq).

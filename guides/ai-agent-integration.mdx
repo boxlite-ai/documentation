@@ -4,7 +4,13 @@ description: "Best practices for integrating BoxLite as a sandboxed execution en
 icon: "robot"
 ---
 
-This guide covers best practices for integrating BoxLite as a sandboxed execution environment for AI agents. It builds on the quick-start patterns in the [Guides](/guides/index) with deeper coverage of configuration, concurrency, timeouts, security, and file transfer.
+This guide covers best practices for integrating BoxLite as a sandboxed execution environment for AI agents — configuration, concurrency, timeouts, security, and file transfer.
+
+<Note>
+  **Using BoxRun?** If your agent communicates via HTTP, [BoxRun's REST API](/boxrun/rest-api) or [Python SDK](/boxrun/python-sdk) may be a simpler integration path. BoxRun handles server lifecycle, file upload/download, and SSE streaming out of the box. See the [AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) section in the BoxRun SDK docs.
+</Note>
+
+The patterns below are for the **BoxLite library** — when you want to embed sandboxing directly in your application process.
 
 ## Recommended Configuration
 
@@ -504,8 +510,10 @@ asyncio.run(main())
 
 ---
 
-## See Also
+## See also
 
+- [BoxRun Python SDK — AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) -- Agent integration via REST API
+- [BoxRun REST API](/boxrun/rest-api) -- HTTP endpoints for sandbox management
 - [Examples Gallery](/guides/examples-gallery) -- Runnable Python examples
-- [SDK Reference](/reference/index) -- Full API reference for all SDKs
+- [SDK Reference](/reference/index) -- Full API reference for all BoxLite SDKs
 - [Architecture](/architecture/index) -- How BoxLite isolation works

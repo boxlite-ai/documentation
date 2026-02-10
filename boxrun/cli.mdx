@@ -1,0 +1,199 @@
+---
+title: "CLI Reference"
+description: "BoxRun CLI commands for managing boxes, executing commands, transferring files, and interactive terminal sessions."
+icon: "terminal"
+---
+
+BoxRun provides a single `boxrun` command with subcommands for managing boxes, executing commands, transferring files, and more.
+
+`BOX` arguments accept either a box ID (`box_abc123`) or a name (`dev`).
+
+## Server
+
+```bash
+boxrun serve [--host 127.0.0.1] [--port 9090] [--socket PATH]
+```
+
+Start the BoxRun server. By default it listens on TCP `127.0.0.1:9090`. Use `--socket` to bind to a Unix domain socket instead.
+
+The web dashboard is available at `http://<host>:<port>/ui` when running in TCP mode.
+
+<Tip>
+  The server starts automatically on your first command — you rarely need to run this manually.
+</Tip>
+
+## Box lifecycle
+
+### Create
+
+```bash
+boxrun create IMAGE [--name NAME] [--cpu 2] [--memory 512] [--network] [-v /host:/guest[:ro]]
+```
+
+Create a new box from a container image.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name`, `-n` | (auto) | Human-readable name |
+| `--cpu` | `2` | CPU cores |
+| `--memory`, `-m` | `512` | Memory in MB |
+| `--network` | `false` | Enable networking |
+| `-v`, `--volume` | (none) | Volume mount (repeatable) |
+
+### List
+
+```bash
+boxrun ls [--status running|stopped|all]
+```
+
+### Stop
+
+```bash
+boxrun stop BOX
+```
+
+Stop a running box. Disk state is preserved — restart it later with `boxrun start`.
+
+### Start
+
+```bash
+boxrun start BOX
+```
+
+Restart a previously stopped box with its disk intact.
+
+### Remove
+
+```bash
+boxrun rm BOX [--force]
+```
+
+Remove a box permanently. Use `--force` to remove a running box without stopping it first.
+
+## Interactive terminal
+
+```bash
+boxrun attach BOX [--shell /bin/bash]
+```
+
+Open a full interactive terminal session inside a running box.
+
+- Full PTY support — vim, htop, tmux all work
+- Automatic terminal resize handling
+- Raw terminal mode — same experience as SSH
+- The box keeps running if you disconnect — reattach anytime
+
+Exit with `Ctrl-D` or type `exit`.
+
+### Shell shortcut
+
+```bash
+boxrun shell IMAGE [--name NAME] [flags...]
+```
+
+Create a box and immediately attach to it — combines `create` + `attach` in one command.
+
+```bash
+boxrun shell ubuntu
+boxrun shell python:slim --name pydev --memory 1024
+```
+
+## Command execution
+
+```bash
+boxrun exec BOX -- CMD [ARGS...]
+```
+
+Execute a command in a box. Output streams to your terminal in real time via SSE.
+
+| Flag | Description |
+|------|-------------|
+| `--detach`, `-d` | Return the exec ID immediately without waiting |
+| `--timeout`, `-t` | Timeout in seconds |
+
+```bash
+# Run a command
+boxrun exec dev -- uname -a
+
+# With timeout
+boxrun exec dev --timeout 30 -- python3 train.py
+
+# Detached (background)
+boxrun exec dev --detach -- long-running-job.sh
+```
+
+## File transfer
+
+```bash
+boxrun cp LOCAL_PATH BOX:REMOTE_PATH    # upload
+boxrun cp BOX:REMOTE_PATH LOCAL_PATH    # download
+```
+
+Direction is inferred from the `BOX:PATH` syntax.
+
+```bash
+# Upload a file
+boxrun cp ./data.csv dev:/root/data.csv
+
+# Download results
+boxrun cp dev:/root/results.csv ./results.csv
+```
+
+## Ephemeral run
+
+```bash
+boxrun run IMAGE -- CMD [ARGS...]
+```
+
+Create a box, run a command, print the output, and destroy the box — all in one step.
+
+```bash
+boxrun run ubuntu -- echo "hello"
+boxrun run python:slim --timeout 30 -- python3 -c "print(42)"
+```
+
+## Volume mounts
+
+Share host directories into VMs using Docker-style `-v` syntax:
+
+```bash
+# Read-write mount
+boxrun create ubuntu:24.04 --name dev -v ~/project:/root/project
+
+# Read-only mount
+boxrun create ubuntu:24.04 --name dev -v ~/data:/mnt/data:ro
+
+# Multiple mounts
+boxrun create ubuntu:24.04 -v /src:/root/src -v /data:/mnt/data:ro
+```
+
+Volumes persist across stop/start cycles. Host paths are validated at creation time.
+
+## Garbage collection
+
+```bash
+boxrun gc [--older-than 3600]
+```
+
+Remove boxes that have been stopped for longer than `--older-than` seconds (default: 1 hour).
+
+## Images
+
+```bash
+boxrun images
+```
+
+List available images with their aliases.
+
+## Shell completions
+
+```bash
+# Zsh (add to ~/.zshrc)
+eval "$(boxrun completion zsh)"
+
+# Bash (add to ~/.bashrc)
+eval "$(boxrun completion bash)"
+
+# Fish
+boxrun completion fish | source
+```

@@ -1,0 +1,312 @@
+---
+title: "Python SDK"
+description: "BoxRun Python SDK reference — async client for managing boxes programmatically."
+icon: "python"
+---
+
+The BoxRun Python SDK provides an async client for managing boxes programmatically.
+
+```bash
+pip install boxrun
+```
+
+## Connection
+
+The SDK auto-connects to the BoxRun server using this priority:
+
+1. Unix socket at `~/.boxrun/boxrun.sock` (if it exists)
+2. `BOXRUN_HOST`:`BOXRUN_PORT` environment variables
+3. Fallback to `127.0.0.1:9090`
+
+```python
+from boxrun import BoxRunClient
+
+# Auto-detect
+async with BoxRunClient() as client:
+    ...
+
+# Explicit URL
+async with BoxRunClient(base_url="http://localhost:9090") as client:
+    ...
+```
+
+---
+
+## BoxRunClient
+
+### create
+
+```python
+await client.create(image, *, name=None, cpu=2, memory_mb=512,
+                    network=False, workdir="/root", env=None, volumes=None) -> BoxHandle
+```
+
+Create a new box and return a handle to it.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `image` | `str` | (required) | Container image |
+| `name` | `str \| None` | `None` | Human-readable name |
+| `cpu` | `int` | `2` | CPU cores |
+| `memory_mb` | `int` | `512` | Memory in MB |
+| `network` | `bool` | `False` | Enable networking |
+| `workdir` | `str` | `"/root"` | Working directory |
+| `env` | `dict[str, str] \| None` | `None` | Environment variables |
+| `volumes` | `list[dict] \| None` | `None` | Volume mounts |
+
+Volume dict format: `{"host_path": "/src", "guest_path": "/root/src", "readonly": False}`
+
+```python
+box = await client.create("ubuntu:24.04", name="dev", memory_mb=1024)
+```
+
+### run
+
+```python
+await client.run(image, cmd, *, env=None, timeout_ms=None, volumes=None) -> RunResult
+```
+
+Ephemeral one-shot: create a box, run a command, return the result, destroy the box.
+
+```python
+result = await client.run("ubuntu:24.04", ["echo", "hello"])
+print(result.stdout)  # "hello\n"
+```
+
+### get_box
+
+```python
+await client.get_box(id_or_name) -> BoxInfo
+```
+
+Get info about a box by ID or name.
+
+### list_boxes
+
+```python
+await client.list_boxes(status=None) -> list[BoxInfo]
+```
+
+List all boxes. Optionally filter by status (`"running"`, `"stopped"`).
+
+### gc
+
+```python
+await client.gc(older_than=3600) -> int
+```
+
+Garbage collect stopped boxes older than `older_than` seconds. Returns the number of boxes removed.
+
+---
+
+## BoxHandle
+
+A handle to a specific box, obtained from `client.create()`.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `str` | Box ID |
+| `name` | `str \| None` | Box name |
+| `info` | `BoxInfo` | Full box info (call `refresh()` to update) |
+
+### exec
+
+```python
+await box.exec(cmd, *, env=None, timeout_ms=None) -> ExecInfo
+```
+
+Execute a command and wait for completion.
+
+```python
+result = await box.exec(["echo", "hello"])
+print(result.exit_code)  # 0
+```
+
+### exec_stream
+
+```python
+box.exec_stream(cmd, *, env=None, timeout_ms=None) -> AsyncIterator[ExecEvent]
+```
+
+Execute a command and stream output events in real time.
+
+```python
+async for event in box.exec_stream(["apt-get", "update"]):
+    if event.type == "log":
+        print(event.data, end="")
+```
+
+### upload
+
+```python
+await box.upload(local_path, dest_path) -> None
+```
+
+Upload a file from the host to the box.
+
+```python
+await box.upload("./script.py", "/root/script.py")
+```
+
+### download
+
+```python
+await box.download(remote_path, local_path) -> None
+```
+
+Download a file from the box to the host.
+
+```python
+await box.download("/root/output.json", "./output.json")
+```
+
+### stop / start / remove
+
+```python
+await box.stop() -> BoxInfo          # Stop (preserves disk)
+await box.start() -> BoxInfo         # Restart a stopped box
+await box.remove(force=False) -> None  # Remove permanently
+```
+
+### refresh
+
+```python
+await box.refresh() -> BoxInfo
+```
+
+Re-fetch box info from the server and update `self.info`.
+
+---
+
+## Data types
+
+### BoxInfo
+
+```python
+@dataclass
+class BoxInfo:
+    id: str
+    name: str | None
+    status: str              # "creating", "running", "stopped", "error"
+    image: str
+    cpu: int
+    memory_mb: int
+    disk_size_gb: int
+    network: bool
+    workdir: str
+    env: dict[str, str] | None
+    volumes: list[dict] | None
+    created_at: str
+    started_at: str | None
+    stopped_at: str | None
+```
+
+### ExecInfo
+
+```python
+@dataclass
+class ExecInfo:
+    id: str
+    box_id: str
+    status: str              # "running", "completed", "error", "timeout", "canceled"
+    cmd: list[str]
+    exit_code: int | None
+    error_message: str | None
+    created_at: str
+    finished_at: str | None
+```
+
+### ExecEvent
+
+```python
+@dataclass
+class ExecEvent:
+    type: str                # "log" | "exit"
+    data: str
+    stream: str | None       # "stdout" | "stderr" (for log events)
+    seq: int
+```
+
+### RunResult
+
+```python
+@dataclass
+class RunResult:
+    exit_code: int | None
+    stdout: str
+    stderr: str
+    error_message: str | None
+```
+
+---
+
+## Error handling
+
+All SDK errors raise `BoxRunError(code, message)`.
+
+```python
+from boxrun.common.errors import BoxRunError
+
+try:
+    box = await client.create("ubuntu:24.04")
+except BoxRunError as e:
+    print(f"Error [{e.code}]: {e.message}")
+```
+
+| Error code | Description |
+|------------|-------------|
+| `BOX_NOT_FOUND` | Box does not exist |
+| `BOX_NOT_RUNNING` | Box is stopped |
+| `BOX_ALREADY_RUNNING` | Box is already running |
+| `EXEC_NOT_FOUND` | Execution does not exist |
+| `EXEC_ALREADY_FINISHED` | Execution already completed |
+| `IMAGE_PULL_FAILED` | Failed to pull container image |
+| `RESOURCE_EXCEEDED` | CPU or memory limit exceeded |
+| `TIMEOUT` | Operation timed out |
+| `RUNTIME_ERROR` | Internal runtime error |
+| `CANCELED` | Operation was canceled |
+
+---
+
+## AI agent patterns
+
+A typical agent workflow with BoxRun:
+
+1. **Create** a box with the right image and resources
+2. **Install dependencies** via `exec`
+3. **Upload** code or data
+4. **Run** the task, streaming output for real-time feedback
+5. **Download** results
+6. **Remove** the box when done
+
+```python
+async def agent_task():
+    async with BoxRunClient() as client:
+        box = await client.create("ubuntu:24.04", name="agent-workspace")
+
+        # Install dependencies
+        await box.exec(["apt-get", "update", "-y"])
+        await box.exec(["apt-get", "install", "-y", "python3", "python3-pip"])
+
+        # Upload code
+        await box.upload("./script.py", "/root/script.py")
+
+        # Run with real-time streaming
+        async for event in box.exec_stream(["python3", "/root/script.py"]):
+            if event.type == "log":
+                print(event.data, end="")
+
+        # Download results
+        await box.download("/root/output.json", "./output.json")
+
+        await box.remove(force=True)
+```
+
+For simple one-shot tasks, use `client.run()`:
+
+```python
+result = await client.run("ubuntu:24.04", ["python3", "-c", "print(42)"])
+print(result.stdout)  # "42\n"
+```

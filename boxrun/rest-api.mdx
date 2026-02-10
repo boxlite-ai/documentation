@@ -1,0 +1,239 @@
+---
+title: "REST API"
+description: "BoxRun HTTP API reference — endpoints for boxes, command execution, file transfer, and interactive terminals."
+icon: "server"
+---
+
+Base URL: `http://localhost:9090` (TCP) or `http://boxrun` (Unix socket)
+
+All endpoints return JSON. Error responses use the format:
+
+```json
+{"code": "ERROR_CODE", "message": "Human-readable message"}
+```
+
+## Boxes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/boxes` | Create a box |
+| `GET` | `/v1/boxes` | List boxes |
+| `GET` | `/v1/boxes/{id}` | Get box by ID or name |
+| `POST` | `/v1/boxes/{id}:stop` | Stop (preserves disk) |
+| `POST` | `/v1/boxes/{id}:start` | Restart a stopped box |
+| `DELETE` | `/v1/boxes/{id}` | Remove a box |
+
+### POST /v1/boxes
+
+Create a new box.
+
+```json Request
+{
+  "image": "ubuntu:24.04",
+  "name": "dev",
+  "cpu": 2,
+  "memory_mb": 512,
+  "disk_size_gb": 8,
+  "network": false,
+  "workdir": "/root",
+  "env": {"KEY": "value"},
+  "volumes": [
+    {"host_path": "/src", "guest_path": "/root/src", "readonly": false}
+  ]
+}
+```
+
+All fields except `image` are optional.
+
+```json Response (201)
+{
+  "id": "box_abc123",
+  "name": "dev",
+  "status": "running",
+  "image": "ubuntu:24.04",
+  "cpu": 2,
+  "memory_mb": 512,
+  "disk_size_gb": 8,
+  "network": false,
+  "workdir": "/root",
+  "created_at": "2025-01-01T00:00:00Z",
+  "started_at": "2025-01-01T00:00:00Z"
+}
+```
+
+### GET /v1/boxes
+
+List all boxes. Optional query parameter: `?status=running` or `?status=stopped`.
+
+### DELETE /v1/boxes/{id}
+
+Remove a box. Use `?force=true` to remove a running box without stopping first.
+
+---
+
+## Exec
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/boxes/{id}/exec` | Start a command |
+| `GET` | `/v1/boxes/{id}/execs` | List executions for a box |
+| `GET` | `/v1/boxes/{id}/exec/{eid}` | Get exec status |
+| `GET` | `/v1/boxes/{id}/exec/{eid}/events` | SSE output stream |
+| `POST` | `/v1/boxes/{id}/exec/{eid}:cancel` | Cancel execution |
+
+### POST /v1/boxes/{id}/exec
+
+Start a command in a box. Only `cmd` is required.
+
+```json Request
+{
+  "cmd": ["echo", "hello"],
+  "env": {"KEY": "value"},
+  "workdir": "/root/project",
+  "timeout_ms": 30000
+}
+```
+
+```json Response (201)
+{
+  "id": "exec_xyz789",
+  "box_id": "box_abc123",
+  "status": "running",
+  "cmd": ["echo", "hello"],
+  "exit_code": null,
+  "created_at": "2025-01-01T00:00:00Z"
+}
+```
+
+### GET /v1/boxes/{id}/exec/{eid}/events
+
+Stream execution output in real time using Server-Sent Events (SSE).
+
+**Event types:**
+
+`log` — output from the command:
+
+```
+event: log
+data: {"stream": "stdout", "data": "hello\n", "seq": 1}
+```
+
+`exit` — command finished:
+
+```
+event: exit
+data: {"stream": null, "data": "{\"exit_code\": 0}", "seq": 5}
+```
+
+The stream replays past events first, then streams live events, and closes after the `exit` event.
+
+---
+
+## Files
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/boxes/{id}/files/upload` | Upload a file |
+| `POST` | `/v1/boxes/{id}/files/download` | Download a file |
+
+### POST /v1/boxes/{id}/files/upload
+
+Upload a file to the box. Uses multipart form data.
+
+**Form fields:**
+- `file` — the file content (multipart file)
+- `dest` — destination path inside the box (string)
+
+```json Response
+{"ok": true, "dest": "/root/data.csv"}
+```
+
+### POST /v1/boxes/{id}/files/download
+
+Download a file from the box.
+
+```json Request
+{"path": "/root/results.csv"}
+```
+
+Response: raw file bytes with `Content-Type: application/octet-stream`.
+
+---
+
+## Interactive terminal (WebSocket)
+
+```
+WS /v1/boxes/{id}/attach?shell=/bin/bash&cols=80&rows=24&term=xterm-256color
+```
+
+Opens an interactive terminal session inside the box.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `shell` | `/bin/bash` | Shell to run |
+| `cols` | `80` | Terminal columns |
+| `rows` | `24` | Terminal rows |
+| `term` | `xterm-256color` | TERM environment variable |
+
+**Protocol:**
+- Binary frames = raw terminal I/O (stdin/stdout)
+- Text frames = JSON control messages
+
+**Client to server:**
+
+```json
+{"type": "resize", "cols": 120, "rows": 40}
+```
+
+**Server to client:**
+
+```json
+{"type": "exit", "code": 0}
+```
+
+---
+
+## Convenience endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/info` | Server info and resource limits |
+| `POST` | `/v1/run` | Ephemeral one-shot run |
+| `POST` | `/v1/gc` | Garbage collect stopped boxes |
+
+### POST /v1/run
+
+Create a box, run a command, return output, destroy the box. Only `image` and `cmd` are required.
+
+```json Request
+{
+  "image": "ubuntu:24.04",
+  "cmd": ["echo", "hello"],
+  "timeout_ms": 30000
+}
+```
+
+```json Response
+{
+  "exit_code": 0,
+  "stdout": "hello\n",
+  "stderr": "",
+  "error_message": null
+}
+```
+
+### GET /v1/info
+
+```json Response
+{"max_cpu": 8, "max_memory_mb": 16384}
+```
+
+### POST /v1/gc
+
+```json Request
+{"older_than": 3600}
+```
+
+```json Response
+{"removed": 2}
+```

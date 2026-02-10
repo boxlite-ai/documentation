@@ -4,8 +4,9 @@
 
 This is the official documentation site for **BoxLite** — a lightweight, embeddable virtual machine runtime for secure, isolated code execution ("SQLite for sandboxing"). The site is built with [Mintlify](https://mintlify.com) and deployed automatically on push to `main`.
 
-- **Product repo**: https://github.com/boxlite-ai/boxlite
-- **Current version**: v0.4.4 (Python SDK stable), Node.js v0.1.6, C v0.2.0
+- **BoxLite repo**: https://github.com/boxlite-ai/boxlite
+- **BoxRun repo**: https://github.com/boxlite-ai/boxrun
+- **Current versions**: BoxLite Python v0.4.4 (stable), Node.js v0.1.6, C v0.2.0; BoxRun latest
 - **Platforms**: macOS (Apple Silicon), Linux (KVM), Windows (WSL2)
 
 ## Tech Stack
@@ -23,6 +24,7 @@ faq.mdx                # FAQ & troubleshooting
 getting-started/       # Quickstart guides (Python, Node.js, Rust, C)
 architecture/          # Architecture, components, security, networking
 reference/             # SDK API reference (python/, nodejs/, rust/, c/)
+boxrun/                # BoxRun platform docs (CLI, Python SDK, REST API, config)
 guides/                # How-to guides (build, examples, AI integration, etc.)
 development/           # Internal docs (CLI, Rust style guide)
 snippets/              # Reusable MDX snippets (e.g., prerequisites.mdx)
@@ -88,10 +90,13 @@ Use these terms consistently across all documentation:
 
 | Term | Usage |
 |------|-------|
-| BoxLite | Product name (capital B, capital L) |
+| BoxLite | Embedded micro-VM library (capital B, capital L) |
+| BoxRun | Sandbox management platform (capital B, capital R) |
 | LiteBox | The VM instance type (capital L, capital B) |
 | box | Generic reference to a sandbox instance (lowercase) |
-| SimpleBox / CodeBox / BrowserBox | Python SDK box types |
+| SimpleBox / CodeBox / BrowserBox | Python/Node.js SDK box types |
+| BoxHandle | BoxRun SDK handle to a specific box |
+| BoxRunClient | BoxRun Python SDK client class |
 | Guest Agent | The agent running inside the VM |
 | Jailer | The security isolation component |
 | ShimController | Process lifecycle manager |

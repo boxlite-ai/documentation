@@ -1,0 +1,119 @@
+---
+title: "Configuration"
+description: "BoxRun environment variables, resource limits, and state directory layout."
+icon: "gear"
+---
+
+## State directory
+
+BoxRun stores all state in a single directory:
+
+```text
+~/.boxrun/
+├── boxrun.sock  # Unix socket (server <-> clients)
+└── boxrun.db    # SQLite (boxes, execs, event log)
+```
+
+No etcd, no Redis, no container runtime, no image registry.
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BOXRUN_STATE_DIR` | `~/.boxrun` | State directory (socket, database) |
+| `BOXRUN_SOCKET` | `~/.boxrun/boxrun.sock` | Unix socket path |
+| `BOXRUN_DB` | `~/.boxrun/boxrun.db` | SQLite database path |
+| `BOXRUN_HOST` | `127.0.0.1` | Server bind host (TCP mode) |
+| `BOXRUN_PORT` | `9090` | Server bind port (TCP mode) |
+| `BOXRUN_MAX_CPU` | auto-detected | Total CPU limit override |
+| `BOXRUN_MAX_MEMORY_MB` | auto-detected | Total memory limit override (MB) |
+
+## Resource limits
+
+Total CPU and memory limits are auto-detected from host hardware. There is no hard limit on box count — you can run as many boxes as your CPU and memory allow.
+
+### Defaults
+
+| Resource | Default |
+|----------|---------|
+| Total CPU | auto-detected (host CPU count) |
+| Total memory | auto-detected (host RAM) |
+| Per-box CPU | 2 cores |
+| Per-box memory | 512 MB |
+| Per-box disk | 8 GB |
+| Per-box workdir | `/root` |
+
+### Overriding limits
+
+Override total resource limits via environment variables:
+
+```bash
+export BOXRUN_MAX_CPU=8
+export BOXRUN_MAX_MEMORY_MB=8192
+```
+
+Configure per-box resources at creation time:
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    boxrun create ubuntu:24.04 --name beefy --cpu 4 --memory 2048
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    box = await client.create("ubuntu:24.04", cpu=4, memory_mb=2048)
+    ```
+  </Tab>
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://localhost:9090/v1/boxes \
+      -H "Content-Type: application/json" \
+      -d '{"image": "ubuntu:24.04", "cpu": 4, "memory_mb": 2048}'
+    ```
+  </Tab>
+</Tabs>
+
+### Checking current limits
+
+```bash
+curl http://localhost:9090/v1/info
+# {"max_cpu": 8, "max_memory_mb": 16384}
+```
+
+## Architecture
+
+```text
+┌─────────────────────────────────────────┐
+│            boxrun serve                 │
+│                                         │
+│  axum + tokio (Unix socket / TCP)       │
+│  ├── BoxManager ── microVM management   │
+│  ├── EventBus ──── SSE pub/sub          │
+│  ├── Store ─────── SQLite (rusqlite)    │
+│  └── Web UI ────── /ui dashboard        │
+└─────────────────────────────────────────┘
+         |  Unix socket / HTTP
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  boxrun CLI  │  │  Python SDK  │  │   Browser    │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+BoxRun is built on [BoxLite](/architecture/index), which provides the underlying micro-VM runtime. BoxRun adds orchestration, persistence, and a multi-client server layer on top.
+
+### Box lifecycle
+
+```text
+creating --> running <--> stopped
+                |              |
+                +--> error     +--> (rm)
+                       |
+                       +--> (rm)
+```
+
+- **creating** — box is being provisioned by BoxLite
+- **running** — box is up and accepting commands
+- **stopped** — box is paused, disk state preserved
+- **error** — box creation or runtime failure
+
+Disk state persists across stop/start cycles. Only `rm` (remove) destroys data.
