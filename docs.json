@@ -9,95 +9,105 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "getting-started/index",
-          "boxrun/index",
-          "getting-started/quickstart-python",
-          "getting-started/quickstart-nodejs",
-          "getting-started/quickstart-rust",
-          "getting-started/quickstart-c"
-        ]
-      },
-      {
-        "group": "Architecture",
-        "pages": [
-          "architecture/index",
-          "architecture/components",
-          "architecture/security",
-          "architecture/networking-storage"
-        ]
-      },
-      {
-        "group": "BoxRun",
-        "pages": [
-          "boxrun/cli",
-          "boxrun/python-sdk",
-          "boxrun/rest-api",
-          "boxrun/configuration"
-        ]
-      },
-      {
-        "group": "SDK Reference",
-        "pages": [
-          "reference/index",
+        "tab": "BoxLite",
+        "groups": [
           {
-            "group": "Python SDK",
+            "group": "Getting Started",
             "pages": [
-              "reference/python/index",
-              "reference/python/box-types",
-              "reference/python/execution",
-              "reference/python/errors-metrics"
+              "index",
+              "getting-started/index",
+              "getting-started/quickstart-python",
+              "getting-started/quickstart-nodejs",
+              "getting-started/quickstart-rust",
+              "getting-started/quickstart-c"
             ]
           },
           {
-            "group": "Node.js SDK",
+            "group": "Guides",
             "pages": [
-              "reference/nodejs/index",
-              "reference/nodejs/box-types",
-              "reference/nodejs/execution",
-              "reference/nodejs/errors-metrics"
+              "guides/index",
+              "guides/ai-agent-integration",
+              "guides/examples-gallery",
+              "guides/building-from-source",
+              "guides/image-registry-configuration",
+              "guides/macos-sandbox-debugging",
+              "guides/changelog"
             ]
           },
           {
-            "group": "Rust SDK",
+            "group": "SDK Reference",
             "pages": [
-              "reference/rust/index",
-              "reference/rust/box-config",
-              "reference/rust/execution",
-              "reference/rust/errors-metrics"
+              "reference/index",
+              {
+                "group": "Python SDK",
+                "pages": [
+                  "reference/python/index",
+                  "reference/python/box-types",
+                  "reference/python/execution",
+                  "reference/python/errors-metrics"
+                ]
+              },
+              {
+                "group": "Node.js SDK",
+                "pages": [
+                  "reference/nodejs/index",
+                  "reference/nodejs/box-types",
+                  "reference/nodejs/execution",
+                  "reference/nodejs/errors-metrics"
+                ]
+              },
+              {
+                "group": "Rust SDK",
+                "pages": [
+                  "reference/rust/index",
+                  "reference/rust/box-config",
+                  "reference/rust/execution",
+                  "reference/rust/errors-metrics"
+                ]
+              },
+              {
+                "group": "C SDK",
+                "pages": [
+                  "reference/c/index",
+                  "reference/c/native-api",
+                  "reference/c/memory-json-threading",
+                  "reference/c/errors-metrics"
+                ]
+              }
             ]
           },
           {
-            "group": "C SDK",
+            "group": "Architecture",
             "pages": [
-              "reference/c/index",
-              "reference/c/native-api",
-              "reference/c/memory-json-threading",
-              "reference/c/errors-metrics"
+              "architecture/index",
+              "architecture/components",
+              "architecture/security",
+              "architecture/networking-storage"
+            ]
+          },
+          {
+            "group": "FAQ",
+            "pages": [
+              "faq"
             ]
           }
         ]
       },
       {
-        "group": "Guides",
-        "pages": [
-          "guides/index",
-          "guides/ai-agent-integration",
-          "guides/examples-gallery",
-          "guides/building-from-source",
-          "guides/image-registry-configuration",
-          "guides/macos-sandbox-debugging",
-          "guides/changelog"
-        ]
-      },
-      {
-        "group": "FAQ",
-        "pages": [
-          "faq"
+        "tab": "BoxRun",
+        "groups": [
+          {
+            "group": "BoxRun",
+            "pages": [
+              "boxrun/index",
+              "boxrun/cli",
+              "boxrun/python-sdk",
+              "boxrun/rest-api",
+              "boxrun/configuration"
+            ]
+          }
         ]
       }
     ]
