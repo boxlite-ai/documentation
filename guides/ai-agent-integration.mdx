@@ -1,16 +1,14 @@
 ---
 title: "AI Agent Integration"
-description: "Best practices for integrating BoxLite as a sandboxed execution environment for AI agents — configuration, concurrency, timeouts, security, and file transfer."
+description: "Production patterns for BoxLite as an AI agent sandbox — configuration, security presets, concurrency, timeout handling, and terminal resizing."
 icon: "robot"
 ---
 
-This guide covers best practices for integrating BoxLite as a sandboxed execution environment for AI agents — configuration, concurrency, timeouts, security, and file transfer.
+This guide covers production patterns for deploying BoxLite as a sandboxed execution environment for AI agents. It assumes you've already worked through the [Tutorials](/tutorials/index) and know how to create boxes, run code, and transfer files.
 
 <Note>
   **Using BoxRun?** If your agent communicates via HTTP, [BoxRun's REST API](/boxrun/rest-api) or [Python SDK](/boxrun/python-sdk) may be a simpler integration path. BoxRun handles server lifecycle, file upload/download, and SSE streaming out of the box. See the [AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) section in the BoxRun SDK docs.
 </Note>
-
-The patterns below are for the **BoxLite library** — when you want to embed sandboxing directly in your application process.
 
 ## Recommended Configuration
 
@@ -235,20 +233,6 @@ async def safe_exec(box, cmd, args=None, timeout=30):
 
 ## Security Boundaries
 
-### Read-Only Volume Mounts
-
-Use read-only volumes to provide data to the sandbox without risk of modification:
-
-```python
-options = boxlite.BoxOptions(
-    image="python:slim",
-    volumes=[
-        ("/host/datasets", "/mnt/data", "ro"),     # Agent can read but not write
-        ("/host/config", "/etc/app/config", "ro"),  # Configuration files
-    ],
-)
-```
-
 ### SecurityOptions Fields
 
 | Field | Type | Description |
@@ -294,103 +278,6 @@ options = boxlite.BoxOptions(
     security=boxlite.SecurityOptions.maximum(),
 )
 ```
-
----
-
-## File Transfer Patterns
-
-### Comparison
-
-| Method | Direction | Best For | Size Limit |
-|---|---|---|---|
-| `box.copy_in()` | Host -> Guest | Files and directories | Large files |
-| `box.copy_out()` | Guest -> Host | Extracting results | Large files |
-| `exec` + base64 | Either | Small inline data | ~1 MB (shell limit) |
-| Volume mounts | Both | Shared datasets, config | No limit |
-
-### copy_in / copy_out
-
-<Tabs>
-  <Tab title="Python">
-    ```python
-    runtime = boxlite.Boxlite.default()
-    box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
-
-    # Copy file into box
-    await box.copy_in("/host/script.py", "/workspace/script.py")
-
-    # Run the script
-    execution = await box.exec("python", ["/workspace/script.py"])
-    result = await execution.wait()
-
-    # Copy results out
-    await box.copy_out("/workspace/output.json", "/host/output.json")
-
-    await box.stop()
-    await runtime.remove(box.id)
-    ```
-  </Tab>
-  <Tab title="Node.js">
-    ```typescript
-    import { JsBoxlite } from 'boxlite';
-
-    const runtime = JsBoxlite.withDefaultConfig();
-    const box = await runtime.create({ image: 'python:slim' });
-
-    // Copy file into box — use exec to write content
-    await box.exec('sh', ['-c', 'cat > /workspace/script.py'], {
-      stdin: 'print("hello")\n',
-    });
-
-    // Run the script
-    const execution = await box.exec('python', ['/workspace/script.py']);
-    const result = await execution.wait();
-
-    // Read output via exec
-    const output = await box.exec('cat', ['/workspace/output.json']);
-    const outputResult = await output.wait();
-
-    await box.stop();
-    await runtime.remove(box.id);
-    ```
-  </Tab>
-</Tabs>
-
-### Inline Data via exec
-
-For small payloads, write data through a command:
-
-```python
-import base64
-
-# Send small file via base64
-data = b"print('hello from transferred script')"
-encoded = base64.b64encode(data).decode()
-
-execution = await box.exec("sh", [
-    "-c",
-    f"echo {encoded} | base64 -d > /workspace/script.py && python /workspace/script.py",
-])
-result = await execution.wait()
-```
-
-### Volume Mounts
-
-For datasets or configuration that should be available immediately:
-
-```python
-options = boxlite.BoxOptions(
-    image="python:slim",
-    volumes=[
-        ("/host/datasets", "/mnt/data", "ro"),   # Input data
-        ("/host/results", "/mnt/results", "rw"),  # Output directory
-    ],
-)
-```
-
-<Tip>
-  Use `copy_in`/`copy_out` for dynamic per-request files. Use volume mounts for shared datasets. Use inline base64 only for trivially small payloads.
-</Tip>
 
 ---
 
@@ -512,8 +399,8 @@ asyncio.run(main())
 
 ## See also
 
-- [BoxRun Python SDK — AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) -- Agent integration via REST API
-- [BoxRun REST API](/boxrun/rest-api) -- HTTP endpoints for sandbox management
-- [Examples Gallery](/guides/examples-gallery) -- Runnable Python examples
-- [SDK Reference](/reference/index) -- Full API reference for all BoxLite SDKs
-- [Architecture](/architecture/index) -- How BoxLite isolation works
+- [Tutorials](/tutorials/index) — Step-by-step walkthroughs for code execution, file transfer, LLM integration, and browser automation
+- [BoxRun Python SDK — AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) — Agent integration via REST API
+- [BoxRun REST API](/boxrun/rest-api) — HTTP endpoints for sandbox management
+- [SDK Reference](/reference/index) — Full API reference for all BoxLite SDKs
+- [Architecture](/architecture/index) — How BoxLite isolation works

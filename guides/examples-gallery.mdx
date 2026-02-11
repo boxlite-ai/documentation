@@ -1,10 +1,14 @@
 ---
 title: "Examples Gallery"
-description: "Browse nine comprehensive Python examples demonstrating all major BoxLite features — from basic command execution to AI code sandboxing and browser automation."
+description: "Nine runnable Python examples in the BoxLite repository — from basic command execution to browser automation and desktop control."
 icon: "images"
 ---
 
-BoxLite ships with nine Python examples that cover all major use cases. Each example is a standalone script you can run after building the Python SDK.
+BoxLite ships with nine Python examples in the repository. Each is a standalone script you can run after building the Python SDK.
+
+<Tip>
+  New to BoxLite? Start with the [Tutorials](/tutorials/index) for guided walkthroughs. This page is a quick reference for the runnable examples in the repo.
+</Tip>
 
 ## Prerequisites
 
@@ -24,224 +28,33 @@ BoxLite ships with nine Python examples that cover all major use cases. Each exa
 
 ## Examples
 
+| # | File | Description | Run |
+|---|------|-------------|-----|
+| 1 | `simplebox_example.py` | Command execution, stdout/stderr, env vars, working dirs | `python examples/python/simplebox_example.py` |
+| 2 | `codebox_example.py` | AI code execution with auto package install | `python examples/python/codebox_example.py` |
+| 3 | `browserbox_example.py` | Browser automation via CDP | `python examples/python/browserbox_example.py` |
+| 4 | `computerbox_example.py` | Desktop automation (mouse, keyboard, screenshots) | `python examples/python/computerbox_example.py` |
+| 5 | `lifecycle_example.py` | Box start, stop, restart, state inspection | `python examples/python/lifecycle_example.py` |
+| 6 | `list_boxes_example.py` | Enumerate and inspect active boxes | `python examples/python/list_boxes_example.py` |
+| 7 | `cross_process_example.py` | Share boxes across processes | `python examples/python/cross_process_example.py` |
+| 8 | `interactivebox_example.py` | Interactive TTY shell sessions | `python examples/python/interactivebox_example.py` |
+| 9 | `native_example.py` | Low-level Rust API from Python | `python examples/python/native_example.py` |
+
+## Related tutorials
+
+For step-by-step explanations of the key patterns demonstrated in these examples:
+
 <CardGroup cols={2}>
-  <Card title="SimpleBox" icon="cube">
-    **Foundation patterns** — command execution, stdout/stderr separation, environment variables, working directories, and error handling.
+  <Card title="Execute AI-generated code" icon="code" href="/tutorials/code-execution">
+    Guided walkthrough of CodeBox — the pattern used in example #2.
   </Card>
-  <Card title="CodeBox" icon="code">
-    **AI code execution** — securely run AI-generated Python code with automatic package installation.
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Three methods for moving files in and out of a sandbox.
   </Card>
-  <Card title="BrowserBox" icon="globe">
-    **Browser automation** — web scraping, end-to-end testing, and screenshot generation.
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Wire up OpenAI function calling with CodeBox.
   </Card>
-  <Card title="ComputerBox" icon="desktop">
-    **Desktop automation** — screenshots, mouse clicks, text input, and 9+ additional functions.
-  </Card>
-  <Card title="Lifecycle Management" icon="arrows-rotate">
-    **Box state management** — start, stop, restart, and inspect box lifecycle.
-  </Card>
-  <Card title="List Boxes" icon="list">
-    **Runtime introspection** — enumerate and inspect all active boxes.
-  </Card>
-  <Card title="Cross Process" icon="arrow-right-arrow-left">
-    **Multi-process operations** — share boxes across processes.
-  </Card>
-  <Card title="InteractiveBox" icon="terminal">
-    **Interactive shells** — TTY sessions with stdin/stdout streaming.
-  </Card>
-  <Card title="Native Example" icon="rust">
-    **Low-level Rust API** — direct access to the BoxLite Rust runtime.
+  <Card title="Automate a browser" icon="globe" href="/tutorials/browser-automation">
+    BrowserBox + Puppeteer/Playwright — the pattern used in example #3.
   </Card>
 </CardGroup>
-
----
-
-## 1. SimpleBox -- Foundation Patterns
-
-**File:** `examples/python/simplebox_example.py`
-
-Demonstrates core BoxLite features: basic command execution, stdout/stderr separation, environment variables, working directory configuration, error handling, and running multiple commands in the same box.
-
-```bash
-python examples/python/simplebox_example.py
-```
-
-**Key Patterns:**
-
-```python
-async with boxlite.SimpleBox(image="python:alpine") as box:
-    # Execute command
-    result = await box.exec("ls", "-lh", "/")
-    print(result.stdout)
-
-    # With environment variables
-    result = await box.exec(
-        "python", "-c", "import os; print(os.getenv('MY_VAR'))",
-        env=[("MY_VAR", "value")]
-    )
-```
-
----
-
-## 2. CodeBox -- AI Code Execution
-
-**File:** `examples/python/codebox_example.py`
-
-Secure Python code execution for AI agents. CodeBox provides automatic package installation and a safe execution sandbox.
-
-```bash
-python examples/python/codebox_example.py
-```
-
-**Key Patterns:**
-
-```python
-async with boxlite.CodeBox() as codebox:
-    # Install packages automatically
-    await codebox.install_package("requests")
-
-    # Run untrusted code safely
-    result = await codebox.run("""
-import requests
-response = requests.get('https://api.github.com/zen')
-print(response.text)
-""")
-```
-
----
-
-## 3. BrowserBox -- Browser Automation
-
-**File:** `examples/python/browserbox_example.py`
-
-Browser automation in an isolated VM. Use cases include web scraping, end-to-end testing, browser automation, and screenshot generation.
-
-```bash
-python examples/python/browserbox_example.py
-```
-
----
-
-## 4. ComputerBox -- Desktop Automation
-
-**File:** `examples/python/computerbox_example.py`
-
-Full desktop automation with a rich set of interaction functions.
-
-```bash
-python examples/python/computerbox_example.py
-```
-
-**Available Functions:**
-
-| Function | Description |
-|---|---|
-| `screenshot()` | Capture the screen |
-| `left_click()` | Left mouse click |
-| `right_click()` | Right mouse click |
-| `double_click()` | Double mouse click |
-| `type_text(text)` | Type text input |
-| `get_screen_size()` | Get screen dimensions |
-| `move_mouse(x, y)` | Move cursor to position |
-| + 9 more | Additional interaction functions |
-
----
-
-## 5. Lifecycle Management
-
-**File:** `examples/python/lifecycle_example.py`
-
-Demonstrates box state management including starting, stopping, restarting, and inspecting box state.
-
-```bash
-python examples/python/lifecycle_example.py
-```
-
----
-
-## 6. List Boxes
-
-**File:** `examples/python/list_boxes_example.py`
-
-Runtime introspection -- enumerate and inspect all active boxes.
-
-```bash
-python examples/python/list_boxes_example.py
-```
-
----
-
-## 7. Cross Process
-
-**File:** `examples/python/cross_process_example.py`
-
-Multi-process operations -- share and access boxes across different processes.
-
-```bash
-python examples/python/cross_process_example.py
-```
-
----
-
-## 8. InteractiveBox
-
-**File:** `examples/python/interactivebox_example.py`
-
-Interactive shell sessions with TTY support.
-
-```bash
-python examples/python/interactivebox_example.py
-```
-
----
-
-## 9. Native Example
-
-**File:** `examples/python/native_example.py`
-
-Low-level access to the BoxLite Rust API from Python.
-
-```bash
-python examples/python/native_example.py
-```
-
----
-
-## Customizing Examples
-
-All examples can be customized by editing the source files. Here are the most common modifications.
-
-### Change the Image
-
-```python
-async with boxlite.SimpleBox(image="ubuntu:22.04") as box:
-    # Use Ubuntu instead of the default
-    result = await box.exec("cat", "/etc/os-release")
-```
-
-### Add Resources
-
-```python
-async with boxlite.SimpleBox(
-    image="python:slim",
-    cpus=2,
-    memory_mib=2048
-) as box:
-    # More CPU and memory for intensive workloads
-    result = await box.exec("python", "heavy_computation.py")
-```
-
-### Mount Volumes
-
-```python
-async with boxlite.SimpleBox(
-    image="python:slim",
-    volumes=[("/host/data", "/mnt/data", "ro")]
-) as box:
-    # Access host data inside the box
-    result = await box.exec("ls", "/mnt/data")
-```
-
-<Tip>
-  For more advanced patterns like networking, port forwarding, debugging, and resource tuning, see the [AI Agent Integration](/guides/ai-agent-integration) guide or the [SDK Reference](/reference/index).
-</Tip>

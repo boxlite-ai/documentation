@@ -1,0 +1,61 @@
+---
+title: "Tutorials"
+description: "Step-by-step tutorials that teach you to solve real problems with BoxLite — execute code, transfer files, connect LLMs, and automate browsers."
+sidebarTitle: "Overview"
+icon: "graduation-cap"
+---
+
+You've installed BoxLite and run "Hello from BoxLite!" — now what? These tutorials walk you through the most common tasks, with working code you can copy and adapt.
+
+## Which box type should I use?
+
+| I want to... | Use | Tutorial |
+|---|---|---|
+| Run a shell command in isolation | **SimpleBox** | [Quick Start](/getting-started/quickstart-python) |
+| Execute AI-generated Python code | **CodeBox** | [Execute AI-generated code](/tutorials/code-execution) |
+| Upload and download files | **SimpleBox** or **CodeBox** | [Upload & download files](/tutorials/file-transfer) |
+| Connect an LLM to a sandbox | **CodeBox** | [Connect to an LLM](/tutorials/llm-integration) |
+| Automate a browser | **BrowserBox** | [Automate a browser](/tutorials/browser-automation) |
+| Control a full desktop | **ComputerBox** | [Examples Gallery](/guides/examples-gallery) |
+| Run an interactive shell session | **InteractiveBox** | [Examples Gallery](/guides/examples-gallery) |
+
+<Tip>
+  Not sure? Start with **CodeBox** — it handles the most common AI agent use case (running untrusted code) and auto-installs packages for you.
+</Tip>
+
+## All tutorials
+
+<CardGroup cols={2}>
+  <Card
+    title="Execute AI-generated code"
+    icon="code"
+    href="/tutorials/code-execution"
+  >
+    Create a CodeBox, run untrusted Python code, auto-install packages, and get output safely. Python and Node.js examples.
+  </Card>
+  <Card
+    title="Upload & download files"
+    icon="arrows-rotate"
+    href="/tutorials/file-transfer"
+  >
+    Move files in and out of a sandbox using copy_in/copy_out, volume mounts, or inline base64. Three methods compared.
+  </Card>
+  <Card
+    title="Connect to an LLM"
+    icon="robot"
+    href="/tutorials/llm-integration"
+  >
+    Wire up OpenAI function calling so an LLM can execute code inside a BoxLite sandbox. The "aha moment" for AI developers.
+  </Card>
+  <Card
+    title="Automate a browser"
+    icon="globe"
+    href="/tutorials/browser-automation"
+  >
+    Launch a BrowserBox, connect via Chrome DevTools Protocol, take a screenshot, and scrape a page with Puppeteer or Playwright.
+  </Card>
+</CardGroup>
+
+## What's next?
+
+Once you've worked through these tutorials, dive into the [Guides](/guides/index) for advanced patterns like concurrency, timeout handling, security configuration, and production deployment.

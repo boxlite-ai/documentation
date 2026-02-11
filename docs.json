@@ -25,6 +25,16 @@
             ]
           },
           {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/index",
+              "tutorials/code-execution",
+              "tutorials/file-transfer",
+              "tutorials/llm-integration",
+              "tutorials/browser-automation"
+            ]
+          },
+          {
             "group": "Guides",
             "pages": [
               "guides/index",

@@ -1,0 +1,269 @@
+---
+title: "Upload & download files"
+description: "Move files in and out of a BoxLite sandbox — upload a file, run a script on it, and download the results using three different methods."
+sidebarTitle: "File transfer"
+icon: "arrows-rotate"
+---
+
+Most real workloads need data. This tutorial shows you how to get files into a sandbox, process them, and get results back out. You'll learn three methods and when to use each one.
+
+## Method comparison
+
+| Method | Direction | Best for | Size limit |
+|---|---|---|---|
+| `copy_in()` / `copy_out()` | Host ↔ Guest | Files and directories | Large files |
+| Volume mounts | Both (shared) | Datasets, config files | No limit |
+| `exec` + base64 | Either | Small inline data | ~1 MB (shell limit) |
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+  </Tab>
+</Tabs>
+
+## Method 1: copy_in / copy_out
+
+The most common approach. Upload a file, process it, download the results.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="file_transfer.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        runtime = boxlite.Boxlite.default()
+        box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
+
+        try:
+            # Upload a script into the box
+            await box.copy_in("/host/script.py", "/workspace/script.py")
+
+            # Run the script
+            execution = await box.exec("python", ["/workspace/script.py"])
+            result = await execution.wait()
+            print(f"Exit code: {result.exit_code}")
+            print(result.stdout)
+
+            # Download the results
+            await box.copy_out("/workspace/output.json", "/host/output.json")
+        finally:
+            await box.stop()
+            await runtime.remove(box.id)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="file_transfer.js"
+    import { JsBoxlite } from 'boxlite';
+
+    async function main() {
+      const runtime = JsBoxlite.withDefaultConfig();
+      const box = await runtime.create({ image: 'python:slim' });
+
+      try {
+        // Write a script into the box using exec + stdin
+        await box.exec('sh', ['-c', 'cat > /workspace/script.py'], {
+          stdin: 'import json\ndata = {"result": 42}\nprint(json.dumps(data))\n',
+        });
+
+        // Run the script
+        const execution = await box.exec('python', ['/workspace/script.py']);
+        const result = await execution.wait();
+        console.log(`Exit code: ${result.exitCode}`);
+        console.log(result.stdout);
+
+        // Read output via exec
+        const output = await box.exec('cat', ['/workspace/output.json']);
+        const outputResult = await output.wait();
+        console.log(outputResult.stdout);
+      } finally {
+        await box.stop();
+        await runtime.remove(box.id);
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+**When to use:** Dynamic per-request files — scripts, input data, configuration that varies across runs.
+
+## Method 2: Volume mounts
+
+Mount a host directory directly into the box. Files are shared in real time — no explicit copy step needed.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="volume_mount.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="python:slim",
+            volumes=[
+                ("/host/datasets", "/mnt/data", "ro"),     # Read-only input
+                ("/host/results", "/mnt/results", "rw"),    # Writable output
+            ],
+        ) as box:
+            # Input data is already available at /mnt/data
+            result = await box.exec(
+                "python", "-c",
+                "import os; print(os.listdir('/mnt/data'))"
+            )
+            print(result.stdout)
+
+            # Write results — they appear on the host immediately
+            await box.exec(
+                "python", "-c",
+                "open('/mnt/results/output.txt', 'w').write('done')"
+            )
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="volume_mount.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'python:slim',
+        volumes: [
+          { hostPath: '/host/datasets', guestPath: '/mnt/data', mode: 'ro' },
+          { hostPath: '/host/results', guestPath: '/mnt/results', mode: 'rw' },
+        ],
+      });
+
+      try {
+        const result = await box.exec(
+          'python', '-c',
+          "import os; print(os.listdir('/mnt/data'))"
+        );
+        console.log(result.stdout);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+**When to use:** Shared datasets or configuration that multiple boxes need access to. Use `"ro"` (read-only) for input data to prevent accidental modification.
+
+<Warning>
+  Volume mounts give the guest direct access to host files. Always use `"ro"` mode for input data. Only use `"rw"` for designated output directories.
+</Warning>
+
+## Method 3: Inline data via base64
+
+For small payloads (under ~1 MB), you can send data through a shell command without touching the filesystem.
+
+```python title="inline_base64.py"
+import asyncio
+import base64
+import boxlite
+
+
+async def main():
+    runtime = boxlite.Boxlite.default()
+    box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
+
+    try:
+        # Encode a small script as base64
+        data = b"print('hello from transferred script')"
+        encoded = base64.b64encode(data).decode()
+
+        # Send and execute in one command
+        execution = await box.exec("sh", [
+            "-c",
+            f"echo {encoded} | base64 -d > /workspace/script.py && python /workspace/script.py",
+        ])
+        result = await execution.wait()
+        print(result.stdout)
+    finally:
+        await box.stop()
+        await runtime.remove(box.id)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**When to use:** Trivially small payloads where you want to avoid the overhead of `copy_in`. Not suitable for binary files or anything over ~1 MB.
+
+## Putting it together
+
+Here's a realistic workflow: upload a CSV, run analysis code on it, and download the results.
+
+```python title="full_workflow.py"
+import asyncio
+import boxlite
+
+
+async def main():
+    runtime = boxlite.Boxlite.default()
+    box = await runtime.create(boxlite.BoxOptions(
+        image="python:slim",
+        memory_mib=1024,
+    ))
+
+    try:
+        # 1. Upload the input data
+        await box.copy_in("/host/sales_data.csv", "/workspace/sales_data.csv")
+
+        # 2. Upload the analysis script
+        await box.copy_in("/host/analyze.py", "/workspace/analyze.py")
+
+        # 3. Run the analysis
+        execution = await box.exec("python", ["/workspace/analyze.py"])
+        result = await execution.wait()
+        print(f"Analysis completed (exit code: {result.exit_code})")
+        print(result.stdout)
+
+        # 4. Download the results
+        await box.copy_out("/workspace/report.json", "/host/report.json")
+        print("Results saved to /host/report.json")
+    finally:
+        await box.stop()
+        await runtime.remove(box.id)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Tip>
+  Use `copy_in`/`copy_out` for dynamic per-request files. Use volume mounts for shared datasets. Use inline base64 only for trivially small payloads.
+</Tip>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Let an LLM generate code and run it in your sandbox automatically.
+  </Card>
+  <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
+    Advanced file transfer patterns, security boundaries, and read-only volume mounts.
+  </Card>
+</CardGroup>

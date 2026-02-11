@@ -1,0 +1,350 @@
+---
+title: "Execute AI-generated code"
+description: "Create a CodeBox, run untrusted Python code safely, auto-install packages, and capture output — the #1 BoxLite use case for AI agents."
+sidebarTitle: "Code execution"
+icon: "code"
+---
+
+CodeBox is BoxLite's purpose-built sandbox for running untrusted Python code. It auto-installs missing packages, captures output, and keeps your host system completely safe. This tutorial walks through the core workflow.
+
+## What you'll build
+
+A script that:
+1. Creates an isolated CodeBox
+2. Runs untrusted Python code inside it
+3. Auto-installs required packages
+4. Returns the output to your application
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Run simple code
+
+Start with a basic example — execute a Python snippet and print the result.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="run_code.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.CodeBox() as codebox:
+            result = await codebox.run("""
+    x = sum(range(100))
+    print(f"Sum of 0-99: {x}")
+    """)
+            print(result)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    ```bash
+    python run_code.py
+    # Output: Sum of 0-99: 4950
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="run_code.js"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox({ memoryMib: 512 });
+      try {
+        const result = await codebox.run(`
+    x = sum(range(100))
+    print(f"Sum of 0-99: {x}")
+        `);
+        console.log(result);
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+
+    ```bash
+    node run_code.js
+    # Output: Sum of 0-99: 4950
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening:**
+- CodeBox creates a lightweight VM with a Python runtime pre-installed
+- Your code runs inside the VM — completely isolated from the host
+- Output is captured and returned as a string
+- The VM is cleaned up automatically when the context exits
+
+## Step 2: Auto-install packages
+
+CodeBox detects missing imports and installs them automatically. No manual `pip install` needed.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="auto_install.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.CodeBox() as codebox:
+            # requests is not pre-installed — CodeBox installs it for you
+            result = await codebox.run("""
+    import requests
+    response = requests.get('https://api.github.com/zen')
+    print(response.text)
+    """)
+            print(result)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="auto_install.js"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox({ memoryMib: 512 });
+      try {
+        const result = await codebox.run(`
+    import requests
+    response = requests.get('https://api.github.com/zen')
+    print(response.text)
+        `);
+        console.log(result);
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## Step 3: Install packages explicitly
+
+When you need specific versions or want to pre-install packages before running code, use `install_package()`.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="explicit_install.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.CodeBox() as codebox:
+            # Pre-install specific packages
+            await codebox.install_package("pandas")
+            await codebox.install_package("matplotlib")
+
+            result = await codebox.run("""
+    import pandas as pd
+    import matplotlib
+    print(f"pandas {pd.__version__}, matplotlib {matplotlib.__version__}")
+
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+    print(df.describe())
+    """)
+            print(result)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="explicit_install.js"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox({ memoryMib: 1024 });
+      try {
+        await codebox.installPackage('pandas');
+        await codebox.installPackage('matplotlib');
+
+        const result = await codebox.run(`
+    import pandas as pd
+    import matplotlib
+    print(f"pandas {pd.__version__}, matplotlib {matplotlib.__version__}")
+
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+    print(df.describe())
+        `);
+        console.log(result);
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  For data-heavy workloads (pandas, numpy, matplotlib), increase memory to 1024 MiB or more. The default 512 MiB is enough for most code execution.
+</Tip>
+
+## Step 4: Run a script file
+
+Use `run_script()` to execute a Python file that's already inside the box.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="run_script.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.CodeBox() as codebox:
+            # First, create a script inside the box
+            await codebox.run("""
+    with open('/workspace/analysis.py', 'w') as f:
+        f.write('''
+    import json
+    data = {"status": "success", "items": [1, 2, 3]}
+    print(json.dumps(data, indent=2))
+    ''')
+    """)
+
+            # Then run the script file
+            result = await codebox.run_script("/workspace/analysis.py")
+            print(result)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="run_script.js"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox({ memoryMib: 512 });
+      try {
+        // Create a script inside the box
+        await codebox.run(`
+    with open('/workspace/analysis.py', 'w') as f:
+        f.write('''
+    import json
+    data = {"status": "success", "items": [1, 2, 3]}
+    print(json.dumps(data, indent=2))
+    ''')
+        `);
+
+        // Run the script file
+        const result = await codebox.runScript('/workspace/analysis.py');
+        console.log(result);
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## Step 5: Run multiple snippets in the same box
+
+A single CodeBox can run many snippets sequentially. State persists between calls — installed packages and files remain available.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="multi_run.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.CodeBox() as codebox:
+            # First run: install and define
+            await codebox.run("""
+    import json
+
+    def process(data):
+        return {k: v * 2 for k, v in data.items()}
+    """)
+
+            # Second run: use what was defined
+            result = await codebox.run("""
+    output = process({"a": 1, "b": 2, "c": 3})
+    print(json.dumps(output))
+    """)
+            print(result)  # {"a": 2, "b": 4, "c": 6}
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="multi_run.js"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox({ memoryMib: 512 });
+      try {
+        await codebox.run(`
+    import json
+
+    def process(data):
+        return {k: v * 2 for k, v in data.items()}
+        `);
+
+        const result = await codebox.run(`
+    output = process({"a": 1, "b": 2, "c": 3})
+    print(json.dumps(output))
+        `);
+        console.log(result);  // {"a": 2, "b": 4, "c": 6}
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Move files in and out of your sandbox to process data and retrieve results.
+  </Card>
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Wire up OpenAI function calling so an LLM can execute code in your sandbox.
+  </Card>
+  <Card title="CodeBox API reference" icon="book" href="/reference/python/box-types#codebox">
+    Full API docs for run(), run_script(), install_package(), and more.
+  </Card>
+  <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
+    Advanced patterns: concurrency, timeouts, security presets, and production configuration.
+  </Card>
+</CardGroup>

@@ -1,0 +1,206 @@
+---
+title: "Connect to an LLM"
+description: "Wire up OpenAI function calling so an LLM can generate and execute Python code inside a BoxLite sandbox — safely and automatically."
+sidebarTitle: "LLM integration"
+icon: "robot"
+---
+
+The most powerful BoxLite pattern: let an LLM generate code and execute it in a sandbox. The LLM reasons about the problem, writes Python, and BoxLite runs it safely. This tutorial builds a minimal working example using OpenAI function calling.
+
+## What you'll build
+
+A chat loop where:
+1. You ask a question (e.g., "What's the 50th Fibonacci number?")
+2. The LLM generates Python code to answer it
+3. BoxLite executes the code in an isolated sandbox
+4. The LLM reads the output and responds with the answer
+
+## Prerequisites
+
+```bash
+pip install boxlite openai
+```
+
+Set your OpenAI API key:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+## Step 1: Define the tool
+
+OpenAI function calling needs a tool definition that describes what "execute code" means.
+
+```python title="llm_sandbox.py"
+import asyncio
+import json
+import boxlite
+from openai import AsyncOpenAI
+
+EXECUTE_CODE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "execute_python",
+        "description": "Execute Python code in a secure sandbox. Use this to run calculations, data analysis, or any Python code. The code's stdout is returned.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code to execute. Use print() to output results.",
+                }
+            },
+            "required": ["code"],
+        },
+    },
+}
+```
+
+## Step 2: Build the execution loop
+
+The core loop: send messages to the LLM, detect tool calls, execute code in BoxLite, and feed results back.
+
+```python title="llm_sandbox.py (continued)"
+async def run_agent(question: str):
+    client = AsyncOpenAI()
+
+    # Create a persistent CodeBox for the conversation
+    async with boxlite.CodeBox(memory_mib=1024) as codebox:
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.",
+            },
+            {"role": "user", "content": question},
+        ]
+
+        while True:
+            response = await client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                tools=[EXECUTE_CODE_TOOL],
+            )
+
+            choice = response.choices[0]
+
+            # If the LLM wants to call a tool, execute the code
+            if choice.finish_reason == "tool_calls":
+                for tool_call in choice.message.tool_calls:
+                    args = json.loads(tool_call.function.arguments)
+                    code = args["code"]
+
+                    print(f"--- Executing code ---\n{code}\n---")
+                    result = await codebox.run(code)
+                    print(f"Output: {result}")
+
+                    # Feed the result back to the LLM
+                    messages.append(choice.message)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": result,
+                    })
+            else:
+                # LLM is done — print the final answer
+                print(f"\nAnswer: {choice.message.content}")
+                break
+
+
+if __name__ == "__main__":
+    asyncio.run(run_agent("What's the 50th Fibonacci number?"))
+```
+
+Run it:
+
+```bash
+python llm_sandbox.py
+```
+
+Expected output:
+
+```
+--- Executing code ---
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
+
+print(fib(50))
+---
+Output: 12586269025
+
+Answer: The 50th Fibonacci number is 12,586,269,025.
+```
+
+## Step 3: Add multiple questions
+
+The CodeBox persists across calls, so installed packages and defined functions carry over between tool invocations within the same conversation.
+
+```python title="multi_question.py"
+async def main():
+    questions = [
+        "What's the standard deviation of [23, 45, 67, 89, 12, 34, 56]?",
+        "Generate a random 8-character password with letters and digits.",
+        "What day of the week was January 1, 2000?",
+    ]
+
+    for question in questions:
+        print(f"\nQ: {question}")
+        await run_agent(question)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Concurrency: one box vs. one box per agent
+
+Two patterns for scaling, depending on your isolation requirements.
+
+### One box, many executions (recommended)
+
+A single CodeBox handles all LLM tool calls. Fast startup, shared state between calls.
+
+```python
+async with boxlite.CodeBox(memory_mib=1024) as codebox:
+    # All tool calls share this box
+    result1 = await codebox.run(code_from_llm_1)
+    result2 = await codebox.run(code_from_llm_2)
+```
+
+**When to use:** Single-user conversations, cost-sensitive workloads, or when you want state to persist across tool calls.
+
+### One box per agent
+
+Each conversation or user gets its own box. Strict isolation, independent resource limits.
+
+```python
+async def handle_user(user_id: str, question: str):
+    async with boxlite.CodeBox(memory_mib=512) as codebox:
+        # This user's code runs in its own sandbox
+        result = await codebox.run(code_from_llm)
+```
+
+**When to use:** Multi-tenant applications where users should not share state or resources.
+
+<Tip>
+  For production deployments, see the [AI agent integration guide](/guides/ai-agent-integration) for timeout handling, security presets (`SecurityOptions.maximum()`), and defensive execution patterns.
+</Tip>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Automate a browser" icon="globe" href="/tutorials/browser-automation">
+    Use BrowserBox to give your LLM agent web browsing capabilities.
+  </Card>
+  <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
+    Production patterns: timeouts, security presets, concurrency, and file transfer.
+  </Card>
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Pass data files to your sandbox and retrieve results.
+  </Card>
+  <Card title="CodeBox API reference" icon="book" href="/reference/python/box-types#codebox">
+    Full API docs for CodeBox.
+  </Card>
+</CardGroup>
