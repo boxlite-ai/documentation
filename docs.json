@@ -21,7 +21,9 @@
               "getting-started/quickstart-python",
               "getting-started/quickstart-nodejs",
               "getting-started/quickstart-rust",
-              "getting-started/quickstart-c"
+              "getting-started/quickstart-c",
+              "getting-started/core-concepts",
+              "faq"
             ]
           },
           {
@@ -95,12 +97,6 @@
               "architecture/components",
               "architecture/security",
               "architecture/networking-storage"
-            ]
-          },
-          {
-            "group": "FAQ",
-            "pages": [
-              "faq"
             ]
           }
         ]

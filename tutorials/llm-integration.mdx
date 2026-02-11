@@ -1,119 +1,197 @@
 ---
 title: "Connect to an LLM"
-description: "Wire up OpenAI function calling so an LLM can generate and execute Python code inside a BoxLite sandbox — safely and automatically."
+description: "Give any LLM the ability to generate and execute Python code inside a BoxLite sandbox. Examples for OpenAI, Anthropic, and Vercel AI SDK."
 sidebarTitle: "LLM integration"
 icon: "robot"
 ---
 
-The most powerful BoxLite pattern: let an LLM generate code and execute it in a sandbox. The LLM reasons about the problem, writes Python, and BoxLite runs it safely. This tutorial builds a minimal working example using OpenAI function calling.
+The most powerful BoxLite pattern: let an LLM generate code and execute it in a sandbox. The LLM reasons about the problem, writes Python, and BoxLite runs it safely. This tutorial shows how to wire up tool calling with three popular providers.
 
-## What you'll build
+## How it works
 
-A chat loop where:
-1. You ask a question (e.g., "What's the 50th Fibonacci number?")
-2. The LLM generates Python code to answer it
-3. BoxLite executes the code in an isolated sandbox
-4. The LLM reads the output and responds with the answer
+Every LLM provider supports **tool calling** (also called function calling). You define a tool called `execute_python` that accepts a `code` parameter. When the LLM decides it needs to compute something, it returns a tool call instead of a text response. Your code executes that tool call inside a BoxLite `CodeBox` and feeds the output back to the LLM, which then formulates the final answer.
+
+The pattern is the same regardless of provider:
+
+1. Define the tool schema (what "execute code" means)
+2. Send messages to the LLM with the tool available
+3. When the LLM returns a tool call, run the code in BoxLite
+4. Send the result back to the LLM
+5. Repeat until the LLM responds with text
 
 ## Prerequisites
 
-```bash
-pip install boxlite openai
-```
+<Tabs>
+  <Tab title="OpenAI">
+    ```bash
+    pip install boxlite openai
+    export OPENAI_API_KEY="sk-..."
+    ```
+  </Tab>
+  <Tab title="Anthropic">
+    ```bash
+    pip install boxlite anthropic
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    ```
+  </Tab>
+  <Tab title="Vercel AI SDK">
+    ```bash
+    npm install @boxlite-ai/boxlite ai @ai-sdk/openai zod
+    ```
 
-Set your OpenAI API key:
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    ```
+  </Tab>
+</Tabs>
 
-```bash
-export OPENAI_API_KEY="sk-..."
-```
+## OpenAI
 
-## Step 1: Define the tool
+<Tabs>
+  <Tab title="Python">
+    ```python title="openai_sandbox.py"
+    import asyncio
+    import json
+    import boxlite
+    from openai import AsyncOpenAI
 
-OpenAI function calling needs a tool definition that describes what "execute code" means.
-
-```python title="llm_sandbox.py"
-import asyncio
-import json
-import boxlite
-from openai import AsyncOpenAI
-
-EXECUTE_CODE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "execute_python",
-        "description": "Execute Python code in a secure sandbox. Use this to run calculations, data analysis, or any Python code. The code's stdout is returned.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "description": "Python code to execute. Use print() to output results.",
-                }
+    EXECUTE_CODE_TOOL = {
+        "type": "function",
+        "function": {
+            "name": "execute_python",
+            "description": "Execute Python code in a secure sandbox. Use this to run calculations, data analysis, or any Python code. The code's stdout is returned.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute. Use print() to output results.",
+                    }
+                },
+                "required": ["code"],
             },
-            "required": ["code"],
         },
-    },
-}
-```
+    }
 
-## Step 2: Build the execution loop
 
-The core loop: send messages to the LLM, detect tool calls, execute code in BoxLite, and feed results back.
+    async def run_agent(question: str):
+        client = AsyncOpenAI()
 
-```python title="llm_sandbox.py (continued)"
-async def run_agent(question: str):
-    client = AsyncOpenAI()
+        async with boxlite.CodeBox(memory_mib=1024) as codebox:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.",
+                },
+                {"role": "user", "content": question},
+            ]
 
-    # Create a persistent CodeBox for the conversation
-    async with boxlite.CodeBox(memory_mib=1024) as codebox:
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.",
-            },
-            {"role": "user", "content": question},
-        ]
+            while True:
+                response = await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    tools=[EXECUTE_CODE_TOOL],
+                )
 
-        while True:
-            response = await client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                tools=[EXECUTE_CODE_TOOL],
-            )
+                choice = response.choices[0]
 
-            choice = response.choices[0]
-
-            # If the LLM wants to call a tool, execute the code
-            if choice.finish_reason == "tool_calls":
-                for tool_call in choice.message.tool_calls:
-                    args = json.loads(tool_call.function.arguments)
-                    code = args["code"]
-
-                    print(f"--- Executing code ---\n{code}\n---")
-                    result = await codebox.run(code)
-                    print(f"Output: {result}")
-
-                    # Feed the result back to the LLM
+                if choice.finish_reason == "tool_calls":
                     messages.append(choice.message)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result,
-                    })
-            else:
-                # LLM is done — print the final answer
-                print(f"\nAnswer: {choice.message.content}")
-                break
+                    for tool_call in choice.message.tool_calls:
+                        args = json.loads(tool_call.function.arguments)
+                        code = args["code"]
+
+                        print(f"--- Executing code ---\n{code}\n---")
+                        result = await codebox.run(code)
+                        print(f"Output: {result}")
+
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result,
+                        })
+                else:
+                    print(f"\nAnswer: {choice.message.content}")
+                    break
 
 
-if __name__ == "__main__":
-    asyncio.run(run_agent("What's the 50th Fibonacci number?"))
-```
+    if __name__ == "__main__":
+        asyncio.run(run_agent("What's the 50th Fibonacci number?"))
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript title="openai-sandbox.ts"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+    import OpenAI from 'openai';
+
+    const EXECUTE_CODE_TOOL: OpenAI.ChatCompletionTool = {
+      type: 'function',
+      function: {
+        name: 'execute_python',
+        description: 'Execute Python code in a secure sandbox. Use print() to output results.',
+        parameters: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'Python code to execute.' },
+          },
+          required: ['code'],
+        },
+      },
+    };
+
+    async function runAgent(question: string) {
+      const client = new OpenAI();
+      const codebox = new CodeBox({ memoryMib: 1024 });
+
+      try {
+        const messages: OpenAI.ChatCompletionMessageParam[] = [
+          { role: 'system', content: 'You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.' },
+          { role: 'user', content: question },
+        ];
+
+        while (true) {
+          const response = await client.chat.completions.create({
+            model: 'gpt-4o',
+            messages,
+            tools: [EXECUTE_CODE_TOOL],
+          });
+
+          const choice = response.choices[0];
+
+          if (choice.finish_reason === 'tool_calls') {
+            messages.push(choice.message);
+            for (const toolCall of choice.message.tool_calls!) {
+              const { code } = JSON.parse(toolCall.function.arguments);
+
+              console.log(`--- Executing code ---\n${code}\n---`);
+              const result = await codebox.run(code);
+              console.log(`Output: ${result}`);
+
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: result,
+              });
+            }
+          } else {
+            console.log(`\nAnswer: ${choice.message.content}`);
+            break;
+          }
+        }
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    runAgent("What's the 50th Fibonacci number?");
+    ```
+  </Tab>
+</Tabs>
 
 Run it:
 
 ```bash
-python llm_sandbox.py
+python openai_sandbox.py
 ```
 
 Expected output:
@@ -133,7 +211,203 @@ Output: 12586269025
 Answer: The 50th Fibonacci number is 12,586,269,025.
 ```
 
-## Step 3: Add multiple questions
+## Anthropic
+
+Anthropic uses a different tool schema format (`input_schema` instead of `parameters`) and a different response structure (`stop_reason` instead of `finish_reason`, content blocks instead of `tool_calls`).
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="anthropic_sandbox.py"
+    import asyncio
+    import boxlite
+    from anthropic import AsyncAnthropic
+
+    EXECUTE_CODE_TOOL = {
+        "name": "execute_python",
+        "description": "Execute Python code in a secure sandbox. Use this to run calculations, data analysis, or any Python code. The code's stdout is returned.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code to execute. Use print() to output results.",
+                }
+            },
+            "required": ["code"],
+        },
+    }
+
+
+    async def run_agent(question: str):
+        client = AsyncAnthropic()
+
+        async with boxlite.CodeBox(memory_mib=1024) as codebox:
+            messages = [{"role": "user", "content": question}]
+
+            while True:
+                response = await client.messages.create(
+                    model="claude-sonnet-4-5-20250514",
+                    max_tokens=4096,
+                    system="You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.",
+                    tools=[EXECUTE_CODE_TOOL],
+                    messages=messages,
+                )
+
+                # Collect assistant response and any tool uses
+                messages.append({"role": "assistant", "content": response.content})
+
+                if response.stop_reason == "tool_use":
+                    tool_results = []
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            code = block.input["code"]
+
+                            print(f"--- Executing code ---\n{code}\n---")
+                            result = await codebox.run(code)
+                            print(f"Output: {result}")
+
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result,
+                            })
+
+                    messages.append({"role": "user", "content": tool_results})
+                else:
+                    # Extract final text response
+                    for block in response.content:
+                        if hasattr(block, "text"):
+                            print(f"\nAnswer: {block.text}")
+                    break
+
+
+    if __name__ == "__main__":
+        asyncio.run(run_agent("What's the 50th Fibonacci number?"))
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript title="anthropic-sandbox.ts"
+    import { CodeBox } from '@boxlite-ai/boxlite';
+    import Anthropic from '@anthropic-ai/sdk';
+
+    const EXECUTE_CODE_TOOL: Anthropic.Tool = {
+      name: 'execute_python',
+      description: 'Execute Python code in a secure sandbox. Use print() to output results.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          code: { type: 'string', description: 'Python code to execute.' },
+        },
+        required: ['code'],
+      },
+    };
+
+    async function runAgent(question: string) {
+      const client = new Anthropic();
+      const codebox = new CodeBox({ memoryMib: 1024 });
+
+      try {
+        const messages: Anthropic.MessageParam[] = [
+          { role: 'user', content: question },
+        ];
+
+        while (true) {
+          const response = await client.messages.create({
+            model: 'claude-sonnet-4-5-20250514',
+            max_tokens: 4096,
+            system: 'You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.',
+            tools: [EXECUTE_CODE_TOOL],
+            messages,
+          });
+
+          messages.push({ role: 'assistant', content: response.content });
+
+          if (response.stop_reason === 'tool_use') {
+            const toolResults: Anthropic.ToolResultBlockParam[] = [];
+            for (const block of response.content) {
+              if (block.type === 'tool_use') {
+                const { code } = block.input as { code: string };
+
+                console.log(`--- Executing code ---\n${code}\n---`);
+                const result = await codebox.run(code);
+                console.log(`Output: ${result}`);
+
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: result,
+                });
+              }
+            }
+            messages.push({ role: 'user', content: toolResults });
+          } else {
+            for (const block of response.content) {
+              if (block.type === 'text') {
+                console.log(`\nAnswer: ${block.text}`);
+              }
+            }
+            break;
+          }
+        }
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    runAgent("What's the 50th Fibonacci number?");
+    ```
+  </Tab>
+</Tabs>
+
+## Vercel AI SDK
+
+The [Vercel AI SDK](https://sdk.vercel.ai) provides a unified `tool()` helper that handles schema validation and execution in one place. The `maxSteps` parameter replaces the manual while loop — the SDK automatically re-calls the model when a tool result is returned.
+
+```typescript title="vercel-ai-sandbox.ts"
+import { CodeBox } from '@boxlite-ai/boxlite';
+import { generateText, tool } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
+
+async function runAgent(question: string) {
+  const codebox = new CodeBox({ memoryMib: 1024 });
+
+  try {
+    const { text } = await generateText({
+      model: openai('gpt-4o'),
+      system: 'You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.',
+      prompt: question,
+      tools: {
+        execute_python: tool({
+          description: 'Execute Python code in a secure sandbox. Use print() to output results.',
+          parameters: z.object({
+            code: z.string().describe('Python code to execute.'),
+          }),
+          execute: async ({ code }) => {
+            console.log(`--- Executing code ---\n${code}\n---`);
+            const result = await codebox.run(code);
+            console.log(`Output: ${result}`);
+            return result;
+          },
+        }),
+      },
+      maxSteps: 5,
+    });
+
+    console.log(`\nAnswer: ${text}`);
+  } finally {
+    await codebox.stop();
+  }
+}
+
+runAgent("What's the 50th Fibonacci number?");
+```
+
+<Tip>
+  The Vercel AI SDK supports [many model providers](https://sdk.vercel.ai/providers) — swap `openai('gpt-4o')` for `anthropic('claude-sonnet-4-5-20250514')`, `google('gemini-2.0-flash')`, or any other supported model. The tool definitions stay the same.
+</Tip>
+
+## Multiple questions
 
 The CodeBox persists across calls, so installed packages and defined functions carry over between tool invocations within the same conversation.
 
