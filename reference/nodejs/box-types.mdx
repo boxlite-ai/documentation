@@ -64,7 +64,7 @@ A box can be in one of the following states:
 Context manager for basic command execution with automatic cleanup.
 
 ```typescript
-import { SimpleBox } from 'boxlite';
+import { SimpleBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -127,7 +127,7 @@ try {
 Python code execution sandbox.
 
 ```typescript
-import { CodeBox } from 'boxlite';
+import { CodeBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -170,7 +170,7 @@ print(requests.get('https://api.github.com/zen').text)
 Browser automation with Chrome DevTools Protocol.
 
 ```typescript
-import { BrowserBox, BrowserType } from 'boxlite';
+import { BrowserBox, BrowserType } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -191,13 +191,11 @@ Supported browser types.
 type BrowserType = 'chromium' | 'firefox' | 'webkit';
 ```
 
-### Browser CDP Ports
+### Default image
 
-| Browser | Port | Image |
-|---------|------|-------|
-| `chromium` | 9222 | `mcr.microsoft.com/playwright:v1.47.2-jammy` |
-| `firefox` | 9223 | `browserless/firefox:latest` |
-| `webkit` | 9224 | `browserless/webkit:latest` |
+All browser types use a single Playwright image: `mcr.microsoft.com/playwright:v1.58.0-jammy`
+
+The Playwright Server listens on port **3000**. The CDP endpoint (for Puppeteer) is on port **9222**.
 
 ### Methods
 
@@ -232,7 +230,7 @@ try {
 Desktop automation with full GUI environment.
 
 ```typescript
-import { ComputerBox } from 'boxlite';
+import { ComputerBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -351,7 +349,7 @@ try {
 Interactive terminal sessions with PTY support.
 
 ```typescript
-import { InteractiveBox } from 'boxlite';
+import { InteractiveBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options

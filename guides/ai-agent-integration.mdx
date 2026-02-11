@@ -40,7 +40,7 @@ This guide covers production patterns for deploying BoxLite as a sandboxed execu
   </Tab>
   <Tab title="Node.js">
     ```typescript
-    import { JsBoxlite } from 'boxlite';
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
 
     const runtime = JsBoxlite.withDefaultConfig();
     const box = await runtime.create({
@@ -114,7 +114,7 @@ A single box can run many `exec()` calls. Each call spawns a new process inside 
   </Tab>
   <Tab title="Node.js">
     ```typescript
-    import { JsBoxlite } from 'boxlite';
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
 
     const runtime = JsBoxlite.withDefaultConfig();
     const box = await runtime.create({

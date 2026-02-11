@@ -122,13 +122,11 @@ from boxlite import BrowserBox, BrowserBoxOptions
 | `memory` | `int` | `2048` | Memory in MiB |
 | `cpu` | `int` | `2` | Number of CPU cores |
 
-### Browser CDP Ports
+### Default image
 
-| Browser | Port |
-|---------|------|
-| chromium | 9222 |
-| firefox | 9223 |
-| webkit | 9224 |
+All browser types use a single Playwright image: `mcr.microsoft.com/playwright:v1.58.0-jammy`
+
+The Playwright Server listens on port **3000**. The CDP endpoint (for Puppeteer) is on port **9222**.
 
 ### Methods
 
@@ -335,7 +333,7 @@ Configuration options shared across all box types. See [BoxOptions reference](/r
 |-------|------|---------|-------------|
 | `image` | `str` | Required | OCI image URI (e.g., `"python:slim"`, `"alpine:latest"`) |
 | `cpus` | `int` | `1` | Number of CPU cores (1 to host CPU count) |
-| `memory_mib` | `int` | `512` | Memory limit in MiB (128-65536) |
+| `memory_mib` | `int` | `2048` | Memory limit in MiB (128-65536) |
 | `disk_size_gb` | `int \| None` | `None` | Persistent disk size in GB (None = ephemeral) |
 | `working_dir` | `str` | `"/root"` | Working directory inside container |
 | `env` | `List[Tuple[str, str]]` | `[]` | Environment variables as (key, value) pairs |

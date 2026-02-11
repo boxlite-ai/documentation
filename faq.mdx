@@ -105,10 +105,10 @@ Frequently asked questions and common issues with BoxLite.
   </Accordion>
 
   <Accordion title="Is BoxLite production-ready?">
-    **Yes.** BoxLite v0.4.4 is stable and used in production.
+    **Yes.** BoxLite v0.5.10 is stable and used in production.
 
     **Production considerations:**
-    - Stable API (v0.4.x series)
+    - Stable API (v0.5.x series)
     - Hardware-level isolation
     - Resource limits enforced
     - Error handling robust
@@ -141,7 +141,7 @@ Frequently asked questions and common issues with BoxLite.
   <Accordion title="How much memory does each box use?">
     **Minimum:** 128 MiB (configured via `memory_mib`)
 
-    **Default:** 512 MiB
+    **Default:** 2048 MiB
 
     **Range:** 128 MiB to 64 GiB (65536 MiB)
 
@@ -155,11 +155,11 @@ Frequently asked questions and common issues with BoxLite.
     # Lightweight box
     boxlite.BoxOptions(memory_mib=128)  # Minimum for Alpine
 
-    # Standard box
-    boxlite.BoxOptions(memory_mib=512)  # Default, good for Python
+    # Standard box (default)
+    boxlite.BoxOptions(memory_mib=2048)  # Default
 
     # Heavy box
-    boxlite.BoxOptions(memory_mib=2048)  # For complex workloads
+    boxlite.BoxOptions(memory_mib=4096)  # For complex workloads
     ```
   </Accordion>
 

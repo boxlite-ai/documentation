@@ -6,7 +6,7 @@ icon: "python"
 
 Complete API reference for the BoxLite Python SDK.
 
-**Version:** 0.5.3
+**Version:** 0.5.10
 **Python:** 3.10+
 **Platforms:** macOS (Apple Silicon), Linux (x86_64, ARM64)
 
@@ -82,7 +82,7 @@ Configuration options for creating a box.
 |-------|------|---------|-------------|
 | `image` | `str` | Required | OCI image URI (e.g., `"python:slim"`, `"alpine:latest"`) |
 | `cpus` | `int` | `1` | Number of CPU cores (1 to host CPU count) |
-| `memory_mib` | `int` | `512` | Memory limit in MiB (128-65536) |
+| `memory_mib` | `int` | `2048` | Memory limit in MiB (128-65536) |
 | `disk_size_gb` | `int \| None` | `None` | Persistent disk size in GB (None = ephemeral) |
 | `working_dir` | `str` | `"/root"` | Working directory inside container |
 | `env` | `List[Tuple[str, str]]` | `[]` | Environment variables as (key, value) pairs |

@@ -96,7 +96,7 @@ Every box accepts CPU, memory, and disk parameters:
 boxlite.SimpleBox(
     image="python:slim",
     cpus=2,             # CPU cores (default: 1)
-    memory_mib=2048,    # Memory in MiB (default: 512)
+    memory_mib=4096,    # Memory in MiB (default: 2048)
     disk_size_gb=10,    # Persistent disk in GB (default: ephemeral)
 )
 ```
@@ -104,7 +104,7 @@ boxlite.SimpleBox(
 | Parameter | Default | Range | Notes |
 |-----------|---------|-------|-------|
 | `cpus` | 1 | 1 to host CPU count | More CPUs help with parallel workloads |
-| `memory_mib` | 512 | 128–65536 | CodeBox benefits from 1024+ for package installation |
+| `memory_mib` | 2048 | 128–65536 | Increase for data-heavy workloads or large packages |
 | `disk_size_gb` | None (ephemeral) | Any positive integer | Set only if you need data to survive a restart |
 
 For most use cases, the defaults work well. Increase `memory_mib` when running data-heavy code or installing large packages, and add CPUs for compute-intensive workloads.
