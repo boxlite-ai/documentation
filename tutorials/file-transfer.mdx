@@ -42,24 +42,17 @@ The most common approach. Upload a file, process it, download the results.
 
 
     async def main():
-        runtime = boxlite.Boxlite.default()
-        box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
-
-        try:
+        async with boxlite.SimpleBox(image="python:slim") as box:
             # Upload a script into the box
             await box.copy_in("/host/script.py", "/workspace/script.py")
 
             # Run the script
-            execution = await box.exec("python", ["/workspace/script.py"])
-            result = await execution.wait()
+            result = await box.exec("python", "/workspace/script.py")
             print(f"Exit code: {result.exit_code}")
             print(result.stdout)
 
             # Download the results
             await box.copy_out("/workspace/output.json", "/host/output.json")
-        finally:
-            await box.stop()
-            await runtime.remove(box.id)
 
 
     if __name__ == "__main__":
@@ -68,31 +61,26 @@ The most common approach. Upload a file, process it, download the results.
   </Tab>
   <Tab title="Node.js">
     ```javascript title="file_transfer.js"
-    import { JsBoxlite } from 'boxlite';
+    import { SimpleBox } from '@boxlite-ai/boxlite';
 
     async function main() {
-      const runtime = JsBoxlite.withDefaultConfig();
-      const box = await runtime.create({ image: 'python:slim' });
-
+      const box = new SimpleBox({ image: 'python:slim' });
       try {
         // Write a script into the box using exec + stdin
-        await box.exec('sh', ['-c', 'cat > /workspace/script.py'], {
+        await box.exec('sh', '-c', 'cat > /workspace/script.py', {
           stdin: 'import json\ndata = {"result": 42}\nprint(json.dumps(data))\n',
         });
 
         // Run the script
-        const execution = await box.exec('python', ['/workspace/script.py']);
-        const result = await execution.wait();
+        const result = await box.exec('python', '/workspace/script.py');
         console.log(`Exit code: ${result.exitCode}`);
         console.log(result.stdout);
 
         // Read output via exec
-        const output = await box.exec('cat', ['/workspace/output.json']);
-        const outputResult = await output.wait();
-        console.log(outputResult.stdout);
+        const output = await box.exec('cat', '/workspace/output.json');
+        console.log(output.stdout);
       } finally {
         await box.stop();
-        await runtime.remove(box.id);
       }
     }
 
@@ -148,8 +136,8 @@ Mount a host directory directly into the box. Files are shared in real time — 
       const box = new SimpleBox({
         image: 'python:slim',
         volumes: [
-          { hostPath: '/host/datasets', guestPath: '/mnt/data', mode: 'ro' },
-          { hostPath: '/host/results', guestPath: '/mnt/results', mode: 'rw' },
+          { hostPath: '/host/datasets', guestPath: '/mnt/data', readOnly: true },
+          { hostPath: '/host/results', guestPath: '/mnt/results' },
         ],
       });
 
@@ -169,10 +157,10 @@ Mount a host directory directly into the box. Files are shared in real time — 
   </Tab>
 </Tabs>
 
-**When to use:** Shared datasets or configuration that multiple boxes need access to. Use `"ro"` (read-only) for input data to prevent accidental modification.
+**When to use:** Shared datasets or configuration that multiple boxes need access to. Use read-only mode for input data to prevent accidental modification.
 
 <Warning>
-  Volume mounts give the guest direct access to host files. Always use `"ro"` mode for input data. Only use `"rw"` for designated output directories.
+  Volume mounts give the guest direct access to host files. Always use read-only mode for input data. Only omit `readOnly` (or use `"rw"` in Python) for designated output directories.
 </Warning>
 
 ## Method 3: Inline data via base64
@@ -186,24 +174,17 @@ import boxlite
 
 
 async def main():
-    runtime = boxlite.Boxlite.default()
-    box = await runtime.create(boxlite.BoxOptions(image="python:slim"))
-
-    try:
+    async with boxlite.SimpleBox(image="python:slim") as box:
         # Encode a small script as base64
         data = b"print('hello from transferred script')"
         encoded = base64.b64encode(data).decode()
 
         # Send and execute in one command
-        execution = await box.exec("sh", [
-            "-c",
+        result = await box.exec(
+            "sh", "-c",
             f"echo {encoded} | base64 -d > /workspace/script.py && python /workspace/script.py",
-        ])
-        result = await execution.wait()
+        )
         print(result.stdout)
-    finally:
-        await box.stop()
-        await runtime.remove(box.id)
 
 
 if __name__ == "__main__":
@@ -222,13 +203,10 @@ import boxlite
 
 
 async def main():
-    runtime = boxlite.Boxlite.default()
-    box = await runtime.create(boxlite.BoxOptions(
+    async with boxlite.SimpleBox(
         image="python:slim",
         memory_mib=1024,
-    ))
-
-    try:
+    ) as box:
         # 1. Upload the input data
         await box.copy_in("/host/sales_data.csv", "/workspace/sales_data.csv")
 
@@ -236,17 +214,13 @@ async def main():
         await box.copy_in("/host/analyze.py", "/workspace/analyze.py")
 
         # 3. Run the analysis
-        execution = await box.exec("python", ["/workspace/analyze.py"])
-        result = await execution.wait()
+        result = await box.exec("python", "/workspace/analyze.py")
         print(f"Analysis completed (exit code: {result.exit_code})")
         print(result.stdout)
 
         # 4. Download the results
         await box.copy_out("/workspace/report.json", "/host/report.json")
         print("Results saved to /host/report.json")
-    finally:
-        await box.stop()
-        await runtime.remove(box.id)
 
 
 if __name__ == "__main__":
@@ -264,6 +238,6 @@ if __name__ == "__main__":
     Let an LLM generate code and run it in your sandbox automatically.
   </Card>
   <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
-    Advanced file transfer patterns, security boundaries, and read-only volume mounts.
+    Production patterns: security presets, concurrency, timeout handling, and resource limits.
   </Card>
 </CardGroup>

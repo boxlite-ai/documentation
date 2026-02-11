@@ -1,17 +1,17 @@
 ---
 title: "Automate a browser"
-description: "Launch a BrowserBox, connect via Chrome DevTools Protocol, take a screenshot, and scrape a web page — all inside an isolated VM."
+description: "Launch a BrowserBox, connect via Playwright or Puppeteer, take a screenshot, and scrape a web page — all inside an isolated VM."
 sidebarTitle: "Browser automation"
 icon: "globe"
 ---
 
-BrowserBox runs a full browser (Chromium, Firefox, or WebKit) inside an isolated VM and exposes it via the Chrome DevTools Protocol (CDP). You connect with Puppeteer, Playwright, or any CDP client — no browser install needed on your host.
+BrowserBox runs a full browser (Chromium, Firefox, or WebKit) inside an isolated VM and exposes it via Playwright Server or Chrome DevTools Protocol. You connect with Playwright or Puppeteer from your host — no browser install needed on the host.
 
 ## What you'll build
 
 A script that:
 1. Launches a BrowserBox with Chromium
-2. Connects via CDP using Puppeteer or Playwright
+2. Connects via Playwright or Puppeteer
 3. Navigates to a page and takes a screenshot
 4. Scrapes content from the page
 
@@ -21,7 +21,6 @@ A script that:
   <Tab title="Python (Playwright)">
     ```bash
     pip install boxlite playwright
-    playwright install  # Downloads browser binaries for Playwright client
     ```
   </Tab>
   <Tab title="Node.js (Puppeteer)">
@@ -37,10 +36,10 @@ A script that:
 
 ## Step 1: Launch a BrowserBox
 
-Create a BrowserBox and get the CDP endpoint.
+Create a BrowserBox and get a connection endpoint.
 
 <Tabs>
-  <Tab title="Python">
+  <Tab title="Python (Playwright)">
     ```python title="browser.py"
     import asyncio
     from boxlite import BrowserBox, BrowserBoxOptions
@@ -48,47 +47,59 @@ Create a BrowserBox and get the CDP endpoint.
     async def main():
         opts = BrowserBoxOptions(browser="chromium", memory=2048, cpu=2)
         async with BrowserBox(opts) as browser:
-            endpoint = browser.endpoint()
-            print(f"CDP endpoint: {endpoint}")
-            # → http://localhost:9222
+            ws = await browser.playwright_endpoint()
+            print(f"Playwright endpoint: {ws}")
+            # → ws://localhost:3000/
 
 
     if __name__ == "__main__":
         asyncio.run(main())
     ```
   </Tab>
-  <Tab title="Node.js">
+  <Tab title="Node.js (Puppeteer)">
     ```javascript title="browser.js"
     import { BrowserBox } from '@boxlite-ai/boxlite';
 
     async function main() {
-      const browser = new BrowserBox({ browser: 'chromium' });
+      const box = new BrowserBox({ browser: 'chromium' });
       try {
-        await browser.start();
-        const endpoint = browser.endpoint();
-        console.log(`CDP endpoint: ${endpoint}`);
-        // → http://localhost:9222
+        const ws = await box.endpoint();
+        console.log(`CDP endpoint: ${ws}`);
+        // → ws://localhost:3000/...
       } finally {
-        await browser.stop();
+        await box.stop();
       }
     }
 
     main();
     ```
+
+    <Note>
+      For Puppeteer, use `endpoint()` which starts the browser with CDP. Do **not** call `start()` first — `start()` launches Playwright Server, which is a different (mutually exclusive) connection mode.
+    </Note>
   </Tab>
 </Tabs>
 
+### Connection modes
+
+BrowserBox has two mutually exclusive connection modes:
+
+| Mode | Method | Protocol | Use with |
+|------|--------|----------|----------|
+| Playwright Server | `playwright_endpoint()` | WebSocket | Playwright (all browsers) |
+| Direct CDP/BiDi | `endpoint()` | WebSocket | Puppeteer, Selenium (chromium/firefox only) |
+
 ### Supported browsers
 
-| Browser | CDP Port | Image |
-|---------|----------|-------|
-| `chromium` | 9222 | `mcr.microsoft.com/playwright:v1.47.2-jammy` |
-| `firefox` | 9223 | `browserless/firefox:latest` |
-| `webkit` | 9224 | `browserless/webkit:latest` |
+| Browser | Works with Playwright | Works with Puppeteer |
+|---------|----------------------|---------------------|
+| `chromium` | Yes | Yes (CDP) |
+| `firefox` | Yes | Yes (WebDriver BiDi) |
+| `webkit` | Yes | No |
 
 ## Step 2: Take a screenshot
 
-Connect to the CDP endpoint and capture a screenshot.
+Connect to the browser and capture a screenshot.
 
 <Tabs>
   <Tab title="Python (Playwright)">
@@ -101,18 +112,18 @@ Connect to the CDP endpoint and capture a screenshot.
     async def main():
         opts = BrowserBoxOptions(browser="chromium", memory=2048, cpu=2)
         async with BrowserBox(opts) as browser:
-            endpoint = browser.endpoint()
+            ws = await browser.playwright_endpoint()
 
             async with async_playwright() as p:
                 # Connect to the browser running inside the VM
-                cdp_browser = await p.chromium.connect_over_cdp(endpoint)
-                page = await cdp_browser.new_page()
+                b = await p.chromium.connect(ws)
+                page = await b.new_page()
 
                 await page.goto("https://example.com")
                 await page.screenshot(path="screenshot.png")
                 print("Screenshot saved to screenshot.png")
 
-                await cdp_browser.close()
+                await b.close()
 
 
     if __name__ == "__main__":
@@ -125,13 +136,12 @@ Connect to the CDP endpoint and capture a screenshot.
     import puppeteer from 'puppeteer-core';
 
     async function main() {
-      const browser = new BrowserBox({ browser: 'chromium' });
+      const box = new BrowserBox({ browser: 'chromium' });
       try {
-        await browser.start();
-        const endpoint = browser.endpoint();
+        const ws = await box.endpoint();
 
         // Connect to the browser running inside the VM
-        const instance = await puppeteer.connect({ browserURL: endpoint });
+        const instance = await puppeteer.connect({ browserWSEndpoint: ws });
         const page = await instance.newPage();
 
         await page.goto('https://example.com');
@@ -140,7 +150,7 @@ Connect to the CDP endpoint and capture a screenshot.
 
         await instance.close();
       } finally {
-        await browser.stop();
+        await box.stop();
       }
     }
 
@@ -164,11 +174,11 @@ Extract content from a web page using standard DOM queries.
     async def main():
         opts = BrowserBoxOptions(browser="chromium", memory=2048, cpu=2)
         async with BrowserBox(opts) as browser:
-            endpoint = browser.endpoint()
+            ws = await browser.playwright_endpoint()
 
             async with async_playwright() as p:
-                cdp_browser = await p.chromium.connect_over_cdp(endpoint)
-                page = await cdp_browser.new_page()
+                b = await p.chromium.connect(ws)
+                page = await b.new_page()
 
                 await page.goto("https://news.ycombinator.com")
 
@@ -182,7 +192,7 @@ Extract content from a web page using standard DOM queries.
                 for i, title in enumerate(titles, 1):
                     print(f"  {i}. {title}")
 
-                await cdp_browser.close()
+                await b.close()
 
 
     if __name__ == "__main__":
@@ -195,12 +205,11 @@ Extract content from a web page using standard DOM queries.
     import puppeteer from 'puppeteer-core';
 
     async function main() {
-      const browser = new BrowserBox({ browser: 'chromium' });
+      const box = new BrowserBox({ browser: 'chromium' });
       try {
-        await browser.start();
-        const endpoint = browser.endpoint();
+        const ws = await box.endpoint();
 
-        const instance = await puppeteer.connect({ browserURL: endpoint });
+        const instance = await puppeteer.connect({ browserWSEndpoint: ws });
         const page = await instance.newPage();
 
         await page.goto('https://news.ycombinator.com');
@@ -218,7 +227,7 @@ Extract content from a web page using standard DOM queries.
 
         await instance.close();
       } finally {
-        await browser.stop();
+        await box.stop();
       }
     }
 
@@ -227,9 +236,9 @@ Extract content from a web page using standard DOM queries.
   </Tab>
 </Tabs>
 
-## Step 4: Fill a form and interact
+## Step 4: Interact with a page
 
-Use the browser to fill in forms, click buttons, and handle dynamic content.
+Read content, click links, and handle navigation.
 
 <Tabs>
   <Tab title="Python (Playwright)">
@@ -242,11 +251,11 @@ Use the browser to fill in forms, click buttons, and handle dynamic content.
     async def main():
         opts = BrowserBoxOptions(browser="chromium", memory=2048, cpu=2)
         async with BrowserBox(opts) as browser:
-            endpoint = browser.endpoint()
+            ws = await browser.playwright_endpoint()
 
             async with async_playwright() as p:
-                cdp_browser = await p.chromium.connect_over_cdp(endpoint)
-                page = await cdp_browser.new_page()
+                b = await p.chromium.connect(ws)
+                page = await b.new_page()
 
                 await page.goto("https://example.com")
 
@@ -260,7 +269,7 @@ Use the browser to fill in forms, click buttons, and handle dynamic content.
                 await page.click("a")
                 print(f"Navigated to: {page.url}")
 
-                await cdp_browser.close()
+                await b.close()
 
 
     if __name__ == "__main__":
@@ -273,12 +282,11 @@ Use the browser to fill in forms, click buttons, and handle dynamic content.
     import puppeteer from 'puppeteer-core';
 
     async function main() {
-      const browser = new BrowserBox({ browser: 'chromium' });
+      const box = new BrowserBox({ browser: 'chromium' });
       try {
-        await browser.start();
-        const endpoint = browser.endpoint();
+        const ws = await box.endpoint();
 
-        const instance = await puppeteer.connect({ browserURL: endpoint });
+        const instance = await puppeteer.connect({ browserWSEndpoint: ws });
         const page = await instance.newPage();
 
         await page.goto('https://example.com');
@@ -295,7 +303,7 @@ Use the browser to fill in forms, click buttons, and handle dynamic content.
 
         await instance.close();
       } finally {
-        await browser.stop();
+        await box.stop();
       }
     }
 
@@ -315,10 +323,7 @@ Use the browser to fill in forms, click buttons, and handle dynamic content.
     Give your LLM agent the ability to browse the web by combining BrowserBox with function calling.
   </Card>
   <Card title="BrowserBox API reference" icon="book" href="/reference/python/box-types#browserbox">
-    Full API docs for BrowserBox, BrowserBoxOptions, and CDP endpoints.
-  </Card>
-  <Card title="Examples Gallery" icon="images" href="/guides/examples-gallery">
-    Browse all nine runnable Python examples including ComputerBox desktop automation.
+    Full API docs for BrowserBox, BrowserBoxOptions, and connection endpoints.
   </Card>
   <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
     Production patterns for using BoxLite with AI agents.

@@ -39,7 +39,7 @@
             "pages": [
               "guides/index",
               "guides/ai-agent-integration",
-              "guides/examples-gallery",
+
               "guides/building-from-source",
               "guides/image-registry-configuration",
               "guides/macos-sandbox-debugging",

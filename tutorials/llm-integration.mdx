@@ -154,38 +154,8 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## Concurrency: one box vs. one box per agent
-
-Two patterns for scaling, depending on your isolation requirements.
-
-### One box, many executions (recommended)
-
-A single CodeBox handles all LLM tool calls. Fast startup, shared state between calls.
-
-```python
-async with boxlite.CodeBox(memory_mib=1024) as codebox:
-    # All tool calls share this box
-    result1 = await codebox.run(code_from_llm_1)
-    result2 = await codebox.run(code_from_llm_2)
-```
-
-**When to use:** Single-user conversations, cost-sensitive workloads, or when you want state to persist across tool calls.
-
-### One box per agent
-
-Each conversation or user gets its own box. Strict isolation, independent resource limits.
-
-```python
-async def handle_user(user_id: str, question: str):
-    async with boxlite.CodeBox(memory_mib=512) as codebox:
-        # This user's code runs in its own sandbox
-        result = await codebox.run(code_from_llm)
-```
-
-**When to use:** Multi-tenant applications where users should not share state or resources.
-
 <Tip>
-  For production deployments, see the [AI agent integration guide](/guides/ai-agent-integration) for timeout handling, security presets (`SecurityOptions.maximum()`), and defensive execution patterns.
+  For production deployments — concurrency models, timeout handling, security presets, and defensive execution patterns — see the [AI agent integration guide](/guides/ai-agent-integration).
 </Tip>
 
 ## What's next?
@@ -195,7 +165,7 @@ async def handle_user(user_id: str, question: str):
     Use BrowserBox to give your LLM agent web browsing capabilities.
   </Card>
   <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
-    Production patterns: timeouts, security presets, concurrency, and file transfer.
+    Production patterns: timeouts, security presets, and concurrency.
   </Card>
   <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
     Pass data files to your sandbox and retrieve results.

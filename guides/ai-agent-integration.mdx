@@ -313,7 +313,7 @@ async for line in stdout:
 
 ## Complete Example
 
-Putting it all together: proper configuration, security, concurrent execution with timeouts, TTY resizing, and cleanup.
+Putting it all together: security configuration, concurrent execution with timeouts, and cleanup.
 
 ```python
 import asyncio
@@ -343,21 +343,15 @@ async def main():
         cpus=2,
         memory_mib=1024,
         working_dir="/workspace",
-        volumes=[
-            ("/host/datasets", "/mnt/data", "ro"),
-        ],
         security=boxlite.SecurityOptions.maximum(),
     ))
 
     try:
-        # Copy a script into the box
-        await box.copy_in("/host/analysis.py", "/workspace/analysis.py")
-
         # Run with timeout protection
         result = await safe_exec(
             box,
             "python",
-            ["/workspace/analysis.py"],
+            ["-c", "print('hello from secure sandbox')"],
             timeout=60,
         )
         print(f"Exit code: {result.exit_code}")
@@ -374,18 +368,6 @@ async def main():
                 print(f"Task {i} failed: {r}")
             else:
                 print(f"Task {i} exit code: {r.exit_code}")
-
-        # Copy results out
-        await box.copy_out("/workspace/results.json", "/host/results.json")
-
-        # Interactive TTY session with resize
-        execution = await box.exec("sh", tty=True)
-        await execution.resize_tty(40, 120)
-
-        stdin = execution.stdin()
-        await stdin.send_input(b"echo 'interactive session'\n")
-        await stdin.send_input(b"exit\n")
-        await execution.wait()
 
     finally:
         await box.stop()
