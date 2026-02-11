@@ -6,7 +6,7 @@ icon: "node-js"
 
 Complete API reference for the BoxLite Node.js/TypeScript SDK.
 
-**Version:** 0.1.6
+**Version:** 0.2.7
 **Node.js:** 18+
 **Platforms:** macOS (Apple Silicon), Linux (x86\_64, ARM64)
 
@@ -15,7 +15,7 @@ Complete API reference for the BoxLite Node.js/TypeScript SDK.
 The BoxLite Node.js SDK provides a TypeScript-first API for creating and managing lightweight virtual machine sandboxes. It supports multiple box types for different use cases -- from simple command execution to full desktop automation.
 
 ```typescript
-import { JsBoxlite, SimpleBox, CodeBox, BrowserBox, ComputerBox } from 'boxlite';
+import { JsBoxlite, SimpleBox, CodeBox, BrowserBox, ComputerBox } from '@boxlite-ai/boxlite';
 ```
 
 ## Installation
@@ -23,13 +23,13 @@ import { JsBoxlite, SimpleBox, CodeBox, BrowserBox, ComputerBox } from 'boxlite'
 Install the SDK via npm:
 
 ```bash
-npm install boxlite
+npm install @boxlite-ai/boxlite
 ```
 
 Or with yarn:
 
 ```bash
-yarn add boxlite
+yarn add @boxlite-ai/boxlite
 ```
 
 <Note>
@@ -45,9 +45,9 @@ yarn add boxlite
 The main runtime for creating and managing boxes.
 
 ```typescript
-import { JsBoxlite } from 'boxlite';
+import { JsBoxlite } from '@boxlite-ai/boxlite';
 // or use the wrapper classes
-import { SimpleBox } from 'boxlite';
+import { SimpleBox } from '@boxlite-ai/boxlite';
 ```
 
 #### Constructor
@@ -118,14 +118,14 @@ Configuration options for creating a box.
 | `image` | `string` | - | OCI image URI |
 | `rootfsPath` | `string` | - | Pre-prepared rootfs directory (alternative to image) |
 | `cpus` | `number` | `1` | Number of CPU cores |
-| `memoryMib` | `number` | `512` | Memory limit in MiB |
+| `memoryMib` | `number` | `2048` | Memory limit in MiB |
 | `diskSizeGb` | `number` | - | Persistent disk size in GB |
 | `workingDir` | `string` | `"/root"` | Working directory inside container |
 | `env` | `JsEnvVar[]` | `[]` | Environment variables |
 | `volumes` | `JsVolumeSpec[]` | `[]` | Volume mounts |
 | `network` | `string` | `"isolated"` | Network mode |
 | `ports` | `JsPortSpec[]` | `[]` | Port mappings |
-| `autoRemove` | `boolean` | `false` | Auto cleanup when stopped |
+| `autoRemove` | `boolean` | `true` | Auto cleanup when stopped |
 | `detach` | `boolean` | `false` | Survive parent process exit |
 
 #### `JsEnvVar`
@@ -169,7 +169,7 @@ Default values used by BoxLite.
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `DEFAULT_CPUS` | `1` | Default CPU cores |
-| `DEFAULT_MEMORY_MIB` | `512` | Default memory in MiB |
+| `DEFAULT_MEMORY_MIB` | `2048` | Default memory in MiB |
 
 ### ComputerBox Defaults
 
@@ -183,13 +183,11 @@ Default values used by BoxLite.
 | `COMPUTERBOX_GUI_HTTPS_PORT` | `3001` | HTTPS GUI port |
 | `DESKTOP_READY_TIMEOUT` | `60` | Ready timeout (seconds) |
 
-### BrowserBox Ports
+### BrowserBox Defaults
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `BROWSERBOX_PORT_CHROMIUM` | `9222` | Chromium CDP port |
-| `BROWSERBOX_PORT_FIREFOX` | `9223` | Firefox CDP port |
-| `BROWSERBOX_PORT_WEBKIT` | `9224` | WebKit CDP port |
+| `BROWSERBOX_PORT` | `3000` | Playwright Server port |
 
 ---
 

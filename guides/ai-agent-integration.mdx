@@ -7,7 +7,7 @@ icon: "robot"
 This guide covers production patterns for deploying BoxLite as a sandboxed execution environment for AI agents. It assumes you've already worked through the [Tutorials](/tutorials/index) and know how to create boxes, run code, and transfer files.
 
 <Note>
-  **Using BoxRun?** If your agent communicates via HTTP, [BoxRun's REST API](/boxrun/rest-api) or [Python SDK](/boxrun/python-sdk) may be a simpler integration path. BoxRun handles server lifecycle, file upload/download, and SSE streaming out of the box. See the [AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) section in the BoxRun SDK docs.
+  **Using BoxRun?** If your agent communicates via HTTP, [BoxRun's REST API](/boxrun/rest-api) or [Python SDK](/boxrun/python-sdk) may be a simpler integration path. BoxRun handles sandbox lifecycle, file upload/download, and SSE streaming out of the box. See the [AI agent patterns](/boxrun/python-sdk#ai-agent-patterns) section in the BoxRun SDK docs.
 </Note>
 
 ## Recommended Configuration
@@ -40,7 +40,7 @@ This guide covers production patterns for deploying BoxLite as a sandboxed execu
   </Tab>
   <Tab title="Node.js">
     ```typescript
-    import { JsBoxlite } from 'boxlite';
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
 
     const runtime = JsBoxlite.withDefaultConfig();
     const box = await runtime.create({
@@ -114,7 +114,7 @@ A single box can run many `exec()` calls. Each call spawns a new process inside 
   </Tab>
   <Tab title="Node.js">
     ```typescript
-    import { JsBoxlite } from 'boxlite';
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
 
     const runtime = JsBoxlite.withDefaultConfig();
     const box = await runtime.create({

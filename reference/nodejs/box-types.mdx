@@ -64,7 +64,7 @@ A box can be in one of the following states:
 Context manager for basic command execution with automatic cleanup.
 
 ```typescript
-import { SimpleBox } from 'boxlite';
+import { SimpleBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -72,16 +72,22 @@ import { SimpleBox } from 'boxlite';
 ```typescript
 interface SimpleBoxOptions {
   image?: string;         // Default: "python:slim"
+  rootfsPath?: string;    // Local OCI layout directory (alternative to image)
   memoryMib?: number;     // Memory in MiB
   cpus?: number;          // CPU cores
+  diskSizeGb?: number;    // Persistent disk size in GB
   runtime?: JsBoxlite;    // Runtime instance
   name?: string;          // Box name
   autoRemove?: boolean;   // Default: true
+  reuseExisting?: boolean; // Default: false — reuse existing box with same name
   detach?: boolean;       // Default: false
   workingDir?: string;    // Working directory
   env?: Record<string, string>;  // Environment variables
   volumes?: VolumeSpec[]; // Volume mounts
   ports?: PortSpec[];     // Port mappings
+  entrypoint?: string[];  // Override image entrypoint
+  cmd?: string[];         // Override image CMD
+  user?: string;          // Run as specific user
 }
 ```
 
@@ -127,7 +133,7 @@ try {
 Python code execution sandbox.
 
 ```typescript
-import { CodeBox } from 'boxlite';
+import { CodeBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -170,7 +176,7 @@ print(requests.get('https://api.github.com/zen').text)
 Browser automation with Chrome DevTools Protocol.
 
 ```typescript
-import { BrowserBox, BrowserType } from 'boxlite';
+import { BrowserBox, BrowserType } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -191,35 +197,43 @@ Supported browser types.
 type BrowserType = 'chromium' | 'firefox' | 'webkit';
 ```
 
-### Browser CDP Ports
+### Default image
 
-| Browser | Port | Image |
-|---------|------|-------|
-| `chromium` | 9222 | `mcr.microsoft.com/playwright:v1.47.2-jammy` |
-| `firefox` | 9223 | `browserless/firefox:latest` |
-| `webkit` | 9224 | `browserless/webkit:latest` |
+All browser types use a single Playwright image: `mcr.microsoft.com/playwright:v1.58.0-jammy`
+
+The Playwright Server listens on port **3000**. The CDP endpoint (for Puppeteer) is on port **9222**.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `browser` | `BrowserType` | The browser type (`'chromium'`, `'firefox'`, or `'webkit'`) |
 
 ### Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `start()` | `(timeout?: number) => Promise<void>` | Start browser |
-| `endpoint()` | `() => string` | Get CDP endpoint URL |
+| `endpoint()` | `(timeout?: number) => Promise<string>` | Get CDP endpoint URL (for Puppeteer) |
+| `playwrightEndpoint()` | `(timeout?: number) => Promise<string>` | Get WebSocket endpoint URL (for Playwright) |
+| `connect()` | `(options?: { timeout?: number }) => Promise<Browser>` | Connect and return a Playwright Browser instance. Requires `playwright-core` installed. |
 
 ### Example
 
 ```typescript
-import puppeteer from 'puppeteer-core';
+import { BrowserBox } from '@boxlite-ai/boxlite';
 
 const browser = new BrowserBox({ browser: 'chromium' });
 try {
-  await browser.start();
-  const endpoint = browser.endpoint();  // "http://localhost:9222"
-
-  const instance = await puppeteer.connect({ browserURL: endpoint });
-  const page = await instance.newPage();
+  // Option 1: Use with Playwright (recommended)
+  const pw = await browser.connect();
+  const page = await pw.newPage();
   await page.goto('https://example.com');
   console.log(await page.title());
+
+  // Option 2: Get endpoints manually
+  const ws = await browser.playwrightEndpoint();  // "ws://localhost:3000/"
+  const cdp = await browser.endpoint();           // "http://localhost:9222"
 } finally {
   await browser.stop();
 }
@@ -229,10 +243,10 @@ try {
 
 ## ComputerBox
 
-Desktop automation with full GUI environment.
+Desktop automation with full GUI environment. Uses the `lscr.io/linuxserver/webtop:ubuntu-xfce` image by default.
 
 ```typescript
-import { ComputerBox } from 'boxlite';
+import { ComputerBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options
@@ -351,7 +365,7 @@ try {
 Interactive terminal sessions with PTY support.
 
 ```typescript
-import { InteractiveBox } from 'boxlite';
+import { InteractiveBox } from '@boxlite-ai/boxlite';
 ```
 
 ### Constructor Options

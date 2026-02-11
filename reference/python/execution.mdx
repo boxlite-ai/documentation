@@ -196,10 +196,13 @@ Result of a completed execution.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `exit_code` | `int` | Process exit code (0 = success) |
+| `exit_code` | `int` | Process exit code (0 = success, negative if terminated by signal) |
+| `stdout` | `str` | Standard output as string |
+| `stderr` | `str` | Standard error as string |
+| `error_message` | `str \| None` | Diagnostic message when the process died unexpectedly (e.g., container init death). `None` on normal exit. |
 
 <Note>
-For higher-level APIs (`SimpleBox.exec()`), the result also includes `stdout` and `stderr` strings, allowing you to access the full output without streaming.
+The low-level `Execution.wait()` returns an `ExecResult` with `exit_code` only. The higher-level `SimpleBox.exec()` populates all four fields including `stdout`, `stderr`, and `error_message`.
 </Note>
 
 ### Example

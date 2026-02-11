@@ -1,5 +1,6 @@
 ---
 title: "Documentation"
+sidebarTitle: "Overview"
 description: "Lightweight micro-VM sandboxes for AI agents and secure code execution. Hardware isolation, sub-second boot, zero daemon."
 icon: "house"
 ---
@@ -44,7 +45,7 @@ Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
     // npm install @boxlite-ai/boxlite
     import { SimpleBox } from '@boxlite-ai/boxlite';
 
-    const box = new SimpleBox({ image: 'alpine:latest' });
+    const box = new SimpleBox();
     try {
       const result = await box.exec('echo', 'Hello from BoxLite!');
       console.log(result.stdout);
@@ -55,23 +56,23 @@ Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
   </Tab>
 </Tabs>
 
-## BoxRun — the platform layer
+## BoxRun — sandbox management
 
-**BoxRun** wraps BoxLite into a ready-to-use platform: CLI, REST API, web dashboard, and Python SDK — all in a single binary. No code required to get started.
+**BoxRun** is the management layer for BoxLite sandboxes. Create, list, stop, and delete boxes through a CLI, REST API, Python SDK, or web dashboard — all in a single binary.
 
 ```bash
 curl -fsSL https://boxlite.ai/boxrun/install | sh
 boxrun shell ubuntu
 ```
 
-BoxRun is built on BoxLite. Choose BoxRun when you want a server you can talk to over HTTP or CLI. Choose BoxLite when you want to embed sandboxing directly in your application code.
+BoxLite creates and runs micro-VMs. BoxRun manages them — tracking state, persisting data, and exposing operations over HTTP and CLI.
 
 ## SDKs and platforms
 
 | SDK | Install | Status |
 |-----|---------|--------|
-| Python | `pip install boxlite` | Stable (v0.4.4) |
-| Node.js | `npm install @boxlite-ai/boxlite` | v0.1.6 |
+| Python | `pip install boxlite` | Stable (v0.5.10) |
+| Node.js | `npm install @boxlite-ai/boxlite` | v0.2.7 |
 | Rust | Git dependency | Native |
 | C | Link `libboxlite` | v0.2.0 |
 
@@ -84,16 +85,16 @@ BoxRun is built on BoxLite. Choose BoxRun when you want a server you can talk to
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Getting started" icon="rocket" href="/getting-started/index">
-    Install BoxLite and run your first sandbox in minutes.
+  <Card title="Tutorials" icon="graduation-cap" href="/tutorials/index">
+    Execute code, connect LLMs, transfer files, and automate browsers — step-by-step.
   </Card>
-  <Card title="Architecture" icon="sitemap" href="/architecture/index">
-    Learn how BoxLite works under the hood — microVMs, the jailer, networking, and storage.
-  </Card>
-  <Card title="BoxRun reference" icon="terminal" href="/boxrun/cli">
-    CLI commands, REST API, Python SDK, and configuration for the BoxRun platform.
+  <Card title="Guides" icon="book-open" href="/guides/index">
+    AI agent integration, security configuration, and production patterns.
   </Card>
   <Card title="SDK reference" icon="book" href="/reference/index">
     Full API reference for the Python, Node.js, Rust, and C SDKs.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/index">
+    How BoxLite works under the hood — microVMs, the jailer, networking, and storage.
   </Card>
 </CardGroup>

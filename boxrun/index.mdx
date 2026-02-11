@@ -1,11 +1,11 @@
 ---
 title: "BoxRun"
 sidebarTitle: "Overview"
-description: "A batteries-included sandbox platform built on BoxLite — CLI, REST API, web dashboard, and Python SDK in a single binary."
+description: "Manage BoxLite sandboxes through CLI, REST API, web dashboard, and Python SDK — all in a single binary."
 icon: "server"
 ---
 
-BoxRun wraps the BoxLite micro-VM runtime into a batteries-included platform — all in a single binary. No Docker, no Kubernetes, no external dependencies.
+BoxRun is the management layer for BoxLite sandboxes — create, list, stop, and delete boxes through CLI, REST API, Python SDK, or web dashboard. All in a single binary, no Docker, no Kubernetes, no external dependencies.
 
 <Tip>
   Want to embed sandboxing as a library instead? See the [BoxLite SDK quickstarts](/getting-started/index).
@@ -38,7 +38,7 @@ BoxRun wraps the BoxLite micro-VM runtime into a batteries-included platform —
 
 The `boxrun serve` process runs an HTTP/Unix socket server that manages the full lifecycle of micro-VMs via BoxLite. Clients — the CLI, Python SDK, or a browser — talk to this server. State is persisted in a single SQLite database; real-time output is streamed via SSE.
 
-BoxRun is built on [BoxLite](/architecture/index), which provides the underlying micro-VM runtime. BoxRun adds orchestration, persistence, and a multi-client server layer on top.
+BoxLite provides the underlying micro-VM runtime. BoxRun adds lifecycle management, persistence, and a multi-client server layer on top.
 
 ## Box lifecycle
 

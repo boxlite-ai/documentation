@@ -132,7 +132,7 @@ interface ExecResult {
 ### Example
 
 ```typescript
-import { SimpleBox } from 'boxlite';
+import { SimpleBox } from '@boxlite-ai/boxlite';
 
 await using box = new SimpleBox({ image: 'alpine:latest' });
 
@@ -158,7 +158,7 @@ if (result.exitCode !== 0) {
 Here is a complete example showing the full lifecycle of a command execution using the low-level API:
 
 ```typescript
-import { JsBoxlite } from 'boxlite';
+import { JsBoxlite } from '@boxlite-ai/boxlite';
 
 const runtime = JsBoxlite.withDefaultConfig();
 const box = await runtime.create({ image: 'alpine:latest' }, 'exec-demo');

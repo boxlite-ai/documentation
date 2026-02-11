@@ -1,0 +1,169 @@
+---
+title: "Core concepts"
+description: "Understand box types, lifecycle, images, and resource configuration before diving into tutorials."
+icon: "lightbulb"
+---
+
+Before working through the tutorials, it helps to understand a few core concepts. BoxLite gives you lightweight, isolated virtual machines — but there are several box types, each designed for a specific use case.
+
+## Box types
+
+| Box type | What it does | When to use it |
+|----------|-------------|----------------|
+| **SimpleBox** | Run shell commands in an isolated VM | General-purpose command execution |
+| **CodeBox** | Execute Python code with auto-install | AI agents, code interpreters, untrusted code |
+| **BrowserBox** | Browser with Chrome DevTools Protocol | Web scraping, browser automation |
+| **ComputerBox** | Full desktop with GUI automation | Desktop automation, visual testing |
+| **InteractiveBox** | PTY terminal session | Interactive shells, REPL-style usage |
+
+**Not sure which one?** Start with **CodeBox** — it's the most common choice for AI applications. It handles package installation automatically and returns stdout as a string.
+
+```python
+async with boxlite.CodeBox() as codebox:
+    result = await codebox.run("print(2 + 2)")
+    # result is "4\n"
+```
+
+For running arbitrary shell commands (not just Python), use **SimpleBox**:
+
+```python
+async with boxlite.SimpleBox(image="alpine:latest") as box:
+    result = await box.exec("ls", "-la", "/")
+    print(result.stdout)
+```
+
+## Lifecycle
+
+Every box follows the same lifecycle: **create → use → stop**.
+
+### Context manager (recommended)
+
+The simplest pattern uses `async with`, which handles startup and cleanup automatically:
+
+```python
+async with boxlite.SimpleBox(image="python:slim") as box:
+    await box.exec("echo", "hello")
+    # Box is automatically stopped when the block exits
+```
+
+### Manual lifecycle
+
+When you need more control (long-lived boxes, cross-function usage), manage the lifecycle explicitly:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    box = boxlite.SimpleBox(image="python:slim")
+    await box.start()
+
+    try:
+        await box.exec("echo", "hello")
+    finally:
+        await box.shutdown()  # Python SDK uses shutdown()
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    const box = new SimpleBox({ image: 'python:slim' });
+
+    try {
+      const result = await box.exec('echo', 'hello');
+      console.log(result.stdout);
+    } finally {
+      await box.stop();  // Node.js SDK uses stop()
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+The Python SDK uses `shutdown()` for explicit cleanup. The Node.js SDK uses `stop()`. Both do the same thing — stop the VM and release resources.
+</Note>
+
+### What happens at each stage
+
+| Stage | What happens |
+|-------|-------------|
+| **Create** | BoxLite pulls the OCI image (cached after first use), allocates resources, and boots a microVM. This takes ~150ms for cached images. |
+| **Use** | Run commands with `exec()` or `run()`. The box keeps its state — files you create, packages you install, and environment variables all persist across calls. |
+| **Stop** | The VM shuts down and all resources are released. With `auto_remove=True` (the default), the box is fully cleaned up. |
+
+## Images
+
+BoxLite uses standard **OCI container images** — the same images you use with Docker. Specify an image when creating a box:
+
+```python
+# Docker Hub images
+boxlite.SimpleBox(image="python:slim")
+boxlite.SimpleBox(image="alpine:latest")
+boxlite.SimpleBox(image="ubuntu:22.04")
+
+# Default (CodeBox uses python:slim automatically)
+boxlite.CodeBox()
+```
+
+The image is pulled on first use and cached locally. Subsequent starts reuse the cached image.
+
+<Tip>
+  Use slim or minimal images (`python:slim`, `alpine:latest`) for faster boot times. Full images like `ubuntu:latest` work but are larger and slower to pull.
+</Tip>
+
+## Resource configuration
+
+Every box accepts CPU, memory, and disk parameters:
+
+```python
+boxlite.SimpleBox(
+    image="python:slim",
+    cpus=2,             # CPU cores (default: 1)
+    memory_mib=4096,    # Memory in MiB (default: 2048)
+    disk_size_gb=10,    # Persistent disk in GB (default: ephemeral)
+)
+```
+
+| Parameter | Default | Range | Notes |
+|-----------|---------|-------|-------|
+| `cpus` | 1 | 1 to host CPU count | More CPUs help with parallel workloads |
+| `memory_mib` | 2048 | 128–65536 | Increase for data-heavy workloads or large packages |
+| `disk_size_gb` | None (ephemeral) | Any positive integer | Set only if you need data to survive a restart |
+
+For most use cases, the defaults work well. Increase `memory_mib` when running data-heavy code or installing large packages, and add CPUs for compute-intensive workloads.
+
+## Security model
+
+Each box is a real **microVM** — not a container. BoxLite provides multiple layers of isolation:
+
+- **Hardware virtualization** — KVM on Linux, Hypervisor.framework on macOS. Each box has its own kernel.
+- **Jailer** — restricts the VM process with seccomp filters and cgroups.
+- **Network isolation** — boxes get their own network namespace by default.
+
+You can tune security with `SecurityOptions` presets:
+
+```python
+from boxlite import SimpleBox, SecurityOptions
+
+async with SimpleBox(
+    image="python:slim",
+    security=SecurityOptions.strict(),  # Maximum isolation
+) as box:
+    await box.exec("echo", "locked down")
+```
+
+For full details on the security architecture, see [Security](/architecture/security).
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Execute AI-generated code" icon="code" href="/tutorials/code-execution">
+    Use CodeBox to run untrusted Python code safely.
+  </Card>
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Wire up tool calling so an LLM can execute code in a sandbox.
+  </Card>
+  <Card title="Python SDK reference" icon="book" href="/reference/python/box-types">
+    Full API reference for all box types.
+  </Card>
+  <Card title="Architecture deep dive" icon="sitemap" href="/architecture/index">
+    How BoxLite works under the hood — microVMs, the jailer, networking.
+  </Card>
+</CardGroup>
