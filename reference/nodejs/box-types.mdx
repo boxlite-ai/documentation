@@ -186,6 +186,8 @@ interface BrowserBoxOptions {
   browser?: BrowserType;  // "chromium" | "firefox" | "webkit"
   memoryMib?: number;     // Default: 2048
   cpus?: number;          // Default: 2
+  port?: number;          // Host port for Playwright Server (default: 3000)
+  cdpPort?: number;       // Host port for CDP/Puppeteer (default: 9222)
 }
 ```
 

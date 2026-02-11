@@ -220,6 +220,14 @@ Create a box, run a command, return output, destroy the box. Only `image` and `c
 {
   "image": "ubuntu:24.04",
   "cmd": ["echo", "hello"],
+  "cpu": 2,
+  "memory_mb": 1024,
+  "disk_size_gb": 8,
+  "network": false,
+  "env": {"KEY": "value"},
+  "volumes": [
+    {"host_path": "/src", "guest_path": "/root/src", "readonly": false}
+  ],
   "timeout_ms": 30000
 }
 ```

@@ -66,10 +66,9 @@ The most common approach. Upload a file, process it, download the results.
     async function main() {
       const box = new SimpleBox({ image: 'python:slim' });
       try {
-        // Write a script into the box using exec + stdin
-        await box.exec('sh', '-c', 'cat > /workspace/script.py', {
-          stdin: 'import json\ndata = {"result": 42}\nprint(json.dumps(data))\n',
-        });
+        // Write a script into the box using a heredoc via sh -c
+        await box.exec('sh', '-c',
+          'cat > /workspace/script.py << \'PYEOF\'\nimport json\ndata = {"result": 42}\nprint(json.dumps(data))\nPYEOF');
 
         // Run the script
         const result = await box.exec('python', '/workspace/script.py');

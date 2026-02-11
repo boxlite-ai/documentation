@@ -132,6 +132,8 @@ from boxlite import BrowserBox, BrowserBoxOptions
 | `browser` | `str` | `"chromium"` | Browser type: `"chromium"`, `"firefox"`, `"webkit"` |
 | `memory` | `int` | `2048` | Memory in MiB |
 | `cpu` | `int` | `2` | Number of CPU cores |
+| `port` | `Optional[int]` | `None` | Host port for Playwright Server (auto-maps to guest port 3000) |
+| `cdp_port` | `Optional[int]` | `None` | Host port for CDP/Puppeteer (auto-maps to guest port 9222) |
 
 ### Default image
 
