@@ -7,7 +7,7 @@ icon: "python"
 The BoxRun Python SDK provides an async client for managing boxes programmatically.
 
 ```bash
-pip install boxrun
+pip install boxrun-sdk
 ```
 
 ## Connection
@@ -19,7 +19,7 @@ The SDK auto-connects to the BoxRun server using this priority:
 3. Fallback to `127.0.0.1:9090`
 
 ```python
-from boxrun import BoxRunClient
+from boxrun_sdk import BoxRunClient
 
 # Auto-detect
 async with BoxRunClient() as client:
@@ -214,7 +214,7 @@ class BoxInfo:
 class ExecInfo:
     id: str
     box_id: str
-    status: str              # "running", "completed", "error", "timeout", "canceled"
+    status: str              # "running", "succeeded", "failed", "canceled"
     cmd: list[str]
     env: dict[str, str] | None
     workdir: str | None
@@ -254,7 +254,7 @@ class RunResult:
 All SDK errors raise `BoxRunError(code, message)`.
 
 ```python
-from boxrun.common.errors import BoxRunError
+from boxrun_sdk import BoxRunError
 
 try:
     box = await client.create("ubuntu:24.04")
@@ -315,6 +315,6 @@ async def agent_task():
 For simple one-shot tasks, use `client.run()`:
 
 ```python
-result = await client.run("ubuntu:24.04", ["python3", "-c", "print(42)"])
+result = await client.run("python", ["python3", "-c", "print(42)"])
 print(result.stdout)  # "42\n"
 ```
