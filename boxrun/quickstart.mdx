@@ -118,12 +118,12 @@ Run `boxrun images` to see all aliases. Any valid OCI image reference also works
 ## Python SDK
 
 ```bash
-pip install boxrun
+pip install boxrun-sdk
 ```
 
 ```python
 import asyncio
-from boxrun import BoxRunClient
+from boxrun_sdk import BoxRunClient
 
 async def main():
     async with BoxRunClient() as client:
@@ -151,7 +151,7 @@ asyncio.run(main())
 For one-shot tasks, use `client.run()` — it creates a box, runs the command, returns output, and destroys the box:
 
 ```python
-result = await client.run("ubuntu", ["python3", "-c", "print(42)"])
+result = await client.run("python", ["python3", "-c", "print(42)"])
 print(result.stdout)  # "42\n"
 ```
 

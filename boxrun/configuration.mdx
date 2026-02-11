@@ -10,8 +10,9 @@ BoxRun stores all state in a single directory:
 
 ```text
 ~/.boxrun/
-├── boxrun.sock  # Unix socket (server <-> clients)
-└── boxrun.db    # SQLite (boxes, execs, event log)
+├── boxrun          # BoxRun binary (installed by install script)
+├── boxrun.db       # SQLite (boxes, execs, event log)
+└── runtime/        # BoxLite runtime (kernel, shim, libraries)
 ```
 
 No etcd, no Redis, no container runtime, no image registry.
