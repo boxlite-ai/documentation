@@ -50,15 +50,35 @@ async with boxlite.SimpleBox(image="python:slim") as box:
 
 When you need more control (long-lived boxes, cross-function usage), manage the lifecycle explicitly:
 
-```python
-box = boxlite.SimpleBox(image="python:slim")
-await box.start()
+<Tabs>
+  <Tab title="Python">
+    ```python
+    box = boxlite.SimpleBox(image="python:slim")
+    await box.start()
 
-try:
-    await box.exec("echo", "hello")
-finally:
-    await box.shutdown()
-```
+    try:
+        await box.exec("echo", "hello")
+    finally:
+        await box.shutdown()  # Python SDK uses shutdown()
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    const box = new SimpleBox({ image: 'python:slim' });
+
+    try {
+      const result = await box.exec('echo', 'hello');
+      console.log(result.stdout);
+    } finally {
+      await box.stop();  // Node.js SDK uses stop()
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+The Python SDK uses `shutdown()` for explicit cleanup. The Node.js SDK uses `stop()`. Both do the same thing — stop the VM and release resources.
+</Note>
 
 ### What happens at each stage
 

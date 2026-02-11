@@ -18,31 +18,40 @@ from boxlite import SimpleBox
 
 ```python
 SimpleBox(
-    image: str,
+    image: str = None,
+    rootfs_path: str = None,
     memory_mib: int = None,
     cpus: int = None,
     runtime: Boxlite = None,
     name: str = None,
     auto_remove: bool = True,
+    reuse_existing: bool = False,
     **kwargs
 )
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `image` | `str` | Required | Container image to use |
+| `image` | `str` | None | Container image to use (e.g., `"python:slim"`) |
+| `rootfs_path` | `str` | None | Path to local OCI layout directory (alternative to `image`) |
 | `memory_mib` | `int` | System default | Memory limit in MiB |
 | `cpus` | `int` | System default | Number of CPU cores |
 | `runtime` | `Boxlite` | Global default | Runtime instance |
 | `name` | `str` | None | Optional unique name |
 | `auto_remove` | `bool` | `True` | Remove box when stopped |
+| `reuse_existing` | `bool` | `False` | If `True` and a box with the given `name` exists, reuse it instead of raising an error |
 | `**kwargs` | | | Additional options: `env`, `volumes`, `ports`, `working_dir` |
+
+<Note>
+Either `image` or `rootfs_path` must be provided. If both are given, `rootfs_path` takes precedence.
+</Note>
 
 ### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `id` | `str` | Box ID (raises if not started) |
+| `created` | `bool \| None` | `True` if newly created, `False` if reused (via `reuse_existing`). `None` if not started yet. |
 
 ### Methods
 
@@ -52,6 +61,8 @@ SimpleBox(
 | `exec()` | `(cmd, *args, env=None) -> ExecResult` | Execute command and wait (async) |
 | `info()` | `() -> BoxInfo` | Get box metadata |
 | `shutdown()` | `() -> None` | Shutdown and release resources |
+| `copy_in()` | `(host_path, container_dest, *, overwrite=True, follow_symlinks=False, include_parent=True) -> None` | Copy files from host into the container (async) |
+| `copy_out()` | `(container_src, host_dest, *, overwrite=True, follow_symlinks=False, include_parent=True) -> None` | Copy files from container to host (async) |
 
 ### Example
 
@@ -128,11 +139,19 @@ All browser types use a single Playwright image: `mcr.microsoft.com/playwright:v
 
 The Playwright Server listens on port **3000**. The CDP endpoint (for Puppeteer) is on port **9222**.
 
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `browser` | `str` | The browser type (`"chromium"`, `"firefox"`, or `"webkit"`) |
+
 ### Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `endpoint()` | `() -> str` | Get CDP endpoint URL |
+| `endpoint()` | `(timeout: int = 60) -> str` | Get CDP endpoint URL for Puppeteer (async) |
+| `playwright_endpoint()` | `(timeout: int = 60) -> str` | Get WebSocket endpoint URL for Playwright (async) |
+| `connect()` | `(timeout: int = 60) -> Browser` | Connect and return a Playwright Browser instance (async). Requires `playwright` installed. |
 
 ### Example
 
@@ -141,15 +160,19 @@ from boxlite import BrowserBox, BrowserBoxOptions
 
 opts = BrowserBoxOptions(browser="chromium", memory=4096)
 async with BrowserBox(opts) as browser:
-    endpoint = browser.endpoint()  # "http://localhost:9222"
+    # Option 1: Use with Playwright (recommended)
+    pw_browser = await browser.connect()
+    page = await pw_browser.new_page()
+    await page.goto("https://example.com")
 
-    # Connect with Puppeteer or Playwright
-    # puppeteer.connect({ browserURL: endpoint })
+    # Option 2: Get endpoints manually
+    ws = await browser.playwright_endpoint()   # "ws://localhost:3000/"
+    cdp = await browser.endpoint()             # "http://localhost:9222"
 ```
 
 ## ComputerBox
 
-Box with full desktop environment and GUI automation capabilities.
+Box with full desktop environment and GUI automation capabilities. Uses the `lscr.io/linuxserver/webtop:ubuntu-xfce` image by default.
 
 ```python
 from boxlite import ComputerBox
