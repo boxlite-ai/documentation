@@ -14,35 +14,106 @@ icon: "rocket"
 curl -fsSL https://boxlite.ai/boxrun/install | sh
 ```
 
-## CLI
+Verify the installation:
 
 ```bash
-# One command: create a VM and drop into a shell
-boxrun shell ubuntu
-
-# Or step by step
-boxrun create ubuntu:24.04 --name dev
-boxrun attach dev
-
-# Run commands non-interactively
-boxrun exec dev -- uname -a
-
-# Mount a host directory into the VM
-boxrun create ubuntu:24.04 --name work -v ~/project:/root/project
-
-# Copy files in and out
-boxrun cp ./data.csv dev:/root/data.csv
-boxrun cp dev:/root/results.csv ./results.csv
-
-# Lifecycle
-boxrun stop dev     # preserves disk
-boxrun start dev    # restart
-boxrun rm dev       # destroy
+boxrun --version
 ```
+
+```text
+boxrun 0.2.0
+```
+
+## Try it out
+
+<Steps>
+  <Step title="Create a VM and drop into a shell">
+    ```bash
+    boxrun shell ubuntu
+    ```
+
+    On first run, BoxRun automatically starts its server in the background and pulls the image:
+
+    ```text
+    Server not running. Starting boxrun serve in background...
+    Pulling ubuntu:24.04...
+    root@box_a1b2c3:~#
+    ```
+
+    You're now inside a full Ubuntu VM. Try `uname -a`, install packages, run scripts — it's a real Linux environment with its own kernel. Exit with `Ctrl-D` or type `exit`.
+  </Step>
+  <Step title="Create a named box">
+    ```bash
+    boxrun create ubuntu --name dev
+    ```
+
+    ```text
+    Box created: box_d4e5f6 (dev)
+    ```
+
+    The box is now running and ready to accept commands.
+  </Step>
+  <Step title="Run commands">
+    ```bash
+    boxrun exec dev -- uname -a
+    ```
+
+    ```text
+    Linux box_d4e5f6 6.1.0 #1 SMP PREEMPT aarch64 GNU/Linux
+    ```
+
+    ```bash
+    boxrun exec dev -- cat /etc/os-release | head -2
+    ```
+
+    ```text
+    PRETTY_NAME="Ubuntu 24.04 LTS"
+    NAME="Ubuntu"
+    ```
+  </Step>
+  <Step title="Transfer files">
+    ```bash
+    # Upload a file into the box
+    boxrun cp ./data.csv dev:/root/data.csv
+
+    # Download a file from the box
+    boxrun cp dev:/root/results.csv ./results.csv
+    ```
+  </Step>
+  <Step title="List your boxes">
+    ```bash
+    boxrun ls
+    ```
+
+    ```text
+    ID                 NAME   STATUS    IMAGE          CPU  MEM     DISK  CREATED
+    box_d4e5f6         dev    running   ubuntu:24.04   2    1024MB  8G    2025-01-15T10:30:00
+    ```
+  </Step>
+  <Step title="Manage the lifecycle">
+    ```bash
+    boxrun stop dev     # preserves disk
+    boxrun start dev    # restart with disk intact
+    boxrun rm dev       # destroy permanently
+    ```
+  </Step>
+</Steps>
 
 <Tip>
   The server starts automatically on your first command — no need to run `boxrun serve` manually.
 </Tip>
+
+## Image aliases
+
+BoxRun provides short names for common images:
+
+```bash
+boxrun shell python    # python:3.12-slim
+boxrun shell node      # node:22-slim
+boxrun shell alpine    # alpine:3.20
+```
+
+Run `boxrun images` to see all aliases. Any valid OCI image reference also works (e.g. `python:3.11`, `nginx:latest`).
 
 ## Python SDK
 
@@ -57,7 +128,7 @@ from boxrun import BoxRunClient
 async def main():
     async with BoxRunClient() as client:
         # Create a sandbox
-        box = await client.create("ubuntu:24.04", name="dev")
+        box = await client.create("ubuntu", name="dev")
 
         # Run a command
         result = await box.exec(["echo", "hello from BoxRun"])
@@ -80,6 +151,23 @@ asyncio.run(main())
 For one-shot tasks, use `client.run()` — it creates a box, runs the command, returns output, and destroys the box:
 
 ```python
-result = await client.run("ubuntu:24.04", ["python3", "-c", "print(42)"])
+result = await client.run("ubuntu", ["python3", "-c", "print(42)"])
 print(result.stdout)  # "42\n"
 ```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Reference" icon="terminal" href="/boxrun/cli">
+    All commands, flags, volume mounts, and shell completions.
+  </Card>
+  <Card title="Python SDK Reference" icon="python" href="/boxrun/python-sdk">
+    Full API, data types, error handling, AI agent patterns.
+  </Card>
+  <Card title="REST API" icon="server" href="/boxrun/rest-api">
+    HTTP endpoints, WebSocket attach, SSE streaming.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/boxrun/configuration">
+    Environment variables, resource limits, state directory.
+  </Card>
+</CardGroup>

@@ -37,7 +37,7 @@ async with BoxRunClient(base_url="http://localhost:9090") as client:
 ### create
 
 ```python
-await client.create(image, *, name=None, cpu=2, memory_mb=512,
+await client.create(image, *, name=None, cpu=2, memory_mb=1024, disk_size_gb=8,
                     network=False, workdir="/root", env=None, volumes=None) -> BoxHandle
 ```
 
@@ -45,10 +45,11 @@ Create a new box and return a handle to it.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `image` | `str` | (required) | Container image |
+| `image` | `str` | (required) | Container image (or alias like `"ubuntu"`) |
 | `name` | `str \| None` | `None` | Human-readable name |
 | `cpu` | `int` | `2` | CPU cores |
-| `memory_mb` | `int` | `512` | Memory in MB |
+| `memory_mb` | `int` | `1024` | Memory in MB |
+| `disk_size_gb` | `int` | `8` | Disk size in GB |
 | `network` | `bool` | `False` | Enable networking |
 | `workdir` | `str` | `"/root"` | Working directory |
 | `env` | `dict[str, str] \| None` | `None` | Environment variables |
@@ -63,7 +64,7 @@ box = await client.create("ubuntu:24.04", name="dev", memory_mb=1024)
 ### run
 
 ```python
-await client.run(image, cmd, *, env=None, timeout_ms=None, volumes=None) -> RunResult
+await client.run(image, cmd, *, env=None, timeout_ms=None, disk_size_gb=8, volumes=None) -> RunResult
 ```
 
 Ephemeral one-shot: create a box, run a command, return the result, destroy the box.
@@ -198,6 +199,9 @@ class BoxInfo:
     workdir: str
     env: dict[str, str] | None
     volumes: list[dict] | None
+    boxlite_id: str | None
+    error_code: str | None
+    error_message: str | None
     created_at: str
     started_at: str | None
     stopped_at: str | None
@@ -212,6 +216,9 @@ class ExecInfo:
     box_id: str
     status: str              # "running", "completed", "error", "timeout", "canceled"
     cmd: list[str]
+    env: dict[str, str] | None
+    workdir: str | None
+    timeout_ms: int | None
     exit_code: int | None
     error_message: str | None
     created_at: str
@@ -263,6 +270,7 @@ except BoxRunError as e:
 | `EXEC_NOT_FOUND` | Execution does not exist |
 | `EXEC_ALREADY_FINISHED` | Execution already completed |
 | `IMAGE_PULL_FAILED` | Failed to pull container image |
+| `NAME_ALREADY_EXISTS` | A box with that name already exists |
 | `RESOURCE_EXCEEDED` | CPU or memory limit exceeded |
 | `TIMEOUT` | Operation timed out |
 | `RUNTIME_ERROR` | Internal runtime error |

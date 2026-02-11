@@ -27,6 +27,7 @@ No etcd, no Redis, no container runtime, no image registry.
 | `BOXRUN_PORT` | `9090` | Server bind port (TCP mode) |
 | `BOXRUN_MAX_CPU` | auto-detected | Total CPU limit override |
 | `BOXRUN_MAX_MEMORY_MB` | auto-detected | Total memory limit override (MB) |
+| `BOXLITE_RUNTIME_DIR` | `./runtime` | BoxLite runtime directory |
 
 ## Resource limits
 
@@ -39,9 +40,10 @@ Total CPU and memory limits are auto-detected from host hardware. There is no ha
 | Total CPU | auto-detected (host CPU count) |
 | Total memory | auto-detected (host RAM) |
 | Per-box CPU | 2 cores |
-| Per-box memory | 512 MB |
+| Per-box memory | 1024 MB |
 | Per-box disk | 8 GB |
 | Per-box workdir | `/root` |
+| Default image | `ubuntu:24.04` |
 
 ### Overriding limits
 
@@ -73,6 +75,21 @@ Configure per-box resources at creation time:
     ```
   </Tab>
 </Tabs>
+
+## Image aliases
+
+BoxRun resolves short image names to full references:
+
+| Alias | Image |
+|-------|-------|
+| `ubuntu` | `ubuntu:24.04` |
+| `python` | `python:3.12-slim` |
+| `node` | `node:22-slim` |
+| `golang` | `golang:1.22` |
+| `rust` | `rust:1.77-slim` |
+| `alpine` | `alpine:3.20` |
+
+You can also use any valid OCI image reference directly (e.g. `python:3.11`, `nginx:latest`).
 
 ### Checking current limits
 

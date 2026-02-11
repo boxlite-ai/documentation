@@ -32,7 +32,7 @@ Create a new box.
   "image": "ubuntu:24.04",
   "name": "dev",
   "cpu": 2,
-  "memory_mb": 512,
+  "memory_mb": 1024,
   "disk_size_gb": 8,
   "network": false,
   "workdir": "/root",
@@ -43,7 +43,7 @@ Create a new box.
 }
 ```
 
-All fields except `image` are optional.
+All fields except `image` are optional. Image aliases (e.g. `"ubuntu"` for `"ubuntu:24.04"`) are accepted.
 
 ```json Response (201)
 {
@@ -52,12 +52,18 @@ All fields except `image` are optional.
   "status": "running",
   "image": "ubuntu:24.04",
   "cpu": 2,
-  "memory_mb": 512,
+  "memory_mb": 1024,
   "disk_size_gb": 8,
   "network": false,
   "workdir": "/root",
+  "env": null,
+  "volumes": null,
+  "boxlite_id": "litevm-abc123",
+  "error_code": null,
+  "error_message": null,
   "created_at": "2025-01-01T00:00:00Z",
-  "started_at": "2025-01-01T00:00:00Z"
+  "started_at": "2025-01-01T00:00:00Z",
+  "stopped_at": null
 }
 ```
 
@@ -100,8 +106,13 @@ Start a command in a box. Only `cmd` is required.
   "box_id": "box_abc123",
   "status": "running",
   "cmd": ["echo", "hello"],
+  "env": null,
+  "workdir": null,
+  "timeout_ms": null,
   "exit_code": null,
-  "created_at": "2025-01-01T00:00:00Z"
+  "error_message": null,
+  "created_at": "2025-01-01T00:00:00Z",
+  "finished_at": null
 }
 ```
 

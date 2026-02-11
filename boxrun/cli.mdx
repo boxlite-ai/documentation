@@ -27,7 +27,7 @@ The web dashboard is available at `http://<host>:<port>/ui` when running in TCP 
 ### Create
 
 ```bash
-boxrun create IMAGE [--name NAME] [--cpu 2] [--memory 512] [--network] [-v /host:/guest[:ro]]
+boxrun create IMAGE [--name NAME] [--cpu 2] [--memory 1024] [--disk 8] [--network] [-v /host:/guest[:ro]]
 ```
 
 Create a new box from a container image.
@@ -36,7 +36,8 @@ Create a new box from a container image.
 |------|---------|-------------|
 | `--name`, `-n` | (auto) | Human-readable name |
 | `--cpu` | `2` | CPU cores |
-| `--memory`, `-m` | `512` | Memory in MB |
+| `--memory`, `-m` | `1024` | Memory in MB |
+| `--disk` | `8` | Disk size in GB |
 | `--network` | `false` | Enable networking |
 | `-v`, `--volume` | (none) | Volume mount (repeatable) |
 
@@ -88,14 +89,14 @@ Exit with `Ctrl-D` or type `exit`.
 ### Shell shortcut
 
 ```bash
-boxrun shell IMAGE [--name NAME] [flags...]
+boxrun shell IMAGE [--name NAME] [--cpu 2] [--memory 1024] [--disk 8] [--shell /bin/bash] [-v /host:/guest[:ro]]
 ```
 
-Create a box and immediately attach to it — combines `create` + `attach` in one command.
+Create a box and immediately attach to it — combines `create` + `attach` in one command. Accepts the same resource flags as `create`.
 
 ```bash
 boxrun shell ubuntu
-boxrun shell python:slim --name pydev --memory 1024
+boxrun shell python --name pydev --memory 2048
 ```
 
 ## Command execution
@@ -142,14 +143,14 @@ boxrun cp dev:/root/results.csv ./results.csv
 ## Ephemeral run
 
 ```bash
-boxrun run IMAGE -- CMD [ARGS...]
+boxrun run IMAGE -- CMD [ARGS...] [--timeout SECONDS] [--disk 8]
 ```
 
 Create a box, run a command, print the output, and destroy the box — all in one step.
 
 ```bash
 boxrun run ubuntu -- echo "hello"
-boxrun run python:slim --timeout 30 -- python3 -c "print(42)"
+boxrun run python --timeout 30 -- python3 -c "print(42)"
 ```
 
 ## Volume mounts
@@ -184,6 +185,41 @@ boxrun images
 ```
 
 List available images with their aliases.
+
+## Image aliases
+
+BoxRun provides built-in aliases for common images so you can use short names:
+
+| Alias | Image | Description |
+|-------|-------|-------------|
+| `ubuntu` | `ubuntu:24.04` | General purpose (default) |
+| `python` | `python:3.12-slim` | Python 3.12 pre-installed |
+| `node` | `node:22-slim` | Node.js 22 LTS pre-installed |
+| `golang` | `golang:1.22` | Go 1.22 pre-installed |
+| `rust` | `rust:1.77-slim` | Rust 1.77 pre-installed |
+| `alpine` | `alpine:3.20` | Lightweight Linux (5 MB) |
+
+```bash
+# These are equivalent
+boxrun shell ubuntu
+boxrun shell ubuntu:24.04
+
+# Use aliases anywhere an image is accepted
+boxrun create python --name pydev
+boxrun run node -- node -e "console.log('hello')"
+```
+
+Run `boxrun images` to see all available aliases.
+
+## Upgrade and uninstall
+
+```bash
+# Upgrade to the latest version
+boxrun upgrade
+
+# Remove BoxRun from your system
+boxrun uninstall
+```
 
 ## Shell completions
 
