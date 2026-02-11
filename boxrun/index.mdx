@@ -1,95 +1,38 @@
 ---
-title: "BoxRun Quick Start"
-sidebarTitle: "BoxRun"
-description: "Get up and running with BoxRun — install, CLI quick start, and Python SDK example."
-icon: "terminal"
+title: "BoxRun"
+sidebarTitle: "Overview"
+description: "A batteries-included sandbox platform built on BoxLite — CLI, REST API, web dashboard, and Python SDK in a single binary."
+icon: "server"
 ---
 
 BoxRun wraps the BoxLite micro-VM runtime into a batteries-included platform: a REST API server, CLI, web dashboard, and SDKs for Python and Rust — all in a single binary.
 
 <Tip>
-  Want to embed sandboxing as a library instead? See the [BoxLite SDK quickstarts](/getting-started/quickstart-python).
+  Want to embed sandboxing as a library instead? See the [BoxLite SDK quickstarts](/getting-started/index).
 </Tip>
 
-## Install
+## How it works
 
-<Note>
-  **Requirements:** macOS Apple Silicon (M1+). Linux support coming soon.
-</Note>
+The `boxrun serve` process runs an HTTP/Unix socket server (axum + tokio) that manages the full lifecycle of micro-VMs via BoxLite. Clients — the CLI, Python SDK, or a browser — talk to this server. State is persisted in a single SQLite database; real-time output is streamed via SSE.
 
-```bash
-curl -fsSL https://boxlite.ai/boxrun/install | sh
+BoxRun is built on [BoxLite](/architecture/index), which provides the underlying micro-VM runtime. BoxRun adds orchestration, persistence, and a multi-client server layer on top.
+
+## Box lifecycle
+
+```text
+creating --> running <--> stopped
+                |              |
+                +--> error     +--> (rm)
+                       |
+                       +--> (rm)
 ```
 
-## Quick start
+- **creating** — box is being provisioned by BoxLite
+- **running** — box is up and accepting commands
+- **stopped** — box is paused, disk state preserved
+- **error** — box creation or runtime failure
 
-```bash
-# One command: create a VM and drop into a shell
-boxrun shell ubuntu
-
-# Or step by step
-boxrun create ubuntu:24.04 --name dev
-boxrun attach dev
-
-# Run commands non-interactively
-boxrun exec dev -- uname -a
-
-# Mount a host directory into the VM
-boxrun create ubuntu:24.04 --name work -v ~/project:/root/project
-
-# Copy files in and out
-boxrun cp ./data.csv dev:/root/data.csv
-boxrun cp dev:/root/results.csv ./results.csv
-
-# Lifecycle
-boxrun stop dev     # preserves disk
-boxrun start dev    # restart
-boxrun rm dev       # destroy
-```
-
-<Tip>
-  The server starts automatically on your first command — no need to run `boxrun serve` manually.
-</Tip>
-
-## Python SDK
-
-```bash
-pip install boxrun
-```
-
-```python
-import asyncio
-from boxrun import BoxRunClient
-
-async def main():
-    async with BoxRunClient() as client:
-        # Create a sandbox
-        box = await client.create("ubuntu:24.04", name="dev")
-
-        # Run a command
-        result = await box.exec(["echo", "hello from BoxRun"])
-        print(f"Exit code: {result.exit_code}")
-
-        # Stream output in real time
-        async for event in box.exec_stream(["apt-get", "update"]):
-            if event.type == "log":
-                print(event.data, end="")
-
-        # Upload and download files
-        await box.upload("./script.py", "/root/script.py")
-        await box.download("/root/output.json", "./output.json")
-
-        await box.remove()
-
-asyncio.run(main())
-```
-
-For one-shot tasks, use `client.run()` — it creates a box, runs the command, returns output, and destroys the box:
-
-```python
-result = await client.run("ubuntu:24.04", ["python3", "-c", "print(42)"])
-print(result.stdout)  # "42\n"
-```
+Disk state persists across stop/start cycles. Only `rm` (remove) destroys data.
 
 ## Web dashboard
 
@@ -98,6 +41,9 @@ A built-in web UI is available at `http://localhost:9090/ui` when the server is 
 ## What's next
 
 <CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/boxrun/quickstart">
+    Install BoxRun and run your first sandbox in minutes.
+  </Card>
   <Card title="CLI Reference" icon="terminal" href="/boxrun/cli">
     All commands, flags, interactive terminal, volume mounts.
   </Card>
@@ -106,8 +52,5 @@ A built-in web UI is available at `http://localhost:9090/ui` when the server is 
   </Card>
   <Card title="REST API" icon="server" href="/boxrun/rest-api">
     HTTP endpoints, WebSocket attach, SSE streaming.
-  </Card>
-  <Card title="Configuration" icon="gear" href="/boxrun/configuration">
-    Environment variables, resource limits, state directory.
   </Card>
 </CardGroup>

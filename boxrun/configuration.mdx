@@ -81,39 +81,3 @@ curl http://localhost:9090/v1/info
 # {"max_cpu": 8, "max_memory_mb": 16384}
 ```
 
-## Architecture
-
-```text
-┌─────────────────────────────────────────┐
-│            boxrun serve                 │
-│                                         │
-│  axum + tokio (Unix socket / TCP)       │
-│  ├── BoxManager ── microVM management   │
-│  ├── EventBus ──── SSE pub/sub          │
-│  ├── Store ─────── SQLite (rusqlite)    │
-│  └── Web UI ────── /ui dashboard        │
-└─────────────────────────────────────────┘
-         |  Unix socket / HTTP
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│  boxrun CLI  │  │  Python SDK  │  │   Browser    │
-└──────────────┘  └──────────────┘  └──────────────┘
-```
-
-BoxRun is built on [BoxLite](/architecture/index), which provides the underlying micro-VM runtime. BoxRun adds orchestration, persistence, and a multi-client server layer on top.
-
-### Box lifecycle
-
-```text
-creating --> running <--> stopped
-                |              |
-                +--> error     +--> (rm)
-                       |
-                       +--> (rm)
-```
-
-- **creating** — box is being provisioned by BoxLite
-- **running** — box is up and accepting commands
-- **stopped** — box is paused, disk state preserved
-- **error** — box creation or runtime failure
-
-Disk state persists across stop/start cycles. Only `rm` (remove) destroys data.

@@ -1,0 +1,85 @@
+---
+title: "Quick Start"
+description: "Install BoxRun and run your first sandbox in minutes."
+icon: "rocket"
+---
+
+## Install
+
+<Note>
+  **Requirements:** macOS Apple Silicon (M1+). Linux support coming soon.
+</Note>
+
+```bash
+curl -fsSL https://boxlite.ai/boxrun/install | sh
+```
+
+## CLI
+
+```bash
+# One command: create a VM and drop into a shell
+boxrun shell ubuntu
+
+# Or step by step
+boxrun create ubuntu:24.04 --name dev
+boxrun attach dev
+
+# Run commands non-interactively
+boxrun exec dev -- uname -a
+
+# Mount a host directory into the VM
+boxrun create ubuntu:24.04 --name work -v ~/project:/root/project
+
+# Copy files in and out
+boxrun cp ./data.csv dev:/root/data.csv
+boxrun cp dev:/root/results.csv ./results.csv
+
+# Lifecycle
+boxrun stop dev     # preserves disk
+boxrun start dev    # restart
+boxrun rm dev       # destroy
+```
+
+<Tip>
+  The server starts automatically on your first command — no need to run `boxrun serve` manually.
+</Tip>
+
+## Python SDK
+
+```bash
+pip install boxrun
+```
+
+```python
+import asyncio
+from boxrun import BoxRunClient
+
+async def main():
+    async with BoxRunClient() as client:
+        # Create a sandbox
+        box = await client.create("ubuntu:24.04", name="dev")
+
+        # Run a command
+        result = await box.exec(["echo", "hello from BoxRun"])
+        print(f"Exit code: {result.exit_code}")
+
+        # Stream output in real time
+        async for event in box.exec_stream(["apt-get", "update"]):
+            if event.type == "log":
+                print(event.data, end="")
+
+        # Upload and download files
+        await box.upload("./script.py", "/root/script.py")
+        await box.download("/root/output.json", "./output.json")
+
+        await box.remove()
+
+asyncio.run(main())
+```
+
+For one-shot tasks, use `client.run()` — it creates a box, runs the command, returns output, and destroys the box:
+
+```python
+result = await client.run("ubuntu:24.04", ["python3", "-c", "print(42)"])
+print(result.stdout)  # "42\n"
+```
