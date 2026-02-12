@@ -44,7 +44,9 @@ The most common approach. Upload a file, process it, download the results.
     async def main():
         async with boxlite.SimpleBox(image="python:slim") as box:
             # Upload a script into the box
-            await box.copy_in("/host/script.py", "/workspace/script.py")
+            # Note: destination must be a directory path, not a file path
+            await box.exec("mkdir", "-p", "/workspace")
+            await box.copy_in("/host/script.py", "/workspace/")
 
             # Run the script
             result = await box.exec("python", "/workspace/script.py")
@@ -52,7 +54,7 @@ The most common approach. Upload a file, process it, download the results.
             print(result.stdout)
 
             # Download the results
-            await box.copy_out("/workspace/output.json", "/host/output.json")
+            await box.copy_out("/workspace/output.json", "/host/")
 
 
     if __name__ == "__main__":
@@ -106,8 +108,8 @@ Mount a host directory directly into the box. Files are shared in real time — 
         async with boxlite.SimpleBox(
             image="python:slim",
             volumes=[
-                ("/host/datasets", "/mnt/data", "ro"),     # Read-only input
-                ("/host/results", "/mnt/results", "rw"),    # Writable output
+                ("/host/datasets", "/mnt/data", True),      # Read-only input
+                ("/host/results", "/mnt/results", False),    # Writable output
             ],
         ) as box:
             # Input data is already available at /mnt/data
@@ -160,7 +162,7 @@ Mount a host directory directly into the box. Files are shared in real time — 
 **When to use:** Shared datasets or configuration that multiple boxes need access to. Use read-only mode for input data to prevent accidental modification.
 
 <Warning>
-  Volume mounts give the guest direct access to host files. Always use read-only mode for input data. Only omit `readOnly` (or use `"rw"` in Python) for designated output directories.
+  Volume mounts give the guest direct access to host files. Always use read-only mode (`True`) for input data. Only use `False` for designated output directories.
 </Warning>
 
 ## Method 3: Inline data via base64
@@ -182,7 +184,7 @@ async def main():
         # Send and execute in one command
         result = await box.exec(
             "sh", "-c",
-            f"echo {encoded} | base64 -d > /workspace/script.py && python /workspace/script.py",
+            f"echo {encoded} | base64 -d > /tmp/script.py && python /tmp/script.py",
         )
         print(result.stdout)
 
@@ -207,19 +209,22 @@ async def main():
         image="python:slim",
         memory_mib=1024,
     ) as box:
-        # 1. Upload the input data
-        await box.copy_in("/host/sales_data.csv", "/workspace/sales_data.csv")
+        # 1. Create workspace directory
+        await box.exec("mkdir", "-p", "/workspace")
 
-        # 2. Upload the analysis script
-        await box.copy_in("/host/analyze.py", "/workspace/analyze.py")
+        # 2. Upload the input data
+        await box.copy_in("/host/sales_data.csv", "/workspace/")
 
-        # 3. Run the analysis
+        # 3. Upload the analysis script
+        await box.copy_in("/host/analyze.py", "/workspace/")
+
+        # 4. Run the analysis
         result = await box.exec("python", "/workspace/analyze.py")
         print(f"Analysis completed (exit code: {result.exit_code})")
         print(result.stdout)
 
-        # 4. Download the results
-        await box.copy_out("/workspace/report.json", "/host/report.json")
+        # 5. Download the results
+        await box.copy_out("/workspace/report.json", "/host/")
         print("Results saved to /host/report.json")
 
 

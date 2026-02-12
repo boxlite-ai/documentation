@@ -28,13 +28,14 @@ This guide covers production patterns for deploying BoxLite as a sandboxed execu
   <Tab title="Python">
     ```python
     import boxlite
+    from boxlite.boxlite import SecurityOptions
 
     options = boxlite.BoxOptions(
         image="python:slim",
         cpus=2,
         memory_mib=1024,
         working_dir="/workspace",
-        security=boxlite.SecurityOptions.maximum(),
+        security=SecurityOptions.maximum(),
     )
     ```
   </Tab>
@@ -66,7 +67,9 @@ This guide covers production patterns for deploying BoxLite as a sandboxed execu
 For AI agents running untrusted code, use `SecurityOptions.maximum()`:
 
 ```python
-security = boxlite.SecurityOptions.maximum()
+from boxlite.boxlite import SecurityOptions
+
+security = SecurityOptions.maximum()
 
 # Customize if needed
 security.max_open_files = 2048
@@ -89,11 +92,12 @@ A single box can run many `exec()` calls. Each call spawns a new process inside 
 
     async def main():
         runtime = boxlite.Boxlite.default()
+        from boxlite.boxlite import SecurityOptions
         box = await runtime.create(boxlite.BoxOptions(
             image="python:slim",
             cpus=2,
             memory_mib=1024,
-            security=boxlite.SecurityOptions.maximum(),
+            security=SecurityOptions.maximum(),
         ))
 
         try:
@@ -252,7 +256,9 @@ async def safe_exec(box, cmd, args=None, timeout=30):
 To prevent an agent from accessing the network:
 
 ```python
-security = boxlite.SecurityOptions.maximum()
+from boxlite.boxlite import SecurityOptions
+
+security = SecurityOptions.maximum()
 security.network_enabled = False
 
 options = boxlite.BoxOptions(
@@ -275,7 +281,7 @@ options = boxlite.BoxOptions(
     image="python:slim",
     cpus=1,             # Cap CPU usage
     memory_mib=512,     # Hard memory limit (OOM kills the box)
-    security=boxlite.SecurityOptions.maximum(),
+    security=SecurityOptions.maximum(),
 )
 ```
 
@@ -318,6 +324,7 @@ Putting it all together: security configuration, concurrent execution with timeo
 ```python
 import asyncio
 import boxlite
+from boxlite.boxlite import SecurityOptions
 
 
 async def safe_exec(box, cmd, args=None, timeout=30):
@@ -343,7 +350,7 @@ async def main():
         cpus=2,
         memory_mib=1024,
         working_dir="/workspace",
-        security=boxlite.SecurityOptions.maximum(),
+        security=SecurityOptions.maximum(),
     ))
 
     try:

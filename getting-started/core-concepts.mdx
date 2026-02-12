@@ -59,7 +59,7 @@ When you need more control (long-lived boxes, cross-function usage), manage the 
     try:
         await box.exec("echo", "hello")
     finally:
-        await box.shutdown()  # Python SDK uses shutdown()
+        await box.shutdown()
     ```
   </Tab>
   <Tab title="Node.js">
@@ -70,22 +70,18 @@ When you need more control (long-lived boxes, cross-function usage), manage the 
       const result = await box.exec('echo', 'hello');
       console.log(result.stdout);
     } finally {
-      await box.stop();  // Node.js SDK uses stop()
+      await box.stop();
     }
     ```
   </Tab>
 </Tabs>
 
-<Note>
-The Python SDK uses `shutdown()` for explicit cleanup. The Node.js SDK uses `stop()`. Both do the same thing — stop the VM and release resources.
-</Note>
-
 ### What happens at each stage
 
 | Stage | What happens |
 |-------|-------------|
-| **Create** | BoxLite pulls the OCI image (cached after first use), allocates resources, and boots a microVM. This takes ~150ms for cached images. |
-| **Use** | Run commands with `exec()` or `run()`. The box keeps its state — files you create, packages you install, and environment variables all persist across calls. |
+| **Create** | BoxLite pulls the OCI image (cached after first use), allocates resources, and boots a microVM. This typically takes under a second for cached images. |
+| **Use** | Run commands with `exec()` or `run()`. Files you create and packages you install persist within the box. Note: each `CodeBox.run()` call starts a new Python process, so Python variables and function definitions do not carry over between calls. |
 | **Stop** | The VM shuts down and all resources are released. With `auto_remove=True` (the default), the box is fully cleaned up. |
 
 ## Images
@@ -140,14 +136,18 @@ Each box is a real **microVM** — not a container. BoxLite provides multiple la
 You can tune security with `SecurityOptions` presets:
 
 ```python
-from boxlite import SimpleBox, SecurityOptions
+from boxlite.boxlite import SecurityOptions
 
-async with SimpleBox(
+async with boxlite.SimpleBox(
     image="python:slim",
-    security=SecurityOptions.strict(),  # Maximum isolation
+    security=SecurityOptions.maximum(),  # Maximum isolation
 ) as box:
     await box.exec("echo", "locked down")
 ```
+
+<Note>
+`SecurityOptions` is currently imported from `boxlite.boxlite`, not from the top-level `boxlite` module. Available presets: `development()`, `standard()`, `maximum()`.
+</Note>
 
 For full details on the security architecture, see [Security](/architecture/security).
 
