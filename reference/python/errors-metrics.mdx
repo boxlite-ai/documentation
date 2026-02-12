@@ -450,18 +450,19 @@ Aggregate metrics across all boxes managed by a runtime instance.
 | Field | Type | Description |
 |-------|------|-------------|
 | `boxes_created` | `int` | Total boxes created |
-| `boxes_destroyed` | `int` | Total boxes destroyed |
-| `total_exec_calls` | `int` | Total command executions |
-| `active_boxes` | `int` | Currently running boxes |
+| `boxes_failed` | `int` | Total boxes that failed |
+| `running` | `int` | Currently running boxes |
+| `commands` | `int` | Total command executions |
+| `errors` | `int` | Total errors |
 
 ```python
 runtime = Boxlite.default()
 metrics = await runtime.metrics()
 
 print(f"Boxes created: {metrics.boxes_created}")
-print(f"Boxes destroyed: {metrics.boxes_destroyed}")
-print(f"Total exec calls: {metrics.total_exec_calls}")
-print(f"Active boxes: {metrics.active_boxes}")
+print(f"Boxes failed: {metrics.boxes_failed}")
+print(f"Running: {metrics.running}")
+print(f"Commands: {metrics.commands}")
 ```
 
 ### `boxlite.BoxMetrics`
@@ -470,47 +471,55 @@ Per-box resource usage metrics. Retrieved via `box.metrics()`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `cpu_time_ms` | `int` | Total CPU time in milliseconds |
-| `memory_usage_bytes` | `int` | Current memory usage in bytes |
-| `network_bytes_sent` | `int` | Total bytes sent |
-| `network_bytes_received` | `int` | Total bytes received |
+| `commands` | `int` | Total commands executed |
+| `errors` | `int` | Total errors |
+| `total_create_ms` | `int \| None` | Time to create box in milliseconds |
+| `guest_boot_ms` | `int \| None` | Guest boot time in milliseconds |
+| `cpu` | `float \| None` | CPU usage |
+| `mem` | `int \| None` | Memory usage in bytes |
 
 ```python
 metrics = await box.metrics()
 
-print(f"CPU time: {metrics.cpu_time_ms}ms")
-print(f"Memory: {metrics.memory_usage_bytes / (1024**2):.2f} MB")
-print(f"Network sent: {metrics.network_bytes_sent} bytes")
-print(f"Network received: {metrics.network_bytes_received} bytes")
+print(f"Commands: {metrics.commands}")
+print(f"Create time: {metrics.total_create_ms}ms")
+print(f"Memory: {metrics.mem / (1024**2):.2f} MB")
 ```
+
+<Note>
+`box.metrics()` is available on the low-level `Box` object (returned by `runtime.create()`). `SimpleBox` does not expose a `metrics()` method.
+</Note>
 
 ### Monitoring Example
 
 ```python
 import asyncio
-from boxlite import SimpleBox
+from boxlite import Boxlite, BoxOptions
 
 async def monitor_box():
-    async with SimpleBox(image="python:slim") as box:
+    runtime = Boxlite.default()
+    box = await runtime.create(BoxOptions(image="python:slim"))
+
+    try:
         # Start a workload
-        execution = await box.exec("python", "-c", """
+        execution = await box.exec("python", ["-c", """
 import time
 data = []
 for i in range(100):
     data.append('x' * 10000)
     time.sleep(0.1)
-""")
+"""])
 
         # Monitor metrics while running
         for _ in range(10):
             metrics = await box.metrics()
-            print(f"CPU: {metrics.cpu_time_ms}ms | "
-                  f"Memory: {metrics.memory_usage_bytes / (1024**2):.1f} MB | "
-                  f"Net TX: {metrics.network_bytes_sent} | "
-                  f"Net RX: {metrics.network_bytes_received}")
+            print(f"Commands: {metrics.commands} | "
+                  f"Memory: {metrics.mem / (1024**2):.1f} MB")
             await asyncio.sleep(1)
 
         await execution.wait()
+    finally:
+        await box.stop()
 ```
 
 ### Runtime-wide Monitoring
@@ -529,7 +538,7 @@ async def runtime_monitoring():
 
     # Check runtime metrics
     metrics = await runtime.metrics()
-    print(f"Active boxes: {metrics.active_boxes}")
+    print(f"Running: {metrics.running}")
     print(f"Total created: {metrics.boxes_created}")
 
     # Clean up
@@ -538,8 +547,7 @@ async def runtime_monitoring():
 
     # Check again
     metrics = await runtime.metrics()
-    print(f"Active boxes: {metrics.active_boxes}")
-    print(f"Total destroyed: {metrics.boxes_destroyed}")
+    print(f"Running: {metrics.running}")
 ```
 
 ## See Also

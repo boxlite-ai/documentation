@@ -85,8 +85,8 @@ Configuration options for creating a box.
 | `memory_mib` | `int` | `2048` | Memory limit in MiB (128-65536) |
 | `disk_size_gb` | `int \| None` | `None` | Persistent disk size in GB (None = ephemeral) |
 | `working_dir` | `str` | `"/root"` | Working directory inside container |
-| `env` | `List[Tuple[str, str]]` | `[]` | Environment variables as (key, value) pairs |
-| `volumes` | `List[Tuple[str, str, str]]` | `[]` | Volume mounts as (host_path, guest_path, mode) |
+| `env` | `Dict[str, str]` | `{}` | Environment variables as key-value pairs |
+| `volumes` | `List[Tuple[str, str, bool]]` | `[]` | Volume mounts as (host_path, guest_path, read_only) |
 | `ports` | `List[Tuple[int, int, str]]` | `[]` | Port forwarding as (host_port, guest_port, protocol) |
 | `auto_remove` | `bool` | `True` | Auto cleanup when stopped |
 | `detach` | `bool` | `False` | Survive parent process exit |
@@ -95,8 +95,8 @@ Configuration options for creating a box.
 
 ```python
 volumes=[
-    ("/host/config", "/etc/app/config", "ro"),  # Read-only
-    ("/host/data", "/mnt/data", "rw"),          # Read-write
+    ("/host/config", "/etc/app/config", True),   # Read-only
+    ("/host/data", "/mnt/data", False),           # Read-write
 ]
 ```
 
@@ -129,7 +129,7 @@ Handle to a running or stopped box.
 | `exec()` | `(cmd, args, env, tty) -> Execution` | Execute command (async) |
 | `stop()` | `() -> None` | Stop the box gracefully (async) |
 | `remove()` | `() -> None` | Delete box and its data (async) |
-| `info()` | `() -> BoxInfo` | Get box metadata (async) |
+| `info()` | `() -> BoxInfo` | Get box metadata (sync) |
 | `metrics()` | `() -> BoxMetrics` | Get resource usage metrics (async) |
 
 ### `boxlite.BoxInfo`

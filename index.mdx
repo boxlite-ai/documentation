@@ -19,7 +19,7 @@ Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
     Each sandbox is a real microVM with its own Linux kernel. Full hardware isolation via KVM or Apple Hypervisor.framework.
   </Card>
   <Card title="Lightweight" icon="feather">
-    VMs boot in ~150ms with minimal overhead. Run hundreds of sandboxes on a single host.
+    VMs boot in under a second with minimal overhead. Run hundreds of sandboxes on a single host.
   </Card>
 </CardGroup>
 
@@ -33,7 +33,7 @@ Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
     import boxlite
 
     async def main():
-        async with boxlite.SimpleBox() as box:
+        async with boxlite.SimpleBox(image="alpine:latest") as box:
             result = await box.exec("echo", "Hello from BoxLite!")
             print(result.stdout)
 

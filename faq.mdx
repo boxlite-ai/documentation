@@ -214,11 +214,8 @@ Frequently asked questions and common issues with BoxLite.
 
     **2. Check box status:**
     ```python
-    info = await box.info()
-    print(f"Status: {info.status}")
-
-    metrics = await box.metrics()
-    print(f"Memory: {metrics.memory_usage_bytes / (1024**2):.2f} MB")
+    info = box.info()
+    print(f"State: {info.state}")
     ```
 
     **3. Inspect filesystem:**
@@ -296,7 +293,7 @@ Frequently asked questions and common issues with BoxLite.
 
     1. **Share data via volumes:**
        ```python
-       volumes=[("/host/shared", "/mnt/shared", "rw")]
+       volumes=[("/host/shared", "/mnt/shared", False)]  # False = read-write
        ```
 
     2. **Use host network:**
@@ -328,8 +325,8 @@ Frequently asked questions and common issues with BoxLite.
 
     3. **Too many boxes:**
        ```python
-       metrics = runtime.metrics()
-       print(f"Active boxes: {metrics.active_boxes}")
+       metrics = await runtime.metrics()
+       print(f"Running boxes: {metrics.running}")
        # Reduce concurrency or increase host resources
        ```
 
@@ -596,8 +593,7 @@ Frequently asked questions and common issues with BoxLite.
     # Provide stdin if needed
     execution = await box.exec("command")
     stdin = execution.stdin()
-    await stdin.write("input\n")
-    await stdin.close()
+    await stdin.send_input(b"input\n")
     ```
   </Accordion>
 
@@ -683,8 +679,9 @@ Frequently asked questions and common issues with BoxLite.
 
     2. **Check actual usage:**
        ```python
+       # metrics() is available on the low-level Box object (via runtime.create())
        metrics = await box.metrics()
-       print(f"Memory: {metrics.memory_usage_bytes / (1024**2):.2f} MB")
+       print(f"Memory: {metrics.mem / (1024**2):.2f} MB")
        ```
 
     3. **Optimize code:**
