@@ -234,7 +234,7 @@ try {
 
   // Option 2: Get endpoints manually
   const ws = await browser.playwrightEndpoint();  // "ws://localhost:3000/"
-  const cdp = await browser.endpoint();           // "http://localhost:9222"
+  const cdp = await browser.endpoint();           // "ws://localhost:3000/..."
 } finally {
   await browser.stop();
 }

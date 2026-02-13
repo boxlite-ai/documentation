@@ -1,0 +1,254 @@
+---
+title: "Run Claude Code in a sandbox"
+description: "Run Claude Code on your project inside an isolated BoxLite sandbox — mount your code, let Claude Code work, and get the changes back safely."
+sidebarTitle: "Claude Code"
+icon: "microchip"
+---
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's CLI coding agent — it reads your code, writes changes, runs commands, and iterates on errors. That power comes with risk: it has full shell access. Running it inside a BoxLite sandbox means it can do its job without touching your host system.
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+You also need an [Anthropic API key](https://console.anthropic.com/settings/keys).
+
+## Step 1: Run Claude Code on your project
+
+The core workflow: mount your project read-only into the sandbox, let Claude Code work on a writable copy, and collect the results on your host.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="claude_code.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="node:20-slim",
+            memory_mib=4096,
+            cpus=2,
+            env=[("ANTHROPIC_API_KEY", "sk-ant-...")],
+            volumes=[
+                ("./my-project", "/workspace/src", True),      # Your code (read-only)
+                ("./output", "/workspace/output", False),       # Results (writable)
+            ],
+            working_dir="/workspace/output",
+        ) as box:
+            # Install Claude Code
+            await box.exec("npm", "install", "-g", "@anthropic-ai/claude-code")
+
+            # Copy source to a writable location so Claude Code can modify it
+            await box.exec("cp", "-r", "/workspace/src/.", "/workspace/output/")
+
+            # Let Claude Code work on the copy
+            result = await box.exec(
+                "claude", "--print",
+                "Add unit tests for the main module. Write them to tests/. Use pytest.",
+            )
+            print(result.stdout)
+
+            if result.exit_code != 0:
+                print(f"Claude Code failed (exit {result.exit_code})")
+                print(result.stderr)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="claude_code.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'node:20-slim',
+        memoryMib: 4096,
+        cpus: 2,
+        env: { ANTHROPIC_API_KEY: 'sk-ant-...' },
+        volumes: [
+          { hostPath: './my-project', guestPath: '/workspace/src', readOnly: true },
+          { hostPath: './output', guestPath: '/workspace/output' },
+        ],
+        workingDir: '/workspace/output',
+      });
+
+      try {
+        // Install Claude Code
+        await box.exec('npm', 'install', '-g', '@anthropic-ai/claude-code');
+
+        // Copy source to a writable location so Claude Code can modify it
+        await box.exec('cp', '-r', '/workspace/src/.', '/workspace/output/');
+
+        // Let Claude Code work on the copy
+        const result = await box.exec(
+          'claude', '--print',
+          'Add unit tests for the main module. Write them to tests/. Use pytest.',
+        );
+        console.log(result.stdout);
+
+        if (result.exitCode !== 0) {
+          console.error(`Claude Code failed (exit ${result.exitCode})`);
+          console.error(result.stderr);
+        }
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+After running, check `./output/` on your host — Claude Code's changes are already there via the volume mount. You can review them, diff against the original, and merge what you want:
+
+```bash
+diff -r ./my-project ./output
+```
+
+<Warning>
+  Always mount your source code as **read-only**. Let Claude Code work on a copy inside the sandbox. This way your original files are never modified until you explicitly merge the changes.
+</Warning>
+
+<Note>
+  Installing Claude Code at runtime takes 30-60 seconds. For repeated use, build a custom Docker image with Claude Code pre-installed and use it as `image="your-registry/claude-code:latest"`.
+</Note>
+
+## Step 2: Chain multiple tasks
+
+Reuse the same sandbox for a multi-step pipeline. Files persist between `claude --print` invocations, so each step builds on the previous one.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="claude_code_pipeline.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="node:20-slim",
+            memory_mib=4096,
+            cpus=2,
+            env=[("ANTHROPIC_API_KEY", "sk-ant-...")],
+            volumes=[("./output", "/workspace", False)],
+            working_dir="/workspace",
+        ) as box:
+            await box.exec("npm", "install", "-g", "@anthropic-ai/claude-code")
+
+            # Task 1: Generate an Express API
+            await box.exec(
+                "claude", "--print",
+                "Create a REST API with Express.js: GET /health returns {status: 'ok'}, POST /echo returns the request body. Save to app.js and package.json."
+            )
+
+            # Task 2: Add tests (app.js from task 1 is still on disk)
+            await box.exec(
+                "claude", "--print",
+                "Write tests for app.js using the Node.js built-in test runner. Save to app.test.js."
+            )
+
+            # Task 3: Install dependencies and run the tests
+            await box.exec("npm", "install")
+            result = await box.exec("node", "--test", "app.test.js")
+            print(f"Test results (exit code {result.exit_code}):")
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="claude_code_pipeline.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'node:20-slim',
+        memoryMib: 4096,
+        cpus: 2,
+        env: { ANTHROPIC_API_KEY: 'sk-ant-...' },
+        volumes: [
+          { hostPath: './output', guestPath: '/workspace' },
+        ],
+        workingDir: '/workspace',
+      });
+
+      try {
+        await box.exec('npm', 'install', '-g', '@anthropic-ai/claude-code');
+
+        // Task 1: Generate an Express API
+        await box.exec(
+          'claude', '--print',
+          'Create a REST API with Express.js: GET /health returns {status: "ok"}, POST /echo returns the request body. Save to app.js and package.json.'
+        );
+
+        // Task 2: Add tests (app.js from task 1 is still on disk)
+        await box.exec(
+          'claude', '--print',
+          'Write tests for app.js using the Node.js built-in test runner. Save to app.test.js.'
+        );
+
+        // Task 3: Install dependencies and run the tests
+        await box.exec('npm', 'install');
+        const result = await box.exec('node', '--test', 'app.test.js');
+        console.log(`Test results (exit code ${result.exitCode}):`);
+        console.log(result.stdout);
+        if (result.stderr) console.error(result.stderr);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+All generated files land in `./output/` on your host.
+
+## Security tips
+
+<Warning>
+  **Never hardcode API keys.** Pass them via environment variables. In production, use a secrets manager.
+</Warning>
+
+- **Read-only source mounts** — Your original code is never modified. Review diffs before merging.
+- **Resource limits** — Claude Code can be resource-intensive. 4096 MiB and 2 CPUs is a good starting point.
+- **Disposable sandboxes** — Each sandbox is ephemeral. If Claude Code installs something dangerous, it disappears when the box stops.
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Build your own LLM tool-calling loop with BoxLite for custom code execution.
+  </Card>
+  <Card title="Execute AI-generated code" icon="code" href="/tutorials/code-execution">
+    Run untrusted Python code safely with CodeBox — auto-install packages and capture output.
+  </Card>
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Move source code and results in and out of your sandbox.
+  </Card>
+  <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
+    Production patterns for running AI agents with BoxLite.
+  </Card>
+</CardGroup>
