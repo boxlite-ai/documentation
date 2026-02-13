@@ -42,7 +42,7 @@ Handle to a running command.
 use boxlite::BoxCommand;
 use futures::StreamExt;
 
-let mut run_handle = litebox.run(BoxCommand::new("ls").arg("-la")).await?;
+let mut run_handle = litebox.exec(BoxCommand::new("ls").arg("-la")).await?;
 
 // Read stdout as stream
 let mut stdout = run_handle.stdout().unwrap();
@@ -91,7 +91,7 @@ impl ExecStdin {
 ### Example
 
 ```rust
-let mut run_handle = litebox.run(BoxCommand::new("cat")).await?;
+let mut run_handle = litebox.exec(BoxCommand::new("cat")).await?;
 
 // Get stdin handle
 let mut stdin = run_handle.stdin().unwrap();
@@ -115,7 +115,7 @@ Standard output/error streams (read-only). Implements `futures::Stream<Item = St
 ```rust
 use futures::StreamExt;
 
-let mut run_handle = litebox.run(BoxCommand::new("ls")).await?;
+let mut run_handle = litebox.exec(BoxCommand::new("ls")).await?;
 
 // Read stdout
 let mut stdout = run_handle.stdout().unwrap();
@@ -136,7 +136,7 @@ while let Some(line) = stderr.next().await {
 use futures::StreamExt;
 use tokio::select;
 
-let mut run_handle = litebox.run(BoxCommand::new("my-command")).await?;
+let mut run_handle = litebox.exec(BoxCommand::new("my-command")).await?;
 let mut stdout = run_handle.stdout().unwrap();
 let mut stderr = run_handle.stderr().unwrap();
 
@@ -159,6 +159,9 @@ Exit status of a process.
 pub struct ExecResult {
     /// Exit code (0 = success, negative = signal number)
     pub exit_code: i32,
+
+    /// Diagnostic message when process died unexpectedly
+    pub error_message: Option<String>,
 }
 
 impl ExecResult {

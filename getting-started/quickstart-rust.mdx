@@ -34,7 +34,7 @@ futures = "0.3"
             rootfs: RootfsSpec::Image("alpine:latest".into()),
             ..Default::default()
         };
-        let (_, litebox) = runtime.create(options)?;
+        let litebox = runtime.create(options, None).await?;
 
         // Execute command
         let mut execution = litebox
