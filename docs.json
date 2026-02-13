@@ -107,6 +107,13 @@
               "faq",
               "guides/changelog"
             ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/cli",
+              "development/rust-style"
+            ]
           }
         ]
       },
