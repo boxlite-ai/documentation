@@ -22,8 +22,7 @@
               "getting-started/quickstart-nodejs",
               "getting-started/quickstart-rust",
               "getting-started/quickstart-c",
-              "getting-started/core-concepts",
-              "faq"
+              "getting-started/core-concepts"
             ]
           },
           {
@@ -41,11 +40,9 @@
             "pages": [
               "guides/index",
               "guides/ai-agent-integration",
-
               "guides/building-from-source",
               "guides/image-registry-configuration",
-              "guides/macos-sandbox-debugging",
-              "guides/changelog"
+              "guides/macos-sandbox-debugging"
             ]
           },
           {
@@ -54,6 +51,7 @@
               "reference/index",
               {
                 "group": "Python SDK",
+                "icon": "python",
                 "pages": [
                   "reference/python/index",
                   "reference/python/box-types",
@@ -63,6 +61,7 @@
               },
               {
                 "group": "Node.js SDK",
+                "icon": "node-js",
                 "pages": [
                   "reference/nodejs/index",
                   "reference/nodejs/box-types",
@@ -72,6 +71,7 @@
               },
               {
                 "group": "Rust SDK",
+                "icon": "gear",
                 "pages": [
                   "reference/rust/index",
                   "reference/rust/box-config",
@@ -81,6 +81,7 @@
               },
               {
                 "group": "C SDK",
+                "icon": "c",
                 "pages": [
                   "reference/c/index",
                   "reference/c/native-api",
@@ -97,6 +98,13 @@
               "architecture/components",
               "architecture/security",
               "architecture/networking-storage"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "faq",
+              "guides/changelog"
             ]
           }
         ]

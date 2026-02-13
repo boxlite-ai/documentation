@@ -1,33 +1,13 @@
 ---
-title: "Getting Started"
-description: "Install a BoxLite SDK and run your first sandbox in minutes."
-icon: "rocket"
+title: "Installation"
+sidebarTitle: "Installation"
+description: "Install BoxLite on your system and set up the SDK for your language."
+icon: "download"
 ---
-
-<Tip>
-  Want to manage sandboxes via CLI, REST API, or dashboard? See [BoxRun](/boxrun/index).
-</Tip>
-
-Pick your language and follow the quickstart:
-
-<CardGroup cols={2}>
-  <Card title="Python" icon="python" href="/getting-started/quickstart-python">
-    **Stable (v0.5.10)** — AI agents, scripting, rapid prototyping
-  </Card>
-  <Card title="Node.js" icon="node-js" href="/getting-started/quickstart-nodejs">
-    **v0.2.7** — Web services, TypeScript projects
-  </Card>
-  <Card title="Rust" icon="gear" href="/getting-started/quickstart-rust">
-    **Native** — Performance-critical, embedded systems
-  </Card>
-  <Card title="C" icon="c" href="/getting-started/quickstart-c">
-    **v0.2.0** — C/C++ applications, system integration
-  </Card>
-</CardGroup>
 
 ## System requirements
 
-BoxLite requires hardware virtualization support:
+BoxLite runs lightweight micro-VMs and requires hardware virtualization support.
 
 | Platform       | Architecture  | Requirements                        |
 |----------------|---------------|-------------------------------------|
@@ -39,6 +19,8 @@ BoxLite requires hardware virtualization support:
 <Warning>
   macOS Intel (x86_64) is **not supported** due to Hypervisor.framework stability issues.
 </Warning>
+
+### Verify virtualization support
 
 <Tabs>
   <Tab title="macOS">
@@ -95,3 +77,79 @@ BoxLite requires hardware virtualization support:
     </Note>
   </Tab>
 </Tabs>
+
+## Install an SDK
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+
+    **Requirements:** Python 3.10+, pip 20.0+
+
+    **Verify:**
+
+    ```bash
+    python3 -c "import boxlite; print(boxlite.__version__)"
+    # Output: 0.5.10
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+
+    **Requirements:** Node.js 18+
+
+    **Verify:**
+
+    ```bash
+    node -e "const b = require('@boxlite-ai/boxlite'); console.log('boxlite loaded')"
+    ```
+  </Tab>
+  <Tab title="Rust">
+    Add to your `Cargo.toml`:
+
+    ```toml
+    [dependencies]
+    boxlite = { git = "https://github.com/boxlite-ai/boxlite" }
+    tokio = { version = "1", features = ["full"] }
+    futures = "0.3"
+    ```
+
+    Then run:
+
+    ```bash
+    cargo build
+    ```
+  </Tab>
+  <Tab title="C">
+    The C SDK is built from source:
+
+    ```bash
+    git clone https://github.com/boxlite-ai/boxlite.git
+    cd boxlite
+    make build:c
+    ```
+
+    **Requirements:** GCC or Clang, CMake 3.15+. On macOS, install Xcode Command Line Tools (`xcode-select --install`).
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Python quickstart" icon="python" href="/getting-started/quickstart-python">
+    Create your first sandbox, execute code, and explore BoxLite's Python API.
+  </Card>
+  <Card title="Node.js quickstart" icon="node-js" href="/getting-started/quickstart-nodejs">
+    Run commands in isolated VMs with the Node.js SDK and TypeScript support.
+  </Card>
+  <Card title="Rust quickstart" icon="gear" href="/getting-started/quickstart-rust">
+    Use the native Rust crate for performance-critical sandbox workloads.
+  </Card>
+  <Card title="C quickstart" icon="c" href="/getting-started/quickstart-c">
+    Integrate BoxLite into C/C++ applications via the native C API.
+  </Card>
+</CardGroup>
