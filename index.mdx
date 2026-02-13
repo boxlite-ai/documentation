@@ -4,13 +4,13 @@ description: "Local-first micro-VM sandbox for AI agents — stateful, lightweig
 icon: "house"
 ---
 
-BoxLite lets you spin up lightweight Linux VMs and run OCI containers inside them. Unlike ephemeral sandboxes that destroy state after each execution, BoxLite Boxes are **stateful workspaces** — install packages, create files, build up environment state, then come back later and pick up where you left off. Every sandbox is a real microVM with its own kernel, providing hardware-level isolation that containers can't match.
+BoxLite lets you spin up lightweight Linux VMs and run OCI containers inside them — in milliseconds, from your own code, with no daemon and no root. Unlike ephemeral sandboxes that destroy state after each execution, BoxLite Boxes are **stateful workspaces** — install packages, create files, build up environment state, then come back later and pick up where you left off.
 
 Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
 
 ## Why BoxLite?
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Stateful" icon="database">
     Boxes retain packages, files, and environment across stop/restart. No rebuilding on every interaction.
   </Card>
@@ -19,6 +19,9 @@ Runs on macOS (Apple Silicon), Linux (KVM), and Windows (WSL2).
   </Card>
   <Card title="Hardware isolation" icon="shield-halved">
     Each sandbox is a real microVM with its own Linux kernel. Full hardware isolation via KVM or Apple Hypervisor.framework.
+  </Card>
+  <Card title="Lightweight" icon="feather">
+    VMs boot in under a second with minimal overhead. Run hundreds of sandboxes on a single host.
   </Card>
 </CardGroup>
 

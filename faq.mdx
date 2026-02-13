@@ -10,7 +10,7 @@ Frequently asked questions and common issues with BoxLite.
 
 <AccordionGroup>
   <Accordion title="What is BoxLite?">
-    BoxLite is a local-first micro-VM sandbox for AI agents. Unlike ephemeral sandboxes that destroy state after each execution, BoxLite Boxes are stateful workspaces — install packages, create files, build up environment state, then come back later and pick up where you left off. No daemon, no root, no cloud account required.
+    BoxLite is a local-first micro-VM sandbox for AI agents — think "SQLite for sandboxing." It's a library you embed directly in your application, no daemon or cloud account required. Unlike ephemeral sandboxes that destroy state after each execution, BoxLite Boxes are stateful workspaces — install packages, create files, build up environment state, then come back later and pick up where you left off.
   </Accordion>
 
   <Accordion title="What's the difference between BoxLite and Docker?">
@@ -20,7 +20,7 @@ Frequently asked questions and common issues with BoxLite.
     | **Daemon** | No daemon required | Requires Docker daemon |
     | **Root** | No root required | Typically needs root/sudo |
     | **Architecture** | Local-first library | Client-server architecture |
-    | **Statefulness** | Stateful — retains state across stop/restart | Stateful (volumes) |
+    | **Default state** | Stateful by default — full filesystem persists across stop/restart | Ephemeral by default — needs explicit volumes to persist data |
     | **Use Case** | AI agent sandboxes, secure code execution | Application deployment, CI/CD |
     | **Startup** | ~1-2 seconds | ~100-500ms |
     | **Isolation Level** | Separate kernel, hardware isolation | Shared kernel |
