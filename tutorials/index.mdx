@@ -17,8 +17,11 @@ You've installed BoxLite and run "Hello from BoxLite!" — now what? These tutor
 | Upload and download files | [**SimpleBox**](/getting-started/core-concepts#box-types) or [**CodeBox**](/getting-started/core-concepts#box-types) | [Upload & download files](/tutorials/file-transfer) |
 | Connect an LLM to a sandbox | [**CodeBox**](/getting-started/core-concepts#box-types) | [Connect to an LLM](/tutorials/llm-integration) |
 | Automate a browser | [**BrowserBox**](/getting-started/core-concepts#box-types) | [Automate a browser](/tutorials/browser-automation) |
-| Control a full desktop | [**ComputerBox**](/getting-started/core-concepts#box-types) | [SDK Reference](/reference/python/box-types#computerbox) |
-| Run an interactive shell session | [**InteractiveBox**](/getting-started/core-concepts#box-types) | [SDK Reference](/reference/python/box-types#interactivebox) |
+| Control a full desktop | [**ComputerBox**](/getting-started/core-concepts#box-types) | [Automate a desktop](/tutorials/desktop-automation) |
+| Run an interactive shell session | [**InteractiveBox**](/getting-started/core-concepts#box-types) | [Interactive terminal](/tutorials/interactive-terminal) |
+| Run Node.js, Go, Rust, or any tool | [**SimpleBox**](/getting-started/core-concepts#box-types) | [Run any language](/tutorials/run-any-language) |
+| Run a server and access it from host | [**SimpleBox**](/getting-started/core-concepts#box-types) | [Long-running services](/tutorials/long-running-services) |
+| Handle errors and debug failures | All | [Error handling](/tutorials/error-handling) |
 
 <Tip>
   Not sure? Start with [**CodeBox**](/getting-started/core-concepts#box-types) — it handles the most common AI agent use case (running untrusted code) and auto-installs packages for you. See [Core concepts](/getting-started/core-concepts) for a full explanation of each box type.
@@ -61,6 +64,41 @@ You've installed BoxLite and run "Hello from BoxLite!" — now what? These tutor
     href="/tutorials/browser-automation"
   >
     Launch a BrowserBox, connect via Chrome DevTools Protocol, take a screenshot, and scrape a page with Puppeteer or Playwright.
+  </Card>
+  <Card
+    title="Automate a desktop"
+    icon="desktop"
+    href="/tutorials/desktop-automation"
+  >
+    Launch a ComputerBox with a full GUI desktop, control the mouse and keyboard, and take screenshots.
+  </Card>
+  <Card
+    title="Interactive terminal"
+    icon="terminal"
+    href="/tutorials/interactive-terminal"
+  >
+    Launch an InteractiveBox with PTY support, run shell sessions, and connect to REPLs.
+  </Card>
+  <Card
+    title="Run any language or tool"
+    icon="toolbox"
+    href="/tutorials/run-any-language"
+  >
+    Use SimpleBox with custom images to run Node.js, shell scripts, or any CLI tool — not just Python.
+  </Card>
+  <Card
+    title="Run services with port forwarding"
+    icon="server"
+    href="/tutorials/long-running-services"
+  >
+    Start HTTP servers and JSON APIs inside a sandbox, forward ports, and access them from the host.
+  </Card>
+  <Card
+    title="Handle errors and debug"
+    icon="bug"
+    href="/tutorials/error-handling"
+  >
+    Check exit codes, catch exceptions, handle timeouts, and stream stderr in real time.
   </Card>
 </CardGroup>
 

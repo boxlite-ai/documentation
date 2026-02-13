@@ -1,0 +1,417 @@
+---
+title: "Run services with port forwarding"
+description: "Start HTTP servers and JSON APIs inside a sandbox, forward ports to the host, and access them from your application."
+sidebarTitle: "Long-running services"
+icon: "server"
+---
+
+Sometimes you need a **service** running inside a sandbox — an HTTP server, a JSON API, a background worker — that your host application can talk to. This tutorial shows how to start background processes inside a box, forward ports to the host, and make requests to services running in complete isolation.
+
+## What you'll build
+
+A script that:
+1. Starts an HTTP server inside a sandbox with port forwarding
+2. Builds a JSON API with multiple routes
+3. Exposes multiple ports for complex services
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite requests
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Start an HTTP server
+
+Launch a box with port forwarding, start a simple HTTP server inside it, and access it from the host.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="http_server.py"
+    import asyncio
+    import requests
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="python:slim",
+            ports=[(8080, 8080, "tcp")]  # (host_port, guest_port, protocol)
+        ) as box:
+            # Start a simple HTTP server in the background
+            # Redirect stdout/stderr so exec() returns immediately
+            await box.exec("sh", "-c",
+                "python -m http.server 8080 --directory /tmp > /dev/null 2>&1 &"
+            )
+
+            # Give the server a moment to start
+            await asyncio.sleep(2)
+
+            # Access the server from the host
+            response = requests.get("http://localhost:8080")
+            print(f"Status: {response.status_code}")
+            print(f"Response:\n{response.text[:200]}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="http_server.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'python:slim',
+        ports: [{ hostPort: 8080, guestPort: 8080, protocol: 'tcp' }],
+      });
+      try {
+        // Start a simple HTTP server in the background
+        // Redirect stdout/stderr so exec() returns immediately
+        await box.exec('sh', '-c',
+          'python -m http.server 8080 --directory /tmp > /dev/null 2>&1 &'
+        );
+
+        // Give the server a moment to start
+        await sleep(2000);
+
+        // Access the server from the host
+        const response = await fetch('http://localhost:8080');
+        const text = await response.text();
+        console.log(`Status: ${response.status}`);
+        console.log(`Response:\n${text.slice(0, 200)}`);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening:**
+- The `ports` parameter maps host port 8080 to guest port 8080 over TCP
+- `sh -c "... > /dev/null 2>&1 &"` starts the server as a background process with output redirected, so `exec()` returns immediately
+- You can then make HTTP requests from the host to `http://localhost:8080`
+
+<Warning>
+  Background processes must redirect stdout and stderr (e.g., `> /dev/null 2>&1 &`). Without the redirect, `exec()` waits for all output streams to close — which never happens for a long-running server — causing your script to hang.
+</Warning>
+
+## Step 2: Build a JSON API
+
+Create a multi-route JSON API inside the sandbox using Python's built-in `http.server` or Node.js's `http` module.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="json_api.py"
+    import asyncio
+    import requests
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="python:slim",
+            ports=[(5050, 5050, "tcp")]
+        ) as box:
+            # Write a JSON API server using Python's standard library
+            await box.exec("sh", "-c", """cat > /tmp/api.py << 'PYEOF'
+    import http.server
+    import json
+
+    class APIHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/":
+                body = {"message": "Hello from sandboxed API!"}
+            elif self.path.startswith("/compute/"):
+                n = int(self.path.split("/")[-1])
+                body = {"sum_to": n, "result": sum(range(n))}
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(body).encode())
+
+        def log_message(self, format, *args):
+            pass  # Suppress request logs
+
+    server = http.server.HTTPServer(("0.0.0.0", 5050), APIHandler)
+    server.serve_forever()
+    PYEOF""")
+
+            # Start the API in the background
+            await box.exec("sh", "-c", "python /tmp/api.py > /dev/null 2>&1 &")
+            await asyncio.sleep(2)
+
+            # Make requests from the host
+            response = requests.get("http://localhost:5050/")
+            print(response.json())
+            # {"message": "Hello from sandboxed API!"}
+
+            response = requests.get("http://localhost:5050/compute/100")
+            print(response.json())
+            # {"sum_to": 100, "result": 4950}
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="json_api.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'node:20-slim',
+        ports: [{ hostPort: 5050, guestPort: 5050, protocol: 'tcp' }],
+      });
+      try {
+        // Write a JSON API server using Node.js's built-in http module
+        await box.exec('sh', '-c', `cat > /tmp/api.js << 'JSEOF'
+    const http = require('http');
+    const url = require('url');
+
+    const server = http.createServer((req, res) => {
+      const path = url.parse(req.url).pathname;
+      res.setHeader('Content-Type', 'application/json');
+
+      if (path === '/') {
+        res.end(JSON.stringify({ message: 'Hello from sandboxed API!' }));
+      } else if (path.startsWith('/compute/')) {
+        const n = parseInt(path.split('/').pop());
+        const result = Array.from({length: n}, (_, i) => i).reduce((a, b) => a + b, 0);
+        res.end(JSON.stringify({ sum_to: n, result }));
+      } else {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: 'Not found' }));
+      }
+    });
+
+    server.listen(5050, '0.0.0.0');
+    JSEOF`);
+
+        // Start the API in the background
+        await box.exec('sh', '-c', 'node /tmp/api.js > /dev/null 2>&1 &');
+        await sleep(2000);
+
+        // Make requests from the host
+        const indexRes = await fetch('http://localhost:5050/');
+        console.log(await indexRes.json());
+        // { message: "Hello from sandboxed API!" }
+
+        const computeRes = await fetch('http://localhost:5050/compute/100');
+        console.log(await computeRes.json());
+        // { sum_to: 100, result: 4950 }
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Port forwarding changes the VM's network configuration, which disables outbound internet access (DNS resolution). Use standard library modules (like Python's `http.server` or Node.js's `http`) that don't require package installation. For services that need third-party packages, build a custom Docker image with your dependencies pre-installed.
+</Note>
+
+## Step 3: Expose multiple ports
+
+A single box can forward multiple ports — useful for running an API server alongside a metrics endpoint, or exposing admin and public interfaces.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="multi_port.py"
+    import asyncio
+    import requests
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(
+            image="python:slim",
+            ports=[
+                (8080, 8080, "tcp"),  # Main API
+                (9090, 9090, "tcp"),  # Admin/metrics
+            ]
+        ) as box:
+            # Write two servers
+            await box.exec("sh", "-c", """cat > /tmp/servers.py << 'PYEOF'
+    import http.server
+    import threading
+    import json
+
+    class MainHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"service": "main", "status": "ok"}).encode())
+        def log_message(self, format, *args):
+            pass
+
+    class AdminHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"service": "admin", "uptime": 42}).encode())
+        def log_message(self, format, *args):
+            pass
+
+    main_server = http.server.HTTPServer(("0.0.0.0", 8080), MainHandler)
+    admin_server = http.server.HTTPServer(("0.0.0.0", 9090), AdminHandler)
+
+    threading.Thread(target=main_server.serve_forever, daemon=True).start()
+    threading.Thread(target=admin_server.serve_forever, daemon=True).start()
+
+    import time
+    while True:
+        time.sleep(60)
+    PYEOF""")
+
+            # Start both servers
+            await box.exec("sh", "-c", "python /tmp/servers.py > /dev/null 2>&1 &")
+            await asyncio.sleep(2)
+
+            # Access each port from the host
+            main_response = requests.get("http://localhost:8080")
+            print(f"Main API: {main_response.json()}")
+
+            admin_response = requests.get("http://localhost:9090")
+            print(f"Admin: {admin_response.json()}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="multi_port.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function main() {
+      const box = new SimpleBox({
+        image: 'node:20-slim',
+        ports: [
+          { hostPort: 8080, guestPort: 8080, protocol: 'tcp' },  // Main API
+          { hostPort: 9090, guestPort: 9090, protocol: 'tcp' },  // Admin/metrics
+        ],
+      });
+      try {
+        // Write a server that listens on two ports
+        await box.exec('sh', '-c', `cat > /tmp/servers.js << 'JSEOF'
+    const http = require('http');
+
+    http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ service: 'main', status: 'ok' }));
+    }).listen(8080, '0.0.0.0');
+
+    http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ service: 'admin', uptime: 42 }));
+    }).listen(9090, '0.0.0.0');
+    JSEOF`);
+
+        // Start both servers
+        await box.exec('sh', '-c', 'node /tmp/servers.js > /dev/null 2>&1 &');
+        await sleep(2000);
+
+        // Access each port from the host
+        const mainRes = await fetch('http://localhost:8080');
+        console.log('Main API:', await mainRes.json());
+
+        const adminRes = await fetch('http://localhost:9090');
+        console.log('Admin:', await adminRes.json());
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## Port forwarding reference
+
+### Python
+
+```python
+boxlite.SimpleBox(
+    image="python:slim",
+    ports=[
+        (host_port, guest_port, "tcp"),
+        # Example: (8080, 80, "tcp") maps host:8080 → guest:80
+    ]
+)
+```
+
+### Node.js
+
+```typescript
+new SimpleBox({
+  image: 'python:slim',
+  ports: [
+    { hostPort: 8080, guestPort: 80, protocol: 'tcp' },
+  ],
+});
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| Host port | Port on your machine (must be available) |
+| Guest port | Port inside the VM where the service listens |
+| Protocol | `"tcp"` (most common) or `"udp"` |
+
+<Tip>
+  Host and guest ports don't have to match. Use `(3000, 80, "tcp")` to access a service listening on port 80 inside the VM via `http://localhost:3000` on the host.
+</Tip>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Run any language or tool" icon="toolbox" href="/tutorials/run-any-language">
+    Use custom images to run Node.js, Go, shell scripts, or any CLI tool.
+  </Card>
+  <Card title="Handle errors and debug" icon="bug" href="/tutorials/error-handling">
+    Catch exceptions, handle timeouts, and debug failures.
+  </Card>
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Copy files into the box for your service to use, and retrieve results.
+  </Card>
+  <Card title="AI agent integration" icon="gear" href="/guides/ai-agent-integration">
+    Production patterns for using BoxLite services with AI agents.
+  </Card>
+</CardGroup>

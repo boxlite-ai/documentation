@@ -1,0 +1,302 @@
+---
+title: "Run an interactive terminal"
+description: "Launch an InteractiveBox with PTY support, run shell sessions, connect to REPLs, and choose the right TTY mode for your use case."
+sidebarTitle: "Interactive terminal"
+icon: "terminal"
+---
+
+InteractiveBox attaches your terminal directly to a shell running inside a VM — like SSH into a sandbox. Use it for interactive tools, REPLs, debugging sessions, or any workflow where you need a live terminal.
+
+## What you'll build
+
+A script that:
+1. Launches an InteractiveBox with a shell
+2. Runs interactive commands in a TTY session
+3. Connects to a Python REPL inside the VM
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Start a shell session
+
+Launch an InteractiveBox and drop into a shell. The session stays open until you type `exit` or the shell terminates.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="shell.py"
+    import asyncio
+    from boxlite import InteractiveBox
+
+
+    async def main():
+        async with InteractiveBox(image="alpine:latest") as box:
+            # You're now in an interactive shell inside the VM
+            # Type commands, see output in real-time
+            # Type "exit" to close the session
+            await box.wait()
+
+        print("Shell session ended")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    ```bash
+    python shell.py
+    # You'll see an Alpine Linux shell prompt
+    # Try: ls, whoami, cat /etc/os-release
+    # Type "exit" to quit
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="shell.js"
+    import { InteractiveBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new InteractiveBox({ image: 'alpine:latest' });
+      try {
+        await box.start();
+        // You're now in an interactive shell inside the VM
+        // Type commands, see output in real-time
+        // Type "exit" to close the session
+        await box.wait();
+      } finally {
+        await box.stop();
+      }
+
+      console.log('Shell session ended');
+    }
+
+    main();
+    ```
+
+    ```bash
+    node shell.js
+    # You'll see an Alpine Linux shell prompt
+    # Try: ls, whoami, cat /etc/os-release
+    # Type "exit" to quit
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening:**
+- InteractiveBox creates a VM with Alpine Linux and attaches your terminal to `/bin/sh`
+- Your keystrokes go directly into the VM's shell, and output streams back in real-time
+- `wait()` blocks until the shell process exits (when you type `exit` or press Ctrl+D)
+
+## Step 2: Choose your shell
+
+You can run any shell or REPL available in the image. Specify it with the `shell` parameter.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="bash_session.py"
+    import asyncio
+    from boxlite import InteractiveBox
+
+
+    async def main():
+        # Use bash (available in Ubuntu, not Alpine)
+        async with InteractiveBox(
+            image="ubuntu:22.04",
+            shell="/bin/bash"
+        ) as box:
+            await box.wait()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    ```python title="python_repl.py"
+    import asyncio
+    from boxlite import InteractiveBox
+
+
+    async def main():
+        # Drop straight into a Python REPL
+        async with InteractiveBox(
+            image="python:slim",
+            shell="/usr/bin/python3"
+        ) as box:
+            await box.wait()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="bash_session.js"
+    import { InteractiveBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // Use bash (available in Ubuntu, not Alpine)
+      const box = new InteractiveBox({
+        image: 'ubuntu:22.04',
+        shell: '/bin/bash',
+      });
+      try {
+        await box.start();
+        await box.wait();
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+
+    ```javascript title="python_repl.js"
+    import { InteractiveBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // Drop straight into a Python REPL
+      const box = new InteractiveBox({
+        image: 'python:slim',
+        shell: '/usr/bin/python3',
+      });
+      try {
+        await box.start();
+        await box.wait();
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Make sure the shell you specify actually exists in the image. Alpine uses `/bin/sh` (busybox), not `/bin/bash`. Ubuntu has both.
+</Tip>
+
+## Step 3: Choose the right TTY mode
+
+The `tty` parameter controls how InteractiveBox handles terminal I/O. The right choice depends on how you're using the box.
+
+| Value | Python | Node.js | Behavior | Use when... |
+|-------|--------|---------|----------|-------------|
+| Auto-detect | `tty=None` (default) | `tty: undefined` (default) | Checks `sys.stdin.isatty()` / `process.stdin.isTTY` | You're not sure — this works in most cases |
+| Force TTY | `tty=True` | `tty: true` | Always enables PTY with I/O forwarding | You're running from a terminal and want interactive control |
+| No I/O | `tty=False` | `tty: false` | Disables I/O forwarding entirely | You're controlling the box programmatically with `exec()` |
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="tty_modes.py"
+    import asyncio
+    from boxlite import InteractiveBox
+
+
+    async def main():
+        # Force TTY mode — always interactive
+        async with InteractiveBox(
+            image="alpine:latest",
+            tty=True
+        ) as box:
+            await box.wait()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    ```python title="programmatic.py"
+    import asyncio
+    from boxlite import InteractiveBox
+
+
+    async def main():
+        # No I/O forwarding — use exec() to send commands
+        async with InteractiveBox(
+            image="alpine:latest",
+            tty=False
+        ) as box:
+            # InteractiveBox extends SimpleBox, so exec() works
+            result = await box.exec("cat", "/etc/os-release")
+            print(result.stdout)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="tty_modes.js"
+    import { InteractiveBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // Force TTY mode — always interactive
+      const box = new InteractiveBox({
+        image: 'alpine:latest',
+        tty: true,
+      });
+      try {
+        await box.start();
+        await box.wait();
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+
+    ```javascript title="programmatic.js"
+    import { InteractiveBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // No I/O forwarding — use exec() to send commands
+      const box = new InteractiveBox({
+        image: 'alpine:latest',
+        tty: false,
+      });
+      try {
+        await box.start();
+        // InteractiveBox extends SimpleBox, so exec() works
+        const result = await box.exec('cat', '/etc/os-release');
+        console.log(result.stdout);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  InteractiveBox extends SimpleBox, so you always have access to `exec()` for running one-off commands. The `tty` parameter only controls whether the shell session itself gets I/O forwarding — `exec()` works regardless.
+</Note>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Run any language or tool" icon="toolbox" href="/tutorials/run-any-language">
+    Use SimpleBox with custom images to run Node.js, Go, Rust, or any CLI tool.
+  </Card>
+  <Card title="Handle errors and debug" icon="bug" href="/tutorials/error-handling">
+    Catch exceptions, handle timeouts, and debug failures.
+  </Card>
+  <Card title="InteractiveBox API reference" icon="book" href="/reference/python/box-types#interactivebox">
+    Full API docs for InteractiveBox constructor options and methods.
+  </Card>
+</CardGroup>
