@@ -67,15 +67,35 @@ This guide covers production patterns for deploying BoxLite as a sandboxed execu
 
 For AI agents running untrusted code, use `SecurityOptions.maximum()`:
 
-```python
-from boxlite.boxlite import SecurityOptions
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from boxlite.boxlite import SecurityOptions
 
-security = SecurityOptions.maximum()
+    security = SecurityOptions.maximum()
 
-# Customize if needed
-security.max_open_files = 2048
-security.network_enabled = False  # Disable network for strict isolation
-```
+    # Customize if needed
+    security.max_open_files = 2048
+    security.network_enabled = False  # Disable network for strict isolation
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    The Node.js SDK enables jailer and seccomp by default. You configure resource limits directly in the box creation options:
+
+    ```typescript
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({
+      image: 'python:slim',
+      cpus: 2,
+      memoryMib: 1024,
+      maxOpenFiles: 2048,
+      // Omit ports to prevent incoming connections
+    });
+    ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -154,21 +174,53 @@ A single box can run many `exec()` calls. Each call spawns a new process inside 
 
 Use separate boxes when you need strict isolation between agents, different images, or independent resource limits.
 
-```python
-async def run_isolated_agent(code: str, image: str = "python:slim"):
-    """Each agent gets its own box."""
-    async with boxlite.SimpleBox(image=image, memory_mib=512) as box:
-        result = await box.exec("python", "-c", code)
-        return result.stdout
+<Tabs>
+  <Tab title="Python">
+    ```python
+    async def run_isolated_agent(code: str, image: str = "python:slim"):
+        """Each agent gets its own box."""
+        async with boxlite.SimpleBox(image=image, memory_mib=512) as box:
+            result = await box.exec("python", "-c", code)
+            return result.stdout
 
-async def main():
-    agents = [
-        run_isolated_agent("print('agent 1')"),
-        run_isolated_agent("print('agent 2')", image="node:alpine"),
-        run_isolated_agent("print('agent 3')"),
-    ]
-    results = await asyncio.gather(*agents)
-```
+    async def main():
+        agents = [
+            run_isolated_agent("print('agent 1')"),
+            run_isolated_agent("print('agent 2')", image="node:alpine"),
+            run_isolated_agent("print('agent 3')"),
+        ]
+        results = await asyncio.gather(*agents)
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    async function runIsolatedAgent(
+      code: string,
+      image: string = 'python:slim'
+    ): Promise<string> {
+      const runtime = JsBoxlite.withDefaultConfig();
+      const box = await runtime.create({ image, memoryMib: 512 });
+
+      try {
+        const execution = await box.exec('python', ['-c', code]);
+        const result = await execution.wait();
+        return result.stdout;
+      } finally {
+        await box.stop();
+        await runtime.remove(box.id);
+      }
+    }
+
+    const results = await Promise.all([
+      runIsolatedAgent("print('agent 1')"),
+      runIsolatedAgent("print('agent 2')", 'node:alpine'),
+      runIsolatedAgent("print('agent 3')"),
+    ]);
+    ```
+  </Tab>
+</Tabs>
 
 **When to use:** Multi-tenant isolation, different language runtimes, or strict resource separation.
 
@@ -197,42 +249,104 @@ async def main():
 
 Always kill the execution in the timeout handler:
 
-```python
-async def exec_with_timeout(box, cmd, args=None, timeout=30):
-    """Execute a command with proper timeout and cleanup."""
-    execution = await box.exec(cmd, args or [])
-    try:
-        result = await asyncio.wait_for(execution.wait(), timeout=timeout)
-        return result
-    except asyncio.TimeoutError:
-        await execution.kill()
-        raise
-```
+<Tabs>
+  <Tab title="Python">
+    ```python
+    async def exec_with_timeout(box, cmd, args=None, timeout=30):
+        """Execute a command with proper timeout and cleanup."""
+        execution = await box.exec(cmd, args or [])
+        try:
+            result = await asyncio.wait_for(execution.wait(), timeout=timeout)
+            return result
+        except asyncio.TimeoutError:
+            await execution.kill()
+            raise
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    async function execWithTimeout(box, cmd, args = [], timeoutMs = 30000) {
+      const execution = await box.exec(cmd, args);
+      let timer;
+      try {
+        const result = await Promise.race([
+          execution.wait(),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Execution timed out')),
+              timeoutMs
+            );
+          }),
+        ]);
+        clearTimeout(timer);
+        return result;
+      } catch (error) {
+        clearTimeout(timer);
+        await execution.kill();
+        throw error;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ### Defensive Helper
 
 For maximum safety, combine timeout handling with a try/finally block:
 
-```python
-async def safe_exec(box, cmd, args=None, timeout=30):
-    """Execute with timeout, guaranteed process cleanup."""
-    execution = await box.exec(cmd, args or [])
-    try:
-        result = await asyncio.wait_for(execution.wait(), timeout=timeout)
-        return result
-    except asyncio.TimeoutError:
+<Tabs>
+  <Tab title="Python">
+    ```python
+    async def safe_exec(box, cmd, args=None, timeout=30):
+        """Execute with timeout, guaranteed process cleanup."""
+        execution = await box.exec(cmd, args or [])
         try:
-            await execution.kill()
+            result = await asyncio.wait_for(execution.wait(), timeout=timeout)
+            return result
+        except asyncio.TimeoutError:
+            try:
+                await execution.kill()
+            except Exception:
+                pass  # Best-effort kill
+            raise
         except Exception:
-            pass  # Best-effort kill
-        raise
-    except Exception:
-        try:
-            await execution.kill()
-        except Exception:
-            pass  # Best-effort kill on any failure
-        raise
-```
+            try:
+                await execution.kill()
+            except Exception:
+                pass  # Best-effort kill on any failure
+            raise
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    async function safeExec(box, cmd, args = [], timeoutMs = 30000) {
+      const execution = await box.exec(cmd, args);
+      let timer;
+      try {
+        const result = await Promise.race([
+          execution.wait(),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Execution timed out')),
+              timeoutMs
+            );
+          }),
+        ]);
+        clearTimeout(timer);
+        return result;
+      } catch (error) {
+        clearTimeout(timer);
+        try {
+          await execution.kill();
+        } catch {
+          // Best-effort kill
+        }
+        throw error;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -256,18 +370,43 @@ async def safe_exec(box, cmd, args=None, timeout=30):
 
 To prevent an agent from accessing the network:
 
-```python
-from boxlite.boxlite import SecurityOptions
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from boxlite.boxlite import SecurityOptions
 
-security = SecurityOptions.maximum()
-security.network_enabled = False
+    security = SecurityOptions.maximum()
+    security.network_enabled = False
 
-options = boxlite.BoxOptions(
-    image="python:slim",
-    security=security,
-    # No ports= means no incoming connections either
-)
-```
+    options = boxlite.BoxOptions(
+        image="python:slim",
+        security=security,
+        # No ports= means no incoming connections either
+    )
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({
+      image: 'python:slim',
+      // Do not pass ports — no incoming connections
+      // On Linux, the VM runs in an isolated network namespace by default
+    });
+
+    // Verify: this should fail if network is isolated
+    const execution = await box.exec('ping', ['-c', '1', '8.8.8.8']);
+    const result = await execution.wait();
+    console.log(`Network test exit code: ${result.exitCode}`);
+    ```
+
+    <Note>
+      The Node.js SDK does not expose a `networkEnabled` toggle. On Linux, network isolation is enforced by the runtime's network namespace. On macOS, use the Python SDK's `SecurityOptions.network_enabled` for explicit control.
+    </Note>
+  </Tab>
+</Tabs>
 
 <Note>
   In the Python bindings, `network_enabled` is currently a macOS-only control. On Linux and other platforms, network isolation is typically enforced by the container/runtime networking configuration (for example, running in an isolated network namespace and not publishing ports), and `network_enabled` may not itself hard-disable all outbound connectivity.
@@ -281,10 +420,31 @@ Resource limits prevent a rogue agent from consuming all host resources:
 options = boxlite.BoxOptions(
     image="python:slim",
     cpus=1,             # Cap CPU usage
-    memory_mib=512,     # Hard memory limit (OOM kills the box)
+    memory_mib=512,     # Hard memory limit
     security=SecurityOptions.maximum(),
 )
 ```
+
+### Memory Limits and OOM
+
+The `memory_mib` setting is a **hard limit** enforced by the hypervisor. When a guest process exceeds this limit, the Linux OOM killer terminates the offending process inside the VM — but the box itself stays running. This means you can detect OOM and retry or report the failure.
+
+How to detect OOM:
+- The process exit code will be **137** (128 + SIGKILL)
+- `stderr` may contain `Killed` or `Out of memory`
+
+```python
+result = await box.exec("python", ["-c", "x = bytearray(2**30)"])
+completed = await result.wait()
+
+if completed.exit_code == 137:
+    print("Process was OOM-killed")
+    print(f"stderr: {completed.stderr}")
+```
+
+<Warning>
+  OOM kills the guest **process**, not the box. The box remains running and can accept new `exec()` calls. If your agent needs to detect and handle OOM, check for exit code 137 after each execution.
+</Warning>
 
 ---
 
@@ -292,28 +452,56 @@ options = boxlite.BoxOptions(
 
 When running interactive TTY sessions (e.g., an AI agent controlling a shell), use `resize_tty()` to set the terminal dimensions. This ensures proper line wrapping and avoids garbled output from programs that query terminal size.
 
-```python
-runtime = boxlite.Boxlite.default()
-box = await runtime.create(boxlite.BoxOptions(image="alpine:latest"))
+<Tabs>
+  <Tab title="Python">
+    ```python
+    runtime = boxlite.Boxlite.default()
+    box = await runtime.create(boxlite.BoxOptions(image="alpine:latest"))
 
-# Start a shell with TTY
-execution = await box.exec("sh", tty=True)
+    # Start a shell with TTY
+    execution = await box.exec("sh", tty=True)
 
-# Set terminal size to 40 rows x 120 columns
-await execution.resize_tty(40, 120)
+    # Set terminal size to 40 rows x 120 columns
+    await execution.resize_tty(40, 120)
 
-# Send commands via stdin
-stdin = execution.stdin()
-await stdin.send_input(b"ls -la\n")
+    # Send commands via stdin
+    stdin = execution.stdin()
+    await stdin.send_input(b"ls -la\n")
 
-# Read output
-stdout = execution.stdout()
-async for line in stdout:
-    print(line)
-```
+    # Read output
+    stdout = execution.stdout()
+    async for line in stdout:
+        print(line)
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({ image: 'alpine:latest' });
+
+    // Start a shell with TTY
+    const execution = await box.exec('sh', [], { tty: true });
+
+    // Set terminal size to 40 rows x 120 columns
+    await execution.resizeTty(40, 120);
+
+    // Send commands via stdin
+    const stdin = execution.stdin();
+    await stdin.sendInput(Buffer.from('ls -la\n'));
+
+    // Read output
+    const stdout = execution.stdout();
+    for await (const line of stdout) {
+      console.log(line);
+    }
+    ```
+  </Tab>
+</Tabs>
 
 <Note>
-  `resize_tty()` only works on executions started with `tty=True`. Calling it on a non-TTY execution returns an error.
+  `resize_tty()` / `resizeTty()` only works on executions started with `tty=True` / `{ tty: true }`. Calling it on a non-TTY execution returns an error.
 </Note>
 
 ---
@@ -322,68 +510,135 @@ async for line in stdout:
 
 Putting it all together: security configuration, concurrent execution with timeouts, and cleanup.
 
-```python
-import asyncio
-import boxlite
-from boxlite.boxlite import SecurityOptions
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import asyncio
+    import boxlite
+    from boxlite.boxlite import SecurityOptions
 
 
-async def safe_exec(box, cmd, args=None, timeout=30):
-    """Execute with timeout and guaranteed process cleanup."""
-    execution = await box.exec(cmd, args or [])
-    try:
-        result = await asyncio.wait_for(execution.wait(), timeout=timeout)
-        return result
-    except asyncio.TimeoutError:
+    async def safe_exec(box, cmd, args=None, timeout=30):
+        """Execute with timeout and guaranteed process cleanup."""
+        execution = await box.exec(cmd, args or [])
         try:
-            await execution.kill()
-        except Exception:
-            pass
-        raise
+            result = await asyncio.wait_for(execution.wait(), timeout=timeout)
+            return result
+        except asyncio.TimeoutError:
+            try:
+                await execution.kill()
+            except Exception:
+                pass
+            raise
 
 
-async def main():
-    runtime = boxlite.Boxlite.default()
+    async def main():
+        runtime = boxlite.Boxlite.default()
 
-    # Configure box with security and resource limits
-    box = await runtime.create(boxlite.BoxOptions(
-        image="python:slim",
-        cpus=2,
-        memory_mib=1024,
-        working_dir="/workspace",
-        security=SecurityOptions.maximum(),
-    ))
+        # Configure box with security and resource limits
+        box = await runtime.create(boxlite.BoxOptions(
+            image="python:slim",
+            cpus=2,
+            memory_mib=1024,
+            working_dir="/workspace",
+            security=SecurityOptions.maximum(),
+        ))
 
-    try:
-        # Run with timeout protection
-        result = await safe_exec(
-            box,
-            "python",
-            ["-c", "print('hello from secure sandbox')"],
-            timeout=60,
-        )
-        print(f"Exit code: {result.exit_code}")
+        try:
+            # Run with timeout protection
+            result = await safe_exec(
+                box,
+                "python",
+                ["-c", "print('hello from secure sandbox')"],
+                timeout=60,
+            )
+            print(f"Exit code: {result.exit_code}")
 
-        # Run concurrent tasks safely
-        tasks = [
-            safe_exec(box, "python", ["-c", "print('task 1')"], timeout=10),
-            safe_exec(box, "python", ["-c", "print('task 2')"], timeout=10),
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Run concurrent tasks safely
+            tasks = [
+                safe_exec(box, "python", ["-c", "print('task 1')"], timeout=10),
+                safe_exec(box, "python", ["-c", "print('task 2')"], timeout=10),
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for i, r in enumerate(results):
-            if isinstance(r, Exception):
-                print(f"Task {i} failed: {r}")
-            else:
-                print(f"Task {i} exit code: {r.exit_code}")
+            for i, r in enumerate(results):
+                if isinstance(r, Exception):
+                    print(f"Task {i} failed: {r}")
+                else:
+                    print(f"Task {i} exit code: {r.exit_code}")
 
-    finally:
-        await box.stop()
-        await runtime.remove(box.id)
+        finally:
+            await box.stop()
+            await runtime.remove(box.id)
 
 
-asyncio.run(main())
-```
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    async function safeExec(box, cmd, args = [], timeoutMs = 30000) {
+      const execution = await box.exec(cmd, args);
+      let timer;
+      try {
+        const result = await Promise.race([
+          execution.wait(),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Execution timed out')),
+              timeoutMs
+            );
+          }),
+        ]);
+        clearTimeout(timer);
+        return result;
+      } catch (error) {
+        clearTimeout(timer);
+        try { await execution.kill(); } catch { /* best-effort */ }
+        throw error;
+      }
+    }
+
+    const runtime = JsBoxlite.withDefaultConfig();
+    const box = await runtime.create({
+      image: 'python:slim',
+      cpus: 2,
+      memoryMib: 1024,
+      workingDir: '/workspace',
+    });
+
+    try {
+      // Run with timeout protection
+      const result = await safeExec(
+        box,
+        'python',
+        ['-c', "print('hello from secure sandbox')"],
+        60000
+      );
+      console.log(`Exit code: ${result.exitCode}`);
+
+      // Run concurrent tasks safely
+      const results = await Promise.allSettled([
+        safeExec(box, 'python', ['-c', "print('task 1')"], 10000),
+        safeExec(box, 'python', ['-c', "print('task 2')"], 10000),
+      ]);
+
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.log(`Task ${i} failed: ${r.reason}`);
+        } else {
+          console.log(`Task ${i} exit code: ${r.value.exitCode}`);
+        }
+      });
+    } finally {
+      await box.stop();
+      await runtime.remove(box.id);
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ---
 

@@ -99,7 +99,7 @@ runtime = boxlite.Boxlite(options)
 # 1. ghcr.io/library/alpine
 # 2. docker.io/library/alpine
 async with boxlite.SimpleBox(image="alpine", runtime=runtime) as box:
-    await box.exec(["echo", "Hello!"])
+    await box.exec("echo", "Hello!")
 ```
 
 ```javascript Node.js
@@ -124,7 +124,8 @@ await box.exec('echo', 'Hello!');
 
 If you want your SDK application to respect a configuration file, you can manually load it. This puts the control in your hands.
 
-```python
+<CodeGroup>
+```python Python
 import boxlite
 import json
 from pathlib import Path
@@ -141,6 +142,22 @@ def load_boxlite_options(config_path: str):
 # Use it
 runtime = boxlite.Boxlite(load_boxlite_options("./config.json"))
 ```
+
+```typescript Node.js
+import { readFileSync } from 'fs';
+import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+function loadBoxliteRuntime(configPath: string): JsBoxlite {
+  const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+  return new JsBoxlite({
+    imageRegistries: config.image_registries ?? [],
+  });
+}
+
+// Use it
+const runtime = loadBoxliteRuntime('./config.json');
+```
+</CodeGroup>
 
 ---
 
@@ -166,3 +183,97 @@ To summarize the full resolution order for CLI usage:
 <Tip>
   For SDK usage, only steps 1, 3 (programmatic registries), and 4 apply. There are no CLI flags.
 </Tip>
+
+---
+
+## Private Registry Authentication
+
+BoxLite uses an OCI-compliant image puller that respects the system's Docker credential store. If your registry requires authentication, configure credentials through Docker's standard mechanism.
+
+### Configure credentials
+
+Use `docker login` to store credentials for your private registry:
+
+```bash
+# Log in to a private registry
+docker login my.private.registry.com
+
+# Log in to GitHub Container Registry
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+
+# Log in to AWS ECR (requires AWS CLI)
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
+```
+
+BoxLite reads credentials from `~/.docker/config.json` at image pull time. No additional BoxLite-specific configuration is needed.
+
+<Note>
+  Credential helpers (e.g., `docker-credential-osxkeychain` on macOS, `docker-credential-ecr-login` for AWS) are supported. BoxLite invokes the same credential lookup chain that Docker uses.
+</Note>
+
+### Verify access
+
+```bash
+# Test that BoxLite can pull from your private registry
+boxlite run my.private.registry.com/my-image:latest echo "Success"
+```
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Image not found (404)">
+    Verify the image reference is correct and the image exists in the registry:
+
+    ```bash
+    # Check with docker (or crane/skopeo) to confirm the image exists
+    docker manifest inspect my.registry.com/my-image:latest
+    ```
+
+    Common causes:
+    - Typo in the image name or tag
+    - The image is in a different registry than expected (check your `image_registries` order)
+    - The image was deleted or the tag was overwritten
+  </Accordion>
+  <Accordion title="Timeout pulling large images">
+    Large images (multi-GB) can exceed default pull timeouts, especially on slow connections. BoxLite caches image layers, so subsequent pulls of the same or similar images are faster.
+
+    Tips:
+    - Use slim or alpine-based images where possible (e.g., `python:slim` instead of `python:latest`)
+    - Pre-pull images before running time-sensitive workloads: `boxlite pull my-image:latest`
+    - Use a local registry mirror or caching proxy to reduce network latency
+  </Accordion>
+  <Accordion title="TLS certificate errors">
+    If your private registry uses a self-signed or corporate CA certificate:
+
+    ```bash
+    # Add the CA certificate to the system trust store (macOS)
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca.crt
+
+    # Add the CA certificate to the system trust store (Ubuntu/Debian)
+    sudo cp ca.crt /usr/local/share/ca-certificates/
+    sudo update-ca-certificates
+    ```
+
+    BoxLite uses the system's TLS trust store for registry connections.
+  </Accordion>
+  <Accordion title="Authentication failed (401/403)">
+    Verify your credentials are stored correctly:
+
+    ```bash
+    # Check that credentials exist
+    cat ~/.docker/config.json
+
+    # Re-authenticate
+    docker login my.private.registry.com
+    ```
+
+    If using a credential helper, ensure it is installed and working:
+
+    ```bash
+    # Test the credential helper directly
+    echo "my.private.registry.com" | docker-credential-osxkeychain get
+    ```
+  </Accordion>
+</AccordionGroup>
