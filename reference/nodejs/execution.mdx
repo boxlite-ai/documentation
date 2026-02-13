@@ -103,6 +103,7 @@ Result of a completed execution. Returned by `JsExecution.wait()`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `exitCode` | `number` | Process exit code (0 = success) |
+| `errorMessage` | `string \| null` | Diagnostic message when process died unexpectedly |
 
 ```typescript
 const execution = await box.exec('grep', ['-r', 'TODO', '/src']);

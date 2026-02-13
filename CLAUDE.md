@@ -6,7 +6,7 @@ This is the official documentation site for **BoxLite** — a lightweight, embed
 
 - **BoxLite repo**: https://github.com/boxlite-ai/boxlite
 - **BoxRun repo**: https://github.com/boxlite-ai/boxrun
-- **Current versions**: BoxLite Python v0.4.4 (stable), Node.js v0.1.6, C v0.2.0; BoxRun latest
+- **Current versions**: BoxLite Python v0.5.11 (stable), Node.js v0.2.8, C v0.5.11; BoxRun latest
 - **Platforms**: macOS (Apple Silicon), Linux (KVM), Windows (WSL2)
 
 ## Tech Stack

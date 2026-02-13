@@ -11,7 +11,7 @@ The C SDK provides C-compatible FFI bindings for integrating BoxLite into C/C++ 
 
 **Library**: `libboxlite`
 **Header**: `boxlite.h`
-**Version**: 0.2.0
+**Version**: 0.5.11
 
 ### API Styles
 
@@ -237,8 +237,8 @@ BoxliteErrorCode boxlite_simple_new(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `image` | `const char*` | OCI image reference (e.g., `"python:slim"`, `"alpine:3.19"`) |
-| `cpus` | `int` | Number of CPUs (0 = default: 2) |
-| `memory_mib` | `int` | Memory in MiB (0 = default: 2048) |
+| `cpus` | `int` | Number of CPUs (0 = default: 1) |
+| `memory_mib` | `int` | Memory in MiB (0 = default: 512) |
 | `out_box` | `CBoxliteSimple**` | Output: created box handle |
 | `out_error` | `CBoxliteError*` | Output: error information |
 

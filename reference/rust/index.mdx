@@ -50,7 +50,11 @@ let runtime = BoxliteRuntime::default_runtime();
 | `list_info` | `async fn list_info(&self) -> BoxliteResult<Vec<BoxInfo>>` | List all boxes |
 | `exists` | `async fn exists(&self, id_or_name: &str) -> BoxliteResult<bool>` | Check if box exists |
 | `metrics` | `async fn metrics(&self) -> RuntimeMetrics` | Get runtime-wide metrics |
+| `get_or_create` | `async fn get_or_create(&self, options: BoxOptions, name: Option<String>) -> BoxliteResult<(LiteBox, bool)>` | Get existing or create new box |
 | `remove` | `async fn remove(&self, id_or_name: &str, force: bool) -> BoxliteResult<()>` | Remove box completely |
+| `shutdown` | `async fn shutdown(&self, timeout: Option<i32>) -> BoxliteResult<()>` | Shut down runtime |
+| `pull_image` | `async fn pull_image(&self, image_ref: &str) -> BoxliteResult<()>` | Pre-pull an OCI image |
+| `list_images` | `async fn list_images(&self) -> BoxliteResult<Vec<ImageInfo>>` | List cached images |
 
 ### Example
 
@@ -67,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let litebox = runtime.create(options, Some("my-box".to_string())).await?;
 
     // Run a command
-    let mut run = litebox.run(BoxCommand::new("echo").arg("Hello")).await?;
+    let mut run = litebox.exec(BoxCommand::new("echo").arg("Hello")).await?;
     let result = run.wait().await?;
 
     println!("Exit code: {}", result.exit_code);
@@ -134,7 +138,9 @@ pub struct LiteBox {
 | `name` | `fn name(&self) -> Option<&str>` | Get optional box name |
 | `info` | `fn info(&self) -> BoxInfo` | Get box info (no VM init) |
 | `start` | `async fn start(&self) -> BoxliteResult<()>` | Start the box |
-| `run` | `async fn run(&self, command: BoxCommand) -> BoxliteResult<Execution>` | Run command |
+| `exec` | `async fn exec(&self, command: BoxCommand) -> BoxliteResult<Execution>` | Execute command |
+| `copy_into` | `async fn copy_into(&self, host_src, guest_dst, opts: CopyOptions) -> BoxliteResult<()>` | Copy file into box |
+| `copy_out` | `async fn copy_out(&self, guest_src, host_dst, opts: CopyOptions) -> BoxliteResult<()>` | Copy file out of box |
 | `metrics` | `async fn metrics(&self) -> BoxliteResult<BoxMetrics>` | Get box metrics |
 | `stop` | `async fn stop(&self) -> BoxliteResult<()>` | Stop the box |
 
@@ -142,7 +148,7 @@ pub struct LiteBox {
 
 - `start()` initializes VM for `Configured` or `Stopped` boxes
 - Idempotent: calling on `Running` box is a no-op
-- `run()` implicitly calls `start()` if needed
+- `exec()` implicitly calls `start()` if needed
 - `stop()` terminates VM; box can be restarted
 
 #### Example
@@ -309,17 +315,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timeout(Duration::from_secs(30))
         .working_dir("/app");
 
-    let mut run_handle = litebox.run(cmd).await?;
+    let mut execution = litebox.exec(cmd).await?;
 
     // Stream output
-    if let Some(mut stdout) = run_handle.stdout() {
+    if let Some(mut stdout) = execution.stdout() {
         while let Some(line) = stdout.next().await {
             println!("{}", line);
         }
     }
 
     // Check result
-    let result = run_handle.wait().await?;
+    let result = execution.wait().await?;
     if !result.success() {
         eprintln!("Command failed with exit code: {}", result.exit_code);
     }

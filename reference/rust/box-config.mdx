@@ -11,10 +11,10 @@ Options for constructing a box.
 
 ```rust
 pub struct BoxOptions {
-    /// Number of CPUs (default: 2)
+    /// Number of CPUs (default: 1)
     pub cpus: Option<u8>,
 
-    /// Memory in MiB (default: 2048)
+    /// Memory in MiB (default: 512)
     pub memory_mib: Option<u32>,
 
     /// Disk size in GB for rootfs (sparse, grows as needed)

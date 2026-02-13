@@ -106,7 +106,7 @@ Safe to call with NULL. Automatically frees all boxes.
     {
       "host_path": "/host/data",
       "guest_path": "/data",
-      "readonly": false
+      "read_only": false
     }
   ],
   "network": "Isolated",
@@ -172,7 +172,7 @@ or
 {
   "host_path": "/absolute/path/on/host",
   "guest_path": "/path/in/guest",
-  "readonly": false
+  "read_only": false
 }
 ```
 
@@ -242,7 +242,7 @@ snprintf(options, sizeof(options),
 const char* options = "{"
     "\"rootfs\":{\"Image\":\"nginx:alpine\"},"
     "\"env\":[],"
-    "\"volumes\":[{\"host_path\":\"/var/www\",\"guest_path\":\"/usr/share/nginx/html\",\"readonly\":true}],"
+    "\"volumes\":[{\"host_path\":\"/var/www\",\"guest_path\":\"/usr/share/nginx/html\",\"read_only\":true}],"
     "\"network\":\"Isolated\","
     "\"ports\":[{\"host_port\":8080,\"guest_port\":80,\"protocol\":\"Tcp\"}]"
 "}";
