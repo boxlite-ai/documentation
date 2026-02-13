@@ -127,7 +127,14 @@
     "primary": {
       "type": "github",
       "href": "https://github.com/boxlite-ai/boxlite"
-    }
+    },
+    "links": [
+      {
+        "label": "Discord",
+        "href": "https://go.boxlite.ai/discord",
+        "icon": "discord"
+      }
+    ]
   },
   "footer": {
     "socials": {
