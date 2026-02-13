@@ -131,7 +131,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/boxlite-ai"
+      "github": "https://github.com/boxlite-ai",
+      "discord": "https://go.boxlite.ai/discord"
     }
   }
 }
