@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is the official documentation site for **BoxLite** — a lightweight, embeddable virtual machine runtime for secure, isolated code execution ("SQLite for sandboxing"). The site is built with [Mintlify](https://mintlify.com) and deployed automatically on push to `main`.
+This is the official documentation site for **BoxLite** — a local-first micro-VM sandbox for AI agents. Stateful, lightweight, hardware-level isolation, no daemon required. The site is built with [Mintlify](https://mintlify.com) and deployed automatically on push to `main`.
 
 - **BoxLite repo**: https://github.com/boxlite-ai/boxlite
 - **BoxRun repo**: https://github.com/boxlite-ai/boxrun
@@ -90,7 +90,7 @@ Use these terms consistently across all documentation:
 
 | Term | Usage |
 |------|-------|
-| BoxLite | Embedded micro-VM library (capital B, capital L) |
+| BoxLite | Local-first micro-VM sandbox (capital B, capital L) |
 | BoxRun | Sandbox management platform (capital B, capital R) |
 | LiteBox | The VM instance type (capital L, capital B) |
 | box | Generic reference to a sandbox instance (lowercase) |

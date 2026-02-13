@@ -10,7 +10,7 @@ Frequently asked questions and common issues with BoxLite.
 
 <AccordionGroup>
   <Accordion title="What is BoxLite?">
-    BoxLite is an embeddable virtual machine runtime for secure, isolated code execution. Think of it as "SQLite for sandboxing" — a lightweight library you can embed directly in your application without requiring a daemon or root privileges.
+    BoxLite is a local-first micro-VM sandbox for AI agents — think "SQLite for sandboxing." It's a library you embed directly in your application, no daemon or cloud account required. Unlike ephemeral sandboxes that destroy state after each execution, BoxLite Boxes are stateful workspaces — install packages, create files, build up environment state, then come back later and pick up where you left off.
   </Accordion>
 
   <Accordion title="What's the difference between BoxLite and Docker?">
@@ -19,8 +19,9 @@ Frequently asked questions and common issues with BoxLite.
     | **Isolation** | Hardware VM (KVM/Hypervisor.framework) | Container (namespaces/cgroups) |
     | **Daemon** | No daemon required | Requires Docker daemon |
     | **Root** | No root required | Typically needs root/sudo |
-    | **Architecture** | Embeddable library | Client-server architecture |
-    | **Use Case** | Embedded sandboxing, AI agents | Application deployment, CI/CD |
+    | **Architecture** | Local-first library | Client-server architecture |
+    | **Default state** | Stateful by default — full filesystem persists across stop/restart | Ephemeral by default — needs explicit volumes to persist data |
+    | **Use Case** | AI agent sandboxes, secure code execution | Application deployment, CI/CD |
     | **Startup** | ~1-2 seconds | ~100-500ms |
     | **Isolation Level** | Separate kernel, hardware isolation | Shared kernel |
 

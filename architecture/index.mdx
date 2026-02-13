@@ -1,14 +1,14 @@
 ---
 title: "Architecture Overview"
 sidebarTitle: "Overview"
-description: "Understand BoxLite's embedded virtual machine runtime architecture, core design philosophy, and system layers."
+description: "Understand BoxLite's local-first micro-VM sandbox architecture, core design philosophy, and system layers."
 icon: "building"
 ---
 
 ## Overview
 
-BoxLite is an embeddable virtual machine runtime that follows the SQLite philosophy: a library that
-can be embedded directly into applications without requiring a daemon or external service.
+BoxLite is a local-first micro-VM sandbox for AI agents. It follows the SQLite philosophy: a library that
+can be embedded directly into applications without requiring a daemon or external service. Boxes are stateful — they retain packages, files, and environment across stop/restart cycles.
 
 <Note>
   Throughout this documentation, we use **"Box"** to refer to an isolated execution
@@ -20,7 +20,8 @@ can be embedded directly into applications without requiring a daemon or externa
 
 BoxLite is built around several key principles:
 
-- **Embedded library model** -- no daemon or external service required, just link and use
+- **Stateful workspaces** -- Boxes retain state across stop/restart, no rebuilding on every interaction
+- **Embeddable library model** -- no daemon or external service required, just link and use
 - **Hardware-level isolation** -- each Box runs in a lightweight VM for strong security boundaries
 - **Container-like interface** -- familiar OCI image and exec workflows despite VM-backed isolation
 - **Lazy initialization** -- heavy work (image pulling, Box startup) is deferred until first use
