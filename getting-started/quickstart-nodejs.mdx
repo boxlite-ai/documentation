@@ -71,6 +71,45 @@ async function main() {
 main();
 ```
 
+## Code Execution (AI Agents)
+
+<Steps>
+  <Step title="Create a file codebox.js">
+    ```javascript
+    import { CodeBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const codebox = new CodeBox();
+      try {
+        // Execute untrusted code safely
+        const code = `
+    import requests
+    response = requests.get('https://api.github.com/zen')
+    print(response.text)
+    `;
+        const result = await codebox.run(code);
+        console.log(result);
+      } finally {
+        await codebox.stop();
+      }
+    }
+
+    main();
+    ```
+  </Step>
+  <Step title="Run it">
+    ```bash
+    node codebox.js
+    ```
+  </Step>
+</Steps>
+
+**What's happening:**
+1. CodeBox automatically installs required packages (requests)
+2. Executes the code in complete isolation
+3. Returns the output as a string
+4. Your host system remains completely safe
+
 ## Running Examples
 
 BoxLite includes 5 Node.js examples:
@@ -114,6 +153,9 @@ BoxLite includes 5 Node.js examples:
 ## Next Steps
 
 <CardGroup cols={2}>
+  <Card title="Core concepts" icon="lightbulb" href="/getting-started/core-concepts">
+    Understand the different box types (SimpleBox, CodeBox, BrowserBox, and more), lifecycle, images, and resource configuration.
+  </Card>
   <Card title="Execute AI-generated code" icon="code" href="/tutorials/code-execution">
     Learn to use CodeBox for safe code execution — auto-install packages, run untrusted code, and capture output.
   </Card>

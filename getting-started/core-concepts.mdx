@@ -4,33 +4,74 @@ description: "Understand box types, lifecycle, images, and resource configuratio
 icon: "lightbulb"
 ---
 
-Before working through the tutorials, it helps to understand a few core concepts. BoxLite gives you lightweight, isolated virtual machines — but there are several box types, each designed for a specific use case.
+Before working through the tutorials, it helps to understand a few core concepts — starting with the most common question.
 
 ## Box types
 
-| Box type | What it does | When to use it |
-|----------|-------------|----------------|
-| **SimpleBox** | Run shell commands in an isolated VM | General-purpose command execution |
-| **CodeBox** | Execute Python code with auto-install | AI agents, code interpreters, untrusted code |
-| **BrowserBox** | Browser with Chrome DevTools Protocol | Web scraping, browser automation |
-| **ComputerBox** | Full desktop with GUI automation | Desktop automation, visual testing |
-| **InteractiveBox** | PTY terminal session | Interactive shells, REPL-style usage |
+### Why are there different box types?
 
-**Not sure which one?** Start with **CodeBox** — it's the most common choice for AI applications. It handles package installation automatically and returns stdout as a string.
+Every box is the same thing under the hood: a lightweight **microVM** (a real virtual machine that boots in under a second). The different box types exist for **convenience** — they bundle a default image and add helper methods so you don't have to wire things up yourself. Some extend SimpleBox directly (CodeBox, InteractiveBox), while others are standalone wrappers with their own specialized APIs (BrowserBox, ComputerBox).
+
+Here's what each box type actually is:
+
+**SimpleBox** — the base box type.
+- You pick any image, you run shell commands with `exec()`.
+- **Image:** required in Python, defaults to `python:slim` in Node.js.
+
+**CodeBox** — extends SimpleBox with Python shortcuts.
+- Defaults to the `python:slim` image (which already has Python inside). Does **not** install Python — the image already has it.
+- Adds `run()` (calls `python -c` for you), `install_package()` (calls `pip install` for you), `run_script()`.
+- Since CodeBox extends SimpleBox, you still have `exec()` too — CodeBox can do everything SimpleBox can.
+- **Image:** changeable, but must have Python inside (e.g. `python:3.11`). Without Python, `run()` will fail.
+
+**BrowserBox** — a standalone box type for browser automation.
+- Uses the Playwright image (`mcr.microsoft.com/playwright:v1.58.0-jammy`) which already has Chromium, Firefox, and WebKit inside. Does **not** install a browser — the image already has them.
+- Provides `playwright_endpoint()`, `endpoint()`, `connect()` to get browser connection URLs.
+- **Image:** fixed, cannot be changed.
+
+**ComputerBox** — a standalone box type for desktop automation.
+- Uses the webtop image (`lscr.io/linuxserver/webtop:ubuntu-xfce`) which already has a GUI desktop inside.
+- Provides `screenshot()`, `mouse_move()`, `left_click()`, `type()`, `key()` for GUI automation.
+- **Image:** fixed, cannot be changed.
+
+**InteractiveBox** — extends SimpleBox with a different connection mode.
+- Does **not** add anything to the image. Instead, it changes how the SDK connects: it attaches your terminal directly to the VM's shell, like SSH. Every Linux image already has a shell.
+- Adds `wait()` to block until the shell session ends.
+- Since InteractiveBox extends SimpleBox, you still have `exec()` too.
+- **Image:** required (any OCI image works).
+
+### So which one should I use?
+
+| I need to... | Use | Why |
+|---|---|---|
+| Run Python code from an AI agent | **CodeBox** | `run()` and `install_package()` handle Python for you |
+| Run shell commands, scripts, or non-Python tools | **SimpleBox** | Pick any image, use `exec()` to run anything |
+| Control a web browser | **BrowserBox** | Gives you a ready-to-use Playwright/Puppeteer endpoint |
+| Interact with a desktop GUI | **ComputerBox** | Gives you screenshot, mouse, and keyboard control |
+| Use an interactive terminal session | **InteractiveBox** | Attaches your terminal to the VM like SSH |
+
+<Tip>
+**Still not sure?** Start with **CodeBox**. It handles the most common AI use case (running untrusted Python) and you can always switch later.
+</Tip>
+
+### Could I just use SimpleBox for everything?
+
+**For CodeBox and InteractiveBox, yes** — they extend SimpleBox and you could replicate what they do manually:
 
 ```python
-async with boxlite.CodeBox() as codebox:
-    result = await codebox.run("print(2 + 2)")
-    # result is "4\n"
+# CodeBox does this for you automatically:
+async with boxlite.CodeBox() as cb:
+    output = await cb.run("print(2 + 2)")
+    # output is "4\n" (run() returns stdout as a string)
+
+# ...but you could do the same thing with SimpleBox:
+async with boxlite.SimpleBox(image="python:slim") as box:
+    result = await box.exec("python", "-c", "print(2 + 2)")
+    output = result.stdout
+    # output is "4\n" (exec() returns an ExecResult with .stdout, .stderr, .exit_code)
 ```
 
-For running arbitrary shell commands (not just Python), use **SimpleBox**:
-
-```python
-async with boxlite.SimpleBox(image="alpine:latest") as box:
-    result = await box.exec("ls", "-la", "/")
-    print(result.stdout)
-```
+**For BrowserBox and ComputerBox, technically yes but practically no.** You could use SimpleBox with the same images (e.g. `SimpleBox(image="mcr.microsoft.com/playwright:v1.58.0-jammy")`), but you'd have to manually set up port forwarding, start the browser server, wait for it to be ready, and connect — all things that BrowserBox handles in a single `connect()` call. The specialized APIs (`screenshot()`, `mouse_move()`, `playwright_endpoint()`, etc.) save significant work.
 
 ## Lifecycle
 
@@ -81,22 +122,25 @@ When you need more control (long-lived boxes, cross-function usage), manage the 
 | Stage | What happens |
 |-------|-------------|
 | **Create** | BoxLite pulls the OCI image (cached after first use), allocates resources, and boots a microVM. This typically takes under a second for cached images. |
-| **Use** | Run commands with `exec()` or `run()`. Files you create and packages you install persist within the box. Note: each `CodeBox.run()` call starts a new Python process, so Python variables and function definitions do not carry over between calls. |
+| **Use** | Run commands with `exec()` (SimpleBox, CodeBox, InteractiveBox) or `run()` (CodeBox only). Use specialized methods for BrowserBox (`connect()`) and ComputerBox (`screenshot()`, `mouse_move()`, etc.). Files you create and packages you install persist within the box. Note: each `CodeBox.run()` call starts a new Python process, so Python variables and function definitions do not carry over between calls. |
 | **Stop** | The VM shuts down and all resources are released. With `auto_remove=True` (the default), the box is fully cleaned up. |
 
 ## Images
 
-BoxLite uses standard **OCI container images** — the same images you use with Docker. Specify an image when creating a box:
+BoxLite uses standard **OCI container images** — the same images you use with Docker. For box types that accept a custom image (SimpleBox, CodeBox, InteractiveBox), specify it when creating the box:
 
 ```python
-# Docker Hub images
+# Docker Hub images — use any image you want
 boxlite.SimpleBox(image="python:slim")
 boxlite.SimpleBox(image="alpine:latest")
 boxlite.SimpleBox(image="ubuntu:22.04")
+boxlite.SimpleBox(image="node:20-slim")
 
-# Default (CodeBox uses python:slim automatically)
+# CodeBox defaults to python:slim — no image needed
 boxlite.CodeBox()
 ```
+
+BrowserBox and ComputerBox use **fixed images** (Playwright and webtop respectively) that can't be changed, because their convenience methods depend on specific software being pre-installed.
 
 The image is pulled on first use and cached locally. Subsequent starts reuse the cached image.
 
@@ -106,7 +150,7 @@ The image is pulled on first use and cached locally. Subsequent starts reuse the
 
 ## Resource configuration
 
-Every box accepts CPU, memory, and disk parameters:
+Every box accepts CPU and memory parameters. The example below uses SimpleBox/CodeBox/InteractiveBox parameter names:
 
 ```python
 boxlite.SimpleBox(
@@ -123,7 +167,11 @@ boxlite.SimpleBox(
 | `memory_mib` | 2048 | 128–65536 | Increase for data-heavy workloads or large packages |
 | `disk_size_gb` | None (ephemeral) | Any positive integer | Set only if you need data to survive a restart |
 
-For most use cases, the defaults work well. Increase `memory_mib` when running data-heavy code or installing large packages, and add CPUs for compute-intensive workloads.
+<Note>
+BrowserBox and ComputerBox use slightly different parameter names: `cpu` (singular) and `memory` (instead of `memory_mib`). See their [SDK reference](/reference/python/box-types) pages for details.
+</Note>
+
+For most use cases, the defaults work well. Increase memory when running data-heavy code or installing large packages, and add CPUs for compute-intensive workloads.
 
 ## Security model
 
