@@ -62,6 +62,10 @@ The most common approach. Upload a file, process it, download the results.
     ```
   </Tab>
   <Tab title="Node.js">
+    <Note>
+      The Node.js SDK does not currently expose `copyIn()` / `copyOut()` methods. Use `exec` with `stdin` to write files, and `exec` with `cat` to read them back.
+    </Note>
+
     ```javascript title="file_transfer.js"
     import { SimpleBox } from '@boxlite-ai/boxlite';
 

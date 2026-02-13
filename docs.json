@@ -29,6 +29,7 @@
             "group": "Tutorials",
             "pages": [
               "tutorials/index",
+              "tutorials/ai-coding-tools",
               "tutorials/code-execution",
               "tutorials/file-transfer",
               "tutorials/llm-integration",

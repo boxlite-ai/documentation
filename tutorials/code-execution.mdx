@@ -210,10 +210,21 @@ When you need specific versions or want to pre-install packages before running c
 
 ## Step 4: Run a script file
 
-Use `run_script()` to execute a Python file that's already inside the box.
+Use `run_script()` to execute a Python script from your host filesystem inside the box.
+
+<Note>
+  `run_script()` reads the script from your **host** machine and executes it inside the box. It does not look for files already inside the guest.
+</Note>
 
 <Tabs>
   <Tab title="Python">
+    ```python title="analysis.py"
+    # This file lives on the HOST at ./analysis.py
+    import json
+    data = {"status": "success", "items": [1, 2, 3]}
+    print(json.dumps(data, indent=2))
+    ```
+
     ```python title="run_script.py"
     import asyncio
     import boxlite
@@ -221,23 +232,23 @@ Use `run_script()` to execute a Python file that's already inside the box.
 
     async def main():
         async with boxlite.CodeBox() as codebox:
-            # First, create a script inside the box
-            await codebox.run("""
-    with open('/workspace/analysis.py', 'w') as f:
-        f.write('''
-    import json
-    data = {"status": "success", "items": [1, 2, 3]}
-    print(json.dumps(data, indent=2))
-    ''')
-    """)
-
-            # Then run the script file
-            result = await codebox.run_script("/workspace/analysis.py")
+            # run_script() reads ./analysis.py from the HOST filesystem
+            # and executes it inside the box
+            result = await codebox.run_script("./analysis.py")
             print(result)
 
 
     if __name__ == "__main__":
         asyncio.run(main())
+    ```
+
+    ```bash
+    python run_script.py
+    # Output:
+    # {
+    #   "status": "success",
+    #   "items": [1, 2, 3]
+    # }
     ```
   </Tab>
   <Tab title="Node.js">
@@ -247,18 +258,9 @@ Use `run_script()` to execute a Python file that's already inside the box.
     async function main() {
       const codebox = new CodeBox({ memoryMib: 512 });
       try {
-        // Create a script inside the box
-        await codebox.run(`
-    with open('/workspace/analysis.py', 'w') as f:
-        f.write('''
-    import json
-    data = {"status": "success", "items": [1, 2, 3]}
-    print(json.dumps(data, indent=2))
-    ''')
-        `);
-
-        // Run the script file
-        const result = await codebox.runScript('/workspace/analysis.py');
+        // runScript() reads ./analysis.py from the HOST filesystem
+        // and executes it inside the box
+        const result = await codebox.runScript('./analysis.py');
         console.log(result);
       } finally {
         await codebox.stop();
@@ -272,7 +274,11 @@ Use `run_script()` to execute a Python file that's already inside the box.
 
 ## Step 5: Run multiple snippets in the same box
 
-A single CodeBox can run many snippets sequentially. State persists between calls — installed packages and files remain available.
+A single CodeBox can run many snippets sequentially. Filesystem state persists between calls — installed packages and written files remain available. However, in-memory state (variables, functions) does **not** persist.
+
+<Warning>
+  Each `run()` call spawns a separate Python process. Variables and functions defined in one `run()` call are **not available** in the next. Use the filesystem to share data between calls.
+</Warning>
 
 <Tabs>
   <Tab title="Python">
@@ -283,18 +289,25 @@ A single CodeBox can run many snippets sequentially. State persists between call
 
     async def main():
         async with boxlite.CodeBox() as codebox:
-            # First run: install and define
+            # First run: compute results and write to a file
             await codebox.run("""
     import json
 
-    def process(data):
-        return {k: v * 2 for k, v in data.items()}
+    data = {"a": 1, "b": 2, "c": 3}
+    output = {k: v * 2 for k, v in data.items()}
+
+    with open('/tmp/results.json', 'w') as f:
+        json.dump(output, f)
+    print("Saved results to /tmp/results.json")
     """)
 
-            # Second run: use what was defined
+            # Second run: read the file from the previous run
             result = await codebox.run("""
-    output = process({"a": 1, "b": 2, "c": 3})
-    print(json.dumps(output))
+    import json
+
+    with open('/tmp/results.json') as f:
+        data = json.load(f)
+    print(json.dumps(data))
     """)
             print(result)  # {"a": 2, "b": 4, "c": 6}
 
@@ -310,16 +323,25 @@ A single CodeBox can run many snippets sequentially. State persists between call
     async function main() {
       const codebox = new CodeBox({ memoryMib: 512 });
       try {
+        // First run: compute results and write to a file
         await codebox.run(`
     import json
 
-    def process(data):
-        return {k: v * 2 for k, v in data.items()}
+    data = {"a": 1, "b": 2, "c": 3}
+    output = {k: v * 2 for k, v in data.items()}
+
+    with open('/tmp/results.json', 'w') as f:
+        json.dump(output, f)
+    print("Saved results to /tmp/results.json")
         `);
 
+        // Second run: read the file from the previous run
         const result = await codebox.run(`
-    output = process({"a": 1, "b": 2, "c": 3})
-    print(json.dumps(output))
+    import json
+
+    with open('/tmp/results.json') as f:
+        data = json.load(f)
+    print(json.dumps(data))
         `);
         console.log(result);  // {"a": 2, "b": 4, "c": 6}
       } finally {

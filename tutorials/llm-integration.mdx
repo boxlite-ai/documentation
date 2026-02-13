@@ -188,12 +188,6 @@ The pattern is the same regardless of provider:
   </Tab>
 </Tabs>
 
-Run it:
-
-```bash
-python openai_sandbox.py
-```
-
 Expected output:
 
 ```
@@ -246,7 +240,7 @@ Anthropic uses a different tool schema format (`input_schema` instead of `parame
 
             while True:
                 response = await client.messages.create(
-                    model="claude-sonnet-4-5-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=4096,
                     system="You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.",
                     tools=[EXECUTE_CODE_TOOL],
@@ -313,7 +307,7 @@ Anthropic uses a different tool schema format (`input_schema` instead of `parame
 
         while (true) {
           const response = await client.messages.create({
-            model: 'claude-sonnet-4-5-20250514',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 4096,
             system: 'You are a helpful assistant. When you need to compute something, write Python code using the execute_python tool. Always print() your results.',
             tools: [EXECUTE_CODE_TOOL],
@@ -404,12 +398,12 @@ runAgent("What's the 50th Fibonacci number?");
 ```
 
 <Tip>
-  The Vercel AI SDK supports [many model providers](https://sdk.vercel.ai/providers) — swap `openai('gpt-4o')` for `anthropic('claude-sonnet-4-5-20250514')`, `google('gemini-2.0-flash')`, or any other supported model. The tool definitions stay the same.
+  The Vercel AI SDK supports [many model providers](https://sdk.vercel.ai/providers) — swap `openai('gpt-4o')` for `anthropic('claude-sonnet-4-5-20250929')`, `google('gemini-2.0-flash')`, or any other supported model. The tool definitions stay the same.
 </Tip>
 
 ## Multiple questions
 
-The CodeBox persists across calls, so installed packages and defined functions carry over between tool invocations within the same conversation.
+The CodeBox persists across calls, so installed packages and files on disk carry over between tool invocations within the same conversation. Note that in-memory state (variables, functions) does **not** persist — each `run()` is a separate Python process.
 
 ```python title="multi_question.py"
 async def main():

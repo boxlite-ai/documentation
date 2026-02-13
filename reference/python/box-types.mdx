@@ -168,7 +168,7 @@ async with BrowserBox(opts) as browser:
 
     # Option 2: Get endpoints manually
     ws = await browser.playwright_endpoint()   # "ws://localhost:3000/"
-    cdp = await browser.endpoint()             # "http://localhost:9222"
+    cdp = await browser.endpoint()             # "ws://localhost:3000/..."
 ```
 
 ## ComputerBox

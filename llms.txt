@@ -1,0 +1,83 @@
+# BoxLite Documentation
+
+> BoxLite is a lightweight, embeddable virtual machine runtime for secure, isolated code execution — "SQLite for sandboxing."
+
+## Getting Started
+
+- [Introduction](/index.mdx): BoxLite overview, features, and quick start
+- [Installation](/getting-started/index.mdx): Install BoxLite for Python, Node.js, Rust, or C
+- [Python Quick Start](/getting-started/quickstart-python.mdx): Get started with BoxLite in Python
+- [Node.js Quick Start](/getting-started/quickstart-nodejs.mdx): Get started with BoxLite in Node.js
+- [Rust Quick Start](/getting-started/quickstart-rust.mdx): Get started with BoxLite in Rust
+- [C Quick Start](/getting-started/quickstart-c.mdx): Get started with BoxLite in C
+- [Core Concepts](/getting-started/core-concepts.mdx): Boxes, images, execution model, and lifecycle
+
+## Tutorials
+
+- [Tutorials Overview](/tutorials/index.mdx): All tutorials and box type selection guide
+- [Run Claude Code in a sandbox](/tutorials/ai-coding-tools.mdx): Run Claude Code inside an isolated VM
+- [Execute AI-generated code](/tutorials/code-execution.mdx): Run untrusted Python code safely with CodeBox
+- [Upload & download files](/tutorials/file-transfer.mdx): Move files in and out of a sandbox
+- [Connect to an LLM](/tutorials/llm-integration.mdx): Wire up OpenAI, Anthropic, or Vercel AI SDK tool calling
+- [Automate a browser](/tutorials/browser-automation.mdx): Browser automation with Playwright or Puppeteer
+
+## Guides
+
+- [Guides Overview](/guides/index.mdx): Advanced patterns and configuration guides
+- [AI Agent Integration](/guides/ai-agent-integration.mdx): Concurrency, timeouts, security presets
+- [Building from Source](/guides/building-from-source.mdx): Compile BoxLite from source
+- [Image Registry Configuration](/guides/image-registry-configuration.mdx): Configure OCI image registries
+- [macOS Sandbox Debugging](/guides/macos-sandbox-debugging.mdx): Debug sandbox issues on macOS
+- [Changelog](/guides/changelog.mdx): Release history
+
+## SDK Reference
+
+- [SDK Reference Overview](/reference/index.mdx): SDK comparison and BoxOptions parameters
+
+### Python SDK
+
+- [Python SDK Overview](/reference/python/index.mdx): Installation, runtime management, sync API
+- [Box Types (Python)](/reference/python/box-types.mdx): SimpleBox, CodeBox, BrowserBox, ComputerBox, InteractiveBox
+- [Execution (Python)](/reference/python/execution.mdx): Command execution, streaming I/O
+- [Errors & Metrics (Python)](/reference/python/errors-metrics.mdx): Exception hierarchy, metrics
+
+### Node.js SDK
+
+- [Node.js SDK Overview](/reference/nodejs/index.mdx): Installation, runtime management
+- [Box Types (Node.js)](/reference/nodejs/box-types.mdx): SimpleBox, CodeBox, BrowserBox, ComputerBox, InteractiveBox
+- [Execution (Node.js)](/reference/nodejs/execution.mdx): Command execution, streaming I/O
+- [Errors & Metrics (Node.js)](/reference/nodejs/errors-metrics.mdx): Error types, metrics
+
+### Rust SDK
+
+- [Rust SDK Overview](/reference/rust/index.mdx): Installation, runtime management
+- [Box Configuration (Rust)](/reference/rust/box-config.mdx): BoxConfig, builder pattern
+- [Execution (Rust)](/reference/rust/execution.mdx): Command execution
+- [Errors & Metrics (Rust)](/reference/rust/errors-metrics.mdx): Error types, metrics
+
+### C SDK
+
+- [C SDK Overview](/reference/c/index.mdx): Installation, runtime management
+- [Native API (C)](/reference/c/native-api.mdx): Core C API functions
+- [Memory, JSON & Threading (C)](/reference/c/memory-json-threading.mdx): Memory management, JSON, threads
+- [Errors & Metrics (C)](/reference/c/errors-metrics.mdx): Error handling, metrics
+
+## Architecture
+
+- [Architecture Overview](/architecture/index.mdx): System architecture and design
+- [Core Components](/architecture/components.mdx): Jailer, ShimController, Guest Agent
+- [Security & Isolation](/architecture/security.mdx): Security model and isolation guarantees
+- [Networking & Storage](/architecture/networking-storage.mdx): Network and storage configuration
+
+## BoxRun
+
+- [BoxRun Overview](/boxrun/index.mdx): Managed sandbox platform
+- [BoxRun Quick Start](/boxrun/quickstart.mdx): Get started with BoxRun
+- [BoxRun CLI](/boxrun/cli.mdx): Command-line reference
+- [BoxRun Python SDK](/boxrun/python-sdk.mdx): Python SDK for BoxRun
+- [BoxRun REST API](/boxrun/rest-api.mdx): REST API reference
+- [BoxRun Configuration](/boxrun/configuration.mdx): Configuration options
+
+## FAQ
+
+- [FAQ & Troubleshooting](/faq.mdx): Common questions and solutions
