@@ -1,6 +1,6 @@
 # BoxLite Documentation — Agent Instructions
 
-This is the official documentation site for **BoxLite**, built with Mintlify. BoxLite is a lightweight, embeddable VM runtime for secure, isolated code execution.
+This is the official documentation site for **BoxLite**, built with Mintlify. BoxLite is a local-first micro-VM sandbox for AI agents — stateful, lightweight, hardware-level isolation, no daemon required.
 
 ## Project Structure
 

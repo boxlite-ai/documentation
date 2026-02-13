@@ -1,6 +1,6 @@
 # BoxLite Documentation
 
-> BoxLite is a lightweight, embeddable virtual machine runtime for secure, isolated code execution — "SQLite for sandboxing."
+> BoxLite is a local-first micro-VM sandbox for AI agents — stateful, lightweight, hardware-level isolation, no daemon required.
 
 ## Getting Started
 
