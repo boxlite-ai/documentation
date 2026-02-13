@@ -63,7 +63,7 @@ The most common approach. Upload a file, process it, download the results.
   </Tab>
   <Tab title="Node.js">
     <Note>
-      The Node.js SDK does not currently expose `copyIn()` / `copyOut()` methods. Use `exec` with `stdin` to write files, and `exec` with `cat` to read them back.
+      The Node.js SDK does not currently expose `copyIn()` / `copyOut()` methods. Use `exec` with shell commands to write files, and `exec` with `cat` to read them back.
     </Note>
 
     ```javascript title="file_transfer.js"
@@ -72,18 +72,20 @@ The most common approach. Upload a file, process it, download the results.
     async function main() {
       const box = new SimpleBox({ image: 'python:slim' });
       try {
-        // Write a script into the box using exec + stdin
-        await box.exec('sh', '-c', 'cat > /workspace/script.py', {
-          stdin: 'import json\ndata = {"result": 42}\nprint(json.dumps(data))\n',
-        });
+        // Create workspace and write a script using a heredoc
+        await box.exec('sh', '-c', `mkdir -p /workspace && cat > /workspace/script.py << 'EOF'
+    import json
+    data = {"result": 42}
+    print(json.dumps(data))
+    EOF`);
 
         // Run the script
         const result = await box.exec('python', '/workspace/script.py');
         console.log(`Exit code: ${result.exitCode}`);
         console.log(result.stdout);
 
-        // Read output via exec
-        const output = await box.exec('cat', '/workspace/output.json');
+        // Read a file back from the box via exec
+        const output = await box.exec('cat', '/workspace/script.py');
         console.log(output.stdout);
       } finally {
         await box.stop();

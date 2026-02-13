@@ -1,0 +1,345 @@
+---
+title: "Run any language or tool"
+description: "Use SimpleBox with custom OCI images to run Node.js, shell scripts, system tools, or any language — not just Python."
+sidebarTitle: "Any language"
+icon: "toolbox"
+---
+
+SimpleBox runs any OCI container image, so you're not limited to Python. Use it to run Node.js, Go, Rust, shell scripts, or any CLI tool — just pick the right image and call `exec()`.
+
+## What you'll build
+
+A script that:
+1. Runs Node.js code inside a `node:20-slim` image
+2. Runs a shell script inside an `alpine:latest` image
+3. Installs and uses CLI tools
+4. Runs multiple languages in the same box
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Run Node.js code
+
+Use the `node:20-slim` image to run JavaScript inside a sandbox.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="run_node.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(image="node:20-slim") as box:
+            result = await box.exec(
+                "node", "-e",
+                "const data = Array.from({length: 5}, (_, i) => i * i);\n"
+                "console.log(JSON.stringify(data));"
+            )
+            print(f"Output: {result.stdout}")  # [0,1,4,9,16]
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="run_node.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({ image: 'node:20-slim' });
+      try {
+        const result = await box.exec(
+          'node', '-e',
+          'const data = Array.from({length: 5}, (_, i) => i * i);\n' +
+          'console.log(JSON.stringify(data));'
+        );
+        console.log(`Output: ${result.stdout}`);  // [0,1,4,9,16]
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening:**
+- SimpleBox pulls the `node:20-slim` image (cached after first use)
+- `exec("node", "-e", "...")` runs the JavaScript code inside the VM
+- Output is captured in `result.stdout` just like any other command
+
+## Step 2: Run a shell script
+
+Use `alpine:latest` for a minimal environment, and run multi-line scripts with `sh -c`.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="run_shell.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(image="alpine:latest") as box:
+            # Run a multi-line shell script
+            result = await box.exec("sh", "-c", """
+    echo "System info:"
+    echo "  Hostname: $(hostname)"
+    echo "  Kernel: $(uname -r)"
+    echo "  Memory: $(free -m | awk '/Mem:/ {print $2}') MB"
+    echo "  Disk: $(df -h / | awk 'NR==2 {print $4}') available"
+    """)
+            print(result.stdout)
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="run_shell.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({ image: 'alpine:latest' });
+      try {
+        // Run a multi-line shell script
+        const result = await box.exec('sh', '-c', `
+    echo "System info:"
+    echo "  Hostname: $(hostname)"
+    echo "  Kernel: $(uname -r)"
+    echo "  Memory: $(free -m | awk '/Mem:/ {print $2}') MB"
+    echo "  Disk: $(df -h / | awk 'NR==2 {print $4}') available"
+        `);
+        console.log(result.stdout);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## Step 3: Install and run tools
+
+Install packages inside the box using the image's package manager, then use them.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="install_tools.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        # Alpine — use apk
+        async with boxlite.SimpleBox(image="alpine:latest") as box:
+            await box.exec("apk", "add", "--no-cache", "curl", "jq")
+
+            result = await box.exec(
+                "sh", "-c",
+                "curl -s https://api.github.com/zen"
+            )
+            print(f"GitHub zen: {result.stdout}")
+
+        # Ubuntu — use apt-get
+        async with boxlite.SimpleBox(image="ubuntu:22.04") as box:
+            await box.exec(
+                "sh", "-c",
+                "apt-get update -qq && apt-get install -y -qq curl > /dev/null"
+            )
+
+            result = await box.exec(
+                "sh", "-c",
+                "curl -s https://api.github.com/zen"
+            )
+            print(f"GitHub zen: {result.stdout}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="install_tools.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // Alpine — use apk
+      {
+        const box = new SimpleBox({ image: 'alpine:latest' });
+        try {
+          await box.exec('apk', 'add', '--no-cache', 'curl', 'jq');
+
+          const result = await box.exec(
+            'sh', '-c',
+            'curl -s https://api.github.com/zen'
+          );
+          console.log(`GitHub zen: ${result.stdout}`);
+        } finally {
+          await box.stop();
+        }
+      }
+
+      // Ubuntu — use apt-get
+      {
+        const box = new SimpleBox({ image: 'ubuntu:22.04' });
+        try {
+          await box.exec(
+            'sh', '-c',
+            'apt-get update -qq && apt-get install -y -qq curl > /dev/null'
+          );
+
+          const result = await box.exec(
+            'sh', '-c',
+            'curl -s https://api.github.com/zen'
+          );
+          console.log(`GitHub zen: ${result.stdout}`);
+        } finally {
+          await box.stop();
+        }
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### Common images and package managers
+
+| Image | Package manager | Install command |
+|-------|----------------|-----------------|
+| `alpine:latest` | apk | `apk add --no-cache curl` |
+| `ubuntu:22.04` | apt-get | `apt-get update && apt-get install -y curl` |
+| `python:slim` | pip + apt-get | `pip install requests` |
+| `node:20-slim` | npm + apt-get | `npm install express` |
+
+## Step 4: Mix languages in one box
+
+The `node:20-bookworm` image includes both Node.js and Python 3, so you can combine languages in a single box without installing anything.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="multi_language.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(image="node:20-bookworm") as box:
+            # Run Python — already included in the bookworm image
+            py_result = await box.exec(
+                "python3", "-c", "print('Hello from Python')"
+            )
+            print(f"Python: {py_result.stdout.strip()}")
+
+            # Run Node.js
+            node_result = await box.exec(
+                "node", "-e", "console.log('Hello from Node.js')"
+            )
+            print(f"Node.js: {node_result.stdout.strip()}")
+
+            # Use Python to generate data, Node.js to process it
+            await box.exec("sh", "-c",
+                "python3 -c \"import json; print(json.dumps([1,2,3,4,5]))\" > /tmp/data.json"
+            )
+
+            result = await box.exec("sh", "-c",
+                "node -e \"const d = require('/tmp/data.json'); console.log('Sum:', d.reduce((a,b) => a+b, 0))\""
+            )
+            print(f"Cross-language: {result.stdout.strip()}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="multi_language.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({ image: 'node:20-bookworm' });
+      try {
+        // Run Python — already included in the bookworm image
+        const pyResult = await box.exec(
+          'python3', '-c', "print('Hello from Python')"
+        );
+        console.log(`Python: ${pyResult.stdout.trim()}`);
+
+        // Run Node.js
+        const nodeResult = await box.exec(
+          'node', '-e', "console.log('Hello from Node.js')"
+        );
+        console.log(`Node.js: ${nodeResult.stdout.trim()}`);
+
+        // Use Python to generate data, Node.js to process it
+        await box.exec('sh', '-c',
+          `python3 -c "import json; print(json.dumps([1,2,3,4,5]))" > /tmp/data.json`
+        );
+
+        const result = await box.exec('sh', '-c',
+          `node -e "const d = require('/tmp/data.json'); console.log('Sum:', d.reduce((a,b) => a+b, 0))"`
+        );
+        console.log(`Cross-language: ${result.stdout.trim()}`);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Use **slim** or **minimal** images for faster startup. Full images like `ubuntu:latest` work but are larger and slower to pull on first use. After the first pull, images are cached locally.
+</Tip>
+
+## Choosing the right image
+
+| I want to run... | Recommended image | Why |
+|------------------|-------------------|-----|
+| Node.js / JavaScript | `node:20-slim` | Node.js pre-installed, minimal size |
+| Python | `python:slim` | Python pre-installed (or use CodeBox) |
+| Shell scripts | `alpine:latest` | Smallest image (~5 MB), fast boot |
+| System tools (curl, git, etc.) | `alpine:latest` or `ubuntu:22.04` | Alpine for size, Ubuntu for compatibility |
+| Multiple languages | `node:20-bookworm` | Python 3 + Node.js pre-installed |
+| Compiled binaries | `alpine:latest` | Copy your binary in, run it |
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Run services with port forwarding" icon="server" href="/tutorials/long-running-services">
+    Start HTTP servers, databases, or APIs inside a box and access them from the host.
+  </Card>
+  <Card title="Upload & download files" icon="arrows-rotate" href="/tutorials/file-transfer">
+    Copy files into the box, process them, and retrieve results.
+  </Card>
+  <Card title="Handle errors and debug" icon="bug" href="/tutorials/error-handling">
+    Catch exceptions, handle timeouts, and debug failures.
+  </Card>
+  <Card title="SimpleBox API reference" icon="book" href="/reference/python/box-types#simplebox">
+    Full API docs for SimpleBox constructor options and methods.
+  </Card>
+</CardGroup>

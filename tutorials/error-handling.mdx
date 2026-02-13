@@ -1,0 +1,621 @@
+---
+title: "Handle errors and debug"
+description: "Check exit codes, catch BoxLite exceptions, handle timeouts safely, stream stderr in real time, and enable debug logging."
+sidebarTitle: "Error handling"
+icon: "bug"
+---
+
+Code running inside a sandbox can fail — especially AI-generated code. This tutorial covers every error-handling pattern you need: checking exit codes, catching typed exceptions, handling timeouts, and streaming stderr for real-time debugging.
+
+## What you'll learn
+
+1. Check exit codes and stderr from command results
+2. Catch `BoxliteError` and other exceptions for infrastructure errors
+3. Handle timeouts safely so long-running commands don't block forever
+4. Stream stderr in real time using the low-level execution API
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Check exit codes
+
+Every `exec()` call returns a result with an exit code, stdout, and stderr. The `exec()` method does **not** raise an exception for non-zero exit codes — you need to check them yourself.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="exit_codes.py"
+    import asyncio
+    import boxlite
+
+
+    async def main():
+        async with boxlite.SimpleBox(image="python:slim") as box:
+            # A successful command
+            result = await box.exec("echo", "hello")
+            print(f"Exit code: {result.exit_code}")  # 0
+            print(f"Stdout: {result.stdout}")         # "hello\n"
+
+            # A failing command — exec() does NOT raise, it returns the error info
+            result = await box.exec(
+                "python", "-c", "import nonexistent_module"
+            )
+            print(f"Exit code: {result.exit_code}")  # 1
+            print(f"Stderr: {result.stderr}")         # "...ModuleNotFoundError: ..."
+
+            # Pattern: always check before using output
+            result = await box.exec("python", "-c", "print(2 + 2)")
+            if result.exit_code == 0:
+                print(f"Result: {result.stdout.strip()}")
+            else:
+                print(f"Failed: {result.stderr}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="exit_codes.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const box = new SimpleBox({ image: 'python:slim' });
+      try {
+        // A successful command
+        const ok = await box.exec('echo', 'hello');
+        console.log(`Exit code: ${ok.exitCode}`);  // 0
+        console.log(`Stdout: ${ok.stdout}`);         // "hello\n"
+
+        // A failing command — exec() does NOT throw, it returns the error info
+        const fail = await box.exec(
+          'python', '-c', 'import nonexistent_module'
+        );
+        console.log(`Exit code: ${fail.exitCode}`);  // 1
+        console.log(`Stderr: ${fail.stderr}`);         // "...ModuleNotFoundError: ..."
+
+        // Pattern: always check before using output
+        const result = await box.exec('python', '-c', 'print(2 + 2)');
+        if (result.exitCode === 0) {
+          console.log(`Result: ${result.stdout.trim()}`);
+        } else {
+          console.log(`Failed: ${result.stderr}`);
+        }
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### ExecResult fields
+
+| Field | Python | Node.js | Description |
+|-------|--------|---------|-------------|
+| Exit code | `result.exit_code` | `result.exitCode` | 0 = success, non-zero = failure |
+| Stdout | `result.stdout` | `result.stdout` | Standard output as string |
+| Stderr | `result.stderr` | `result.stderr` | Standard error as string |
+| Error message | `result.error_message` | N/A | Diagnostic message when process died unexpectedly (Python only) |
+
+## Step 2: Catch infrastructure exceptions
+
+While `exec()` returns non-zero exit codes without raising, BoxLite **does** raise exceptions for infrastructure failures — invalid images, command-not-found, config errors, timeouts, and more. The exception hierarchy is:
+
+```text
+BoxliteError (base)
+├── ExecError       — execution infrastructure failure
+├── TimeoutError    — operation exceeded time limit
+└── ParseError      — failed to parse command output
+```
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="exceptions.py"
+    import asyncio
+    from boxlite import SimpleBox, BoxliteError, TimeoutError
+
+
+    async def main():
+        # Catch infrastructure errors (bad image, command not found, etc.)
+        try:
+            async with SimpleBox(image="python:slim") as box:
+                # This raises RuntimeError — command doesn't exist in the image
+                result = await box.exec("nonexistent_command")
+
+        except RuntimeError as e:
+            # Command-not-found raises RuntimeError
+            print(f"Command not found: {e}")
+
+        except TimeoutError:
+            # An operation timed out (e.g. wait_until_ready)
+            print("Operation timed out")
+
+        except BoxliteError as e:
+            # Catch-all for BoxLite errors (image pull, config, etc.)
+            print(f"BoxLite error: {e}")
+
+        # For exec() with valid commands, check exit codes instead
+        async with SimpleBox(image="python:slim") as box:
+            result = await box.exec("python", "-c", "import sys; sys.exit(42)")
+            # No exception — check the exit code
+            if result.exit_code != 0:
+                print(f"Command exited with code {result.exit_code}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="exceptions.js"
+    import { SimpleBox, BoxliteError, TimeoutError } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      // Catch infrastructure errors (bad image, command not found, etc.)
+      {
+        const box = new SimpleBox({ image: 'python:slim' });
+        try {
+          // This throws — command doesn't exist in the image
+          const result = await box.exec('nonexistent_command');
+        } catch (err) {
+          if (err instanceof TimeoutError) {
+            console.error('Operation timed out');
+          } else if (err instanceof BoxliteError) {
+            console.error(`BoxLite error: ${err.message}`);
+          } else {
+            console.error(`Error: ${err.message}`);
+          }
+        } finally {
+          await box.stop();
+        }
+      }
+
+      // For exec() with valid commands, check exit codes instead
+      {
+        const box = new SimpleBox({ image: 'python:slim' });
+        try {
+          const result = await box.exec('python', '-c', 'import sys; sys.exit(42)');
+          // No exception — check the exit code
+          if (result.exitCode !== 0) {
+            console.log(`Command exited with code ${result.exitCode}`);
+          }
+        } finally {
+          await box.stop();
+        }
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  **Key distinction:** `exec()` returns non-zero exit codes as data (check `result.exit_code`). It only raises exceptions for infrastructure failures like command-not-found, which means the command couldn't be started at all.
+</Note>
+
+## Step 3: Handle timeouts safely
+
+When a command runs too long, use `asyncio.wait_for()` (Python) or `Promise.race()` (Node.js) to set a deadline. The guest process may keep running inside the VM after a timeout, but it will be cleaned up when the box shuts down.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="timeout.py"
+    import asyncio
+    from boxlite import SimpleBox
+
+
+    async def main():
+        async with SimpleBox(image="python:slim") as box:
+            try:
+                # Wait with a 5-second timeout
+                result = await asyncio.wait_for(
+                    box.exec("sleep", "3600"),
+                    timeout=5.0
+                )
+                print(f"Completed with exit code: {result.exit_code}")
+            except asyncio.TimeoutError:
+                print("Command timed out")
+
+            # The box is still usable after a timeout
+            result = await box.exec("echo", "still alive")
+            print(f"After timeout: {result.stdout.strip()}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="timeout.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    function withTimeout(promise, ms) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), ms)
+        ),
+      ]);
+    }
+
+    async function main() {
+      const box = new SimpleBox({ image: 'python:slim' });
+      try {
+        try {
+          // Wait with a 5-second timeout
+          const result = await withTimeout(
+            box.exec('sleep', '3600'),
+            5000
+          );
+          console.log(`Completed with exit code: ${result.exitCode}`);
+        } catch (err) {
+          if (err.message === 'Timeout') {
+            console.log('Command timed out');
+          } else {
+            throw err;
+          }
+        }
+
+        // The box is still usable after a timeout
+        const result = await box.exec('echo', 'still alive');
+        console.log(`After timeout: ${result.stdout.trim()}`);
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### Timeout with a helper function
+
+For repeated use, wrap the pattern in a helper.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="timeout_helper.py"
+    import asyncio
+    from boxlite import SimpleBox
+
+
+    async def exec_with_timeout(box, timeout_seconds, cmd, *args):
+        """Run a command with a timeout. Returns ExecResult or None if timed out."""
+        try:
+            return await asyncio.wait_for(
+                box.exec(cmd, *args),
+                timeout=timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            return None
+
+
+    async def main():
+        async with SimpleBox(image="python:slim") as box:
+            # This completes in time
+            result = await exec_with_timeout(box, 10, "echo", "fast")
+            if result:
+                print(f"Output: {result.stdout.strip()}")
+
+            # This times out
+            result = await exec_with_timeout(box, 2, "sleep", "3600")
+            if result is None:
+                print("Command timed out")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="timeout_helper.js"
+    import { SimpleBox } from '@boxlite-ai/boxlite';
+
+    async function execWithTimeout(box, timeoutMs, cmd, ...args) {
+      try {
+        return await Promise.race([
+          box.exec(cmd, ...args),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), timeoutMs)
+          ),
+        ]);
+      } catch (err) {
+        if (err.message === 'Timeout') {
+          return null;
+        }
+        throw err;
+      }
+    }
+
+    async function main() {
+      const box = new SimpleBox({ image: 'python:slim' });
+      try {
+        // This completes in time
+        const result = await execWithTimeout(box, 10000, 'echo', 'fast');
+        if (result) {
+          console.log(`Output: ${result.stdout.trim()}`);
+        }
+
+        // This times out
+        const timedOut = await execWithTimeout(box, 2000, 'sleep', '3600');
+        if (timedOut === null) {
+          console.log('Command timed out');
+        }
+      } finally {
+        await box.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### Advanced: kill the guest process explicitly
+
+If you need to kill the timed-out process instead of letting it run until the box shuts down, use the low-level execution API.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="timeout_kill.py"
+    import asyncio
+    from boxlite import Boxlite, BoxOptions
+
+
+    async def main():
+        runtime = Boxlite.default()
+        box = await runtime.create(BoxOptions(image="python:slim"))
+        try:
+            # Low-level exec returns an Execution handle
+            execution = await box.exec("sleep", ["3600"])
+
+            try:
+                result = await asyncio.wait_for(execution.wait(), timeout=5.0)
+                print(f"Completed: {result.exit_code}")
+            except asyncio.TimeoutError:
+                # Kill the guest process explicitly
+                await execution.kill()
+                print("Timed out — process killed")
+        finally:
+            await box.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="timeout_kill.js"
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const runtime = JsBoxlite.withDefaultConfig();
+      const box = await runtime.create({ image: 'python:slim' }, 'timeout-demo');
+      try {
+        // Low-level exec returns an execution handle
+        const execution = await box.exec('sleep', ['3600']);
+
+        try {
+          const result = await Promise.race([
+            execution.wait(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Timeout')), 5000)
+            ),
+          ]);
+          console.log(`Completed: ${result.exitCode}`);
+        } catch (err) {
+          if (err.message === 'Timeout') {
+            // Kill the guest process explicitly
+            await execution.kill();
+            console.log('Timed out — process killed');
+          } else {
+            throw err;
+          }
+        }
+      } finally {
+        await box.stop();
+        await runtime.remove('timeout-demo');
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+## Step 4: Stream stderr in real time
+
+For long-running commands, you might want to see errors as they happen instead of waiting for the command to finish. Use the low-level execution API with async iterators.
+
+<Note>
+  The high-level `SimpleBox.exec()` collects all output and returns it as a single string. For real-time streaming, use the low-level API via `Boxlite.default()` and `runtime.create()`.
+</Note>
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="stream_stderr.py"
+    import asyncio
+    from boxlite import Boxlite, BoxOptions
+
+
+    async def main():
+        runtime = Boxlite.default()
+        box = await runtime.create(BoxOptions(image="python:slim"))
+        try:
+            # Low-level exec gives you streaming access
+            execution = await box.exec("python", ["-c", """
+    import sys
+    import time
+
+    for i in range(5):
+        print(f"Progress: {i+1}/5")
+        sys.stdout.flush()
+        if i == 2:
+            print("Warning: something looks off", file=sys.stderr)
+            sys.stderr.flush()
+        time.sleep(1)
+
+    print("Done!")
+    """])
+
+            # Stream stdout and stderr concurrently
+            async def read_stdout():
+                async for line in execution.stdout():
+                    print(f"[stdout] {line}", end="")
+
+            async def read_stderr():
+                async for line in execution.stderr():
+                    print(f"[stderr] {line}", end="")
+
+            await asyncio.gather(read_stdout(), read_stderr())
+
+            result = await execution.wait()
+            print(f"Exit code: {result.exit_code}")
+        finally:
+            await box.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="stream_stderr.js"
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const runtime = JsBoxlite.withDefaultConfig();
+      const box = await runtime.create({ image: 'python:slim' }, 'stream-demo');
+      try {
+        // Low-level exec gives you streaming access
+        const execution = await box.exec('python', ['-c', `
+    import sys
+    import time
+
+    for i in range(5):
+        print(f"Progress: {i+1}/5")
+        sys.stdout.flush()
+        if i == 2:
+            print("Warning: something looks off", file=sys.stderr)
+            sys.stderr.flush()
+        time.sleep(1)
+
+    print("Done!")
+        `]);
+
+        // Stream stdout and stderr concurrently
+        async function readStdout() {
+          const stdout = await execution.stdout();
+          while (true) {
+            const line = await stdout.next();
+            if (line === null) break;
+            console.log(`[stdout] ${line}`);
+          }
+        }
+
+        async function readStderr() {
+          const stderr = await execution.stderr();
+          while (true) {
+            const line = await stderr.next();
+            if (line === null) break;
+            console.error(`[stderr] ${line}`);
+          }
+        }
+
+        await Promise.all([readStdout(), readStderr()]);
+
+        const result = await execution.wait();
+        console.log(`Exit code: ${result.exitCode}`);
+      } finally {
+        await box.stop();
+        await runtime.remove('stream-demo');
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Each stream (stdout, stderr) can only be iterated once. After iteration, the stream is consumed.
+</Warning>
+
+## Debugging tips
+
+### Enable debug logging
+
+Set the `RUST_LOG` environment variable to see detailed BoxLite internals — VM lifecycle, image pulls, command execution, and network setup.
+
+```bash
+# See everything
+RUST_LOG=debug python my_script.py
+
+# Filter to BoxLite only
+RUST_LOG=boxlite=debug python my_script.py
+```
+
+### Check box status
+
+If commands fail unexpectedly, check whether the box is still running.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    info = await box.info()
+    print(f"Box status: {info.status}")  # "running", "stopped", etc.
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript
+    const info = await box.getInfo();
+    console.log(`Box status: ${info.status}`);  // "Running", "Stopped", etc.
+    ```
+  </Tab>
+</Tabs>
+
+### Common failure patterns
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `exit_code: 127` | Command not found in image | Use an image that has the command, or install it first |
+| `exit_code: 137` | Process killed (OOM or SIGKILL) | Increase `memory_mib` |
+| `exit_code: -9` | Process terminated by signal | Check if another process or timeout killed it |
+| `error_message` is set | VM or container init failed | Enable debug logging and check the message |
+| `BoxliteError: image error` | Image pull failed | Check network, verify image name/tag exists |
+| `RuntimeError: spawn_failed` | Command binary not in image | Check the image has the binary, or install it |
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Execute AI-generated code" icon="code" href="/tutorials/code-execution">
+    Use CodeBox for Python code execution with auto-install and output capture.
+  </Card>
+  <Card title="Run services with port forwarding" icon="server" href="/tutorials/long-running-services">
+    Start servers inside boxes and access them from the host.
+  </Card>
+  <Card title="Errors & metrics reference (Python)" icon="book" href="/reference/python/errors-metrics">
+    Full reference for all exception types, error variants, and metrics.
+  </Card>
+  <Card title="Errors & metrics reference (Node.js)" icon="book" href="/reference/nodejs/errors-metrics">
+    Node.js SDK error types, metrics API, and monitoring patterns.
+  </Card>
+</CardGroup>

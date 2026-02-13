@@ -121,12 +121,19 @@ CodeBox detects missing imports and installs them automatically. No manual `pip 
     ```
   </Tab>
   <Tab title="Node.js">
+    <Note>
+      Auto-install is a Python SDK feature. In Node.js, use `installPackage()` before running code that needs third-party packages.
+    </Note>
+
     ```javascript title="auto_install.js"
     import { CodeBox } from '@boxlite-ai/boxlite';
 
     async function main() {
-      const codebox = new CodeBox({ memoryMib: 512 });
+      const codebox = new CodeBox();
       try {
+        // Node.js SDK requires explicit package installation
+        await codebox.installPackage('requests');
+
         const result = await codebox.run(`
     import requests
     response = requests.get('https://api.github.com/zen')
@@ -180,7 +187,7 @@ When you need specific versions or want to pre-install packages before running c
     import { CodeBox } from '@boxlite-ai/boxlite';
 
     async function main() {
-      const codebox = new CodeBox({ memoryMib: 1024 });
+      const codebox = new CodeBox();
       try {
         await codebox.installPackage('pandas');
         await codebox.installPackage('matplotlib');

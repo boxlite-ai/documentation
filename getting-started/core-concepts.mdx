@@ -14,6 +14,14 @@ Every box is the same thing under the hood: a lightweight **microVM** (a real vi
 
 Here's what each box type actually is:
 
+| Box type | What it adds | Default image | Image changeable? | Has `exec()`? |
+|----------|-------------|---------------|-------------------|---------------|
+| **SimpleBox** | Shell commands | (you choose) | Yes | Yes |
+| **CodeBox** | `run()`, `install_package()` | `python:slim` | Yes (needs Python) | Yes |
+| **BrowserBox** | `connect()`, `playwright_endpoint()` | Playwright (fixed) | No | No |
+| **ComputerBox** | `screenshot()`, mouse/keyboard | webtop (fixed) | No | No |
+| **InteractiveBox** | PTY terminal session | (you choose) | Yes | Yes |
+
 **SimpleBox** — the base box type.
 - You pick any image, you run shell commands with `exec()`.
 - **Image:** required in Python, defaults to `python:slim` in Node.js.

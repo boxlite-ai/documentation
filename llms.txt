@@ -20,6 +20,11 @@
 - [Upload & download files](/tutorials/file-transfer.mdx): Move files in and out of a sandbox
 - [Connect to an LLM](/tutorials/llm-integration.mdx): Wire up OpenAI, Anthropic, or Vercel AI SDK tool calling
 - [Automate a browser](/tutorials/browser-automation.mdx): Browser automation with Playwright or Puppeteer
+- [Automate a desktop](/tutorials/desktop-automation.mdx): GUI desktop automation with ComputerBox
+- [Interactive terminal](/tutorials/interactive-terminal.mdx): PTY sessions with InteractiveBox
+- [Run any language or tool](/tutorials/run-any-language.mdx): Use SimpleBox with custom images
+- [Run services with port forwarding](/tutorials/long-running-services.mdx): Start servers, forward ports, access from host
+- [Handle errors and debug](/tutorials/error-handling.mdx): Exit codes, exceptions, timeouts, streaming
 
 ## Guides
 

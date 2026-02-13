@@ -33,7 +33,12 @@
               "tutorials/code-execution",
               "tutorials/file-transfer",
               "tutorials/llm-integration",
-              "tutorials/browser-automation"
+              "tutorials/browser-automation",
+              "tutorials/desktop-automation",
+              "tutorials/interactive-terminal",
+              "tutorials/run-any-language",
+              "tutorials/long-running-services",
+              "tutorials/error-handling"
             ]
           },
           {

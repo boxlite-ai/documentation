@@ -1,0 +1,413 @@
+---
+title: "Automate a desktop"
+description: "Launch a ComputerBox with a full GUI desktop, take screenshots, control the mouse and keyboard, and automate a complete workflow — all inside an isolated VM."
+sidebarTitle: "Desktop automation"
+icon: "desktop"
+---
+
+ComputerBox runs a full Linux desktop (XFCE) inside an isolated VM and gives you programmatic control over the screen, mouse, and keyboard. Use it when you need GUI automation — filling out forms, testing desktop apps, or driving tools that don't have a CLI.
+
+<Note>
+  Need browser automation only? Use [BrowserBox](/tutorials/browser-automation) instead — it's lighter and gives you direct Playwright/Puppeteer access without a full desktop.
+</Note>
+
+## What you'll build
+
+A script that:
+1. Launches a ComputerBox with a GUI desktop
+2. Takes a screenshot
+3. Uses the mouse and keyboard to interact with the desktop
+4. Automates a complete workflow: open a text editor, type content, and save
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install boxlite
+    ```
+    Requires Python 3.10+.
+  </Tab>
+  <Tab title="Node.js">
+    ```bash
+    npm install @boxlite-ai/boxlite
+    ```
+    Requires Node.js 18+.
+  </Tab>
+</Tabs>
+
+## Step 1: Launch and take a screenshot
+
+Create a ComputerBox, wait for the desktop to be ready, and capture a screenshot.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="screenshot.py"
+    import asyncio
+    import base64
+    from boxlite import ComputerBox
+
+
+    async def main():
+        async with ComputerBox() as desktop:
+            # Wait for the GUI desktop to fully load
+            await desktop.wait_until_ready()
+            print("Desktop is ready")
+
+            # Take a screenshot
+            screenshot = await desktop.screenshot()
+            print(f"Screen size: {screenshot['width']}x{screenshot['height']}")
+
+            # Save the screenshot to a file
+            with open("desktop.png", "wb") as f:
+                f.write(base64.b64decode(screenshot["data"]))
+            print("Screenshot saved to desktop.png")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="screenshot.js"
+    import { ComputerBox } from '@boxlite-ai/boxlite';
+    import { writeFileSync } from 'fs';
+
+    async function main() {
+      const desktop = new ComputerBox();
+      try {
+        // Wait for the GUI desktop to fully load
+        await desktop.waitUntilReady();
+        console.log('Desktop is ready');
+
+        // Take a screenshot
+        const screenshot = await desktop.screenshot();
+        console.log(`Screen size: ${screenshot.width}x${screenshot.height}`);
+
+        // Save the screenshot to a file
+        writeFileSync('desktop.png', Buffer.from(screenshot.data, 'base64'));
+        console.log('Screenshot saved to desktop.png');
+      } finally {
+        await desktop.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening:**
+- ComputerBox boots a VM with the `lscr.io/linuxserver/webtop:ubuntu-xfce` image — a full Ubuntu desktop with XFCE
+- `wait_until_ready()` blocks until the desktop environment is loaded and responsive
+- `screenshot()` returns a base64-encoded PNG with the current screen contents
+
+## Step 2: Mouse interaction
+
+Move the cursor, click, double-click, and drag.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="mouse.py"
+    import asyncio
+    from boxlite import ComputerBox
+
+
+    async def main():
+        async with ComputerBox() as desktop:
+            await desktop.wait_until_ready()
+
+            # Move the mouse to coordinates (512, 384)
+            await desktop.mouse_move(512, 384)
+
+            # Check where the cursor is
+            x, y = await desktop.cursor_position()
+            print(f"Cursor is at ({x}, {y})")
+
+            # Click at the current position
+            await desktop.left_click()
+
+            # Double-click to open an item
+            await desktop.double_click()
+
+            # Right-click for context menu
+            await desktop.right_click()
+
+            # Drag from one position to another
+            await desktop.left_click_drag(100, 100, 400, 400)
+
+            print("Mouse interactions complete")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="mouse.js"
+    import { ComputerBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const desktop = new ComputerBox();
+      try {
+        await desktop.waitUntilReady();
+
+        // Move the mouse to coordinates (512, 384)
+        await desktop.mouseMove(512, 384);
+
+        // Check where the cursor is
+        const [x, y] = await desktop.cursorPosition();
+        console.log(`Cursor is at (${x}, ${y})`);
+
+        // Click at the current position
+        await desktop.leftClick();
+
+        // Double-click to open an item
+        await desktop.doubleClick();
+
+        // Right-click for context menu
+        await desktop.rightClick();
+
+        // Drag from one position to another
+        await desktop.leftClickDrag(100, 100, 400, 400);
+
+        console.log('Mouse interactions complete');
+      } finally {
+        await desktop.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### Mouse methods reference
+
+| Method (Python) | Method (Node.js) | Description |
+|-----------------|-------------------|-------------|
+| `mouse_move(x, y)` | `mouseMove(x, y)` | Move cursor to coordinates |
+| `left_click()` | `leftClick()` | Left click at current position |
+| `right_click()` | `rightClick()` | Right click at current position |
+| `double_click()` | `doubleClick()` | Double left click |
+| `triple_click()` | `tripleClick()` | Triple left click (select line) |
+| `left_click_drag(sx, sy, ex, ey)` | `leftClickDrag(sx, sy, ex, ey)` | Drag from start to end |
+| `cursor_position()` | `cursorPosition()` | Get current cursor (x, y) |
+
+## Step 3: Keyboard input
+
+Type text and press key combinations.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="keyboard.py"
+    import asyncio
+    from boxlite import ComputerBox
+
+
+    async def main():
+        async with ComputerBox() as desktop:
+            await desktop.wait_until_ready()
+
+            # Type text characters
+            await desktop.type("Hello from BoxLite!")
+
+            # Press Enter
+            await desktop.key("Return")
+
+            # Press a key combination (Ctrl+A to select all)
+            await desktop.key("ctrl+a")
+
+            # Press Ctrl+C to copy
+            await desktop.key("ctrl+c")
+
+            # Switch windows with Alt+Tab
+            await desktop.key("alt+Tab")
+
+            print("Keyboard interactions complete")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="keyboard.js"
+    import { ComputerBox } from '@boxlite-ai/boxlite';
+
+    async function main() {
+      const desktop = new ComputerBox();
+      try {
+        await desktop.waitUntilReady();
+
+        // Type text characters
+        await desktop.type('Hello from BoxLite!');
+
+        // Press Enter
+        await desktop.key('Return');
+
+        // Press a key combination (Ctrl+A to select all)
+        await desktop.key('ctrl+a');
+
+        // Press Ctrl+C to copy
+        await desktop.key('ctrl+c');
+
+        // Switch windows with Alt+Tab
+        await desktop.key('alt+Tab');
+
+        console.log('Keyboard interactions complete');
+      } finally {
+        await desktop.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+### Key syntax reference (xdotool format)
+
+The `key()` method uses **xdotool key syntax**:
+
+| Key | Syntax |
+|-----|--------|
+| Enter | `Return` |
+| Tab | `Tab` |
+| Escape | `Escape` |
+| Backspace | `BackSpace` |
+| Delete | `Delete` |
+| Space | `space` |
+| Arrow keys | `Up`, `Down`, `Left`, `Right` |
+| Function keys | `F1`, `F2`, ... `F12` |
+| Page keys | `Page_Up`, `Page_Down`, `Home`, `End` |
+| Modifiers | `ctrl`, `alt`, `shift`, `super` |
+| Combinations | `ctrl+c`, `ctrl+shift+s`, `alt+Tab` |
+
+## Step 4: Automate a full workflow
+
+Put it all together — open a text editor, type content, save the file, and verify with a screenshot.
+
+<Tabs>
+  <Tab title="Python">
+    ```python title="workflow.py"
+    import asyncio
+    import base64
+    from boxlite import ComputerBox
+
+
+    async def main():
+        async with ComputerBox(cpu=2, memory=2048) as desktop:
+            await desktop.wait_until_ready()
+
+            # Open the Mousepad text editor (comes with XFCE)
+            # Double-click on the desktop to deselect, then use the app menu
+            await desktop.key("ctrl+alt+t")  # Open terminal
+            await asyncio.sleep(2)
+            await desktop.type("mousepad /tmp/notes.txt &")
+            await desktop.key("Return")
+            await asyncio.sleep(3)
+
+            # Type content into the editor
+            await desktop.type("Meeting Notes")
+            await desktop.key("Return")
+            await desktop.key("Return")
+            await desktop.type("1. Review Q4 targets")
+            await desktop.key("Return")
+            await desktop.type("2. Plan sprint backlog")
+            await desktop.key("Return")
+            await desktop.type("3. Assign action items")
+
+            # Save the file with Ctrl+S
+            await desktop.key("ctrl+s")
+            await asyncio.sleep(1)
+
+            # Take a screenshot to verify
+            screenshot = await desktop.screenshot()
+            with open("workflow_result.png", "wb") as f:
+                f.write(base64.b64decode(screenshot["data"]))
+            print("Workflow complete — screenshot saved to workflow_result.png")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```javascript title="workflow.js"
+    import { ComputerBox } from '@boxlite-ai/boxlite';
+    import { writeFileSync } from 'fs';
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function main() {
+      const desktop = new ComputerBox({ cpus: 2, memoryMib: 2048 });
+      try {
+        await desktop.waitUntilReady();
+
+        // Open the Mousepad text editor (comes with XFCE)
+        await desktop.key('ctrl+alt+t');  // Open terminal
+        await sleep(2000);
+        await desktop.type('mousepad /tmp/notes.txt &');
+        await desktop.key('Return');
+        await sleep(3000);
+
+        // Type content into the editor
+        await desktop.type('Meeting Notes');
+        await desktop.key('Return');
+        await desktop.key('Return');
+        await desktop.type('1. Review Q4 targets');
+        await desktop.key('Return');
+        await desktop.type('2. Plan sprint backlog');
+        await desktop.key('Return');
+        await desktop.type('3. Assign action items');
+
+        // Save the file with Ctrl+S
+        await desktop.key('ctrl+s');
+        await sleep(1000);
+
+        // Take a screenshot to verify
+        const screenshot = await desktop.screenshot();
+        writeFileSync('workflow_result.png', Buffer.from(screenshot.data, 'base64'));
+        console.log('Workflow complete — screenshot saved to workflow_result.png');
+      } finally {
+        await desktop.stop();
+      }
+    }
+
+    main();
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  You can also view the desktop live in your browser at `http://localhost:3000` (or whatever port you set with `gui_http_port`). This is helpful for debugging automation scripts — watch what's happening in real time while your code runs.
+</Tip>
+
+## Constructor options
+
+| Parameter | Python | Node.js | Default | Description |
+|-----------|--------|---------|---------|-------------|
+| CPU cores | `cpu` | `cpus` | `2` | Number of CPU cores |
+| Memory | `memory` | `memoryMib` | `2048` | Memory in MiB |
+| HTTP port | `gui_http_port` | `guiHttpPort` | `3000` | Port for browser-based desktop access |
+| HTTPS port | `gui_https_port` | `guiHttpsPort` | `3001` | Port for secure desktop access |
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Automate a browser" icon="globe" href="/tutorials/browser-automation">
+    Use BrowserBox for browser-only automation with Playwright or Puppeteer — lighter than a full desktop.
+  </Card>
+  <Card title="Handle errors and debug" icon="bug" href="/tutorials/error-handling">
+    Catch exceptions, handle timeouts, and debug failures in your automation scripts.
+  </Card>
+  <Card title="ComputerBox API reference" icon="book" href="/reference/python/box-types#computerbox">
+    Full API docs for all mouse, keyboard, and display methods.
+  </Card>
+  <Card title="Connect to an LLM" icon="robot" href="/tutorials/llm-integration">
+    Give an LLM the ability to control a desktop by wiring up ComputerBox to function calling.
+  </Card>
+</CardGroup>
