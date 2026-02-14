@@ -11,12 +11,12 @@ Complete reference for BoxLite APIs, configuration, and error handling.
 
 Complete API documentation for each SDK:
 
-| SDK | Version | Description |
-|-----|---------|-------------|
-| **Python** | 0.5.11 (stable) | Async/sync API, box types, metrics |
-| **Node.js** | 0.2.8 | TypeScript definitions, box types, CDP endpoints |
-| **Rust** | Native | Core runtime, stream APIs, security options |
-| **C** | 0.5.11 | FFI bindings, JSON API, callback streaming |
+| SDK | Description |
+|-----|-------------|
+| **Python** | Async/sync API, box types, metrics |
+| **Node.js** | TypeScript definitions, box types, CDP endpoints |
+| **Rust** | Core runtime, stream APIs, security options |
+| **C** | FFI bindings, JSON API, callback streaming |
 
 <CardGroup cols={2}>
   <Card title="Python SDK" icon="python" href="/reference/python/index">
@@ -113,204 +113,12 @@ For complete C API documentation, see **[C API Reference](/reference/c/index)**.
 
 ## Configuration Reference
 
-### BoxOptions Parameters
-
-Complete reference for box configuration options.
-
-#### `image: String`
-
-OCI image URI to use for the box rootfs.
-
-**Format:** `[registry/]repository[:tag]`
-
-**Default:** `"python:slim"` (for Python SDK convenience wrappers)
-
-**Examples:**
-
-```python
-# Docker Hub (default registry)
-image="python:3.11-slim"
-image="alpine:latest"
-image="ubuntu:22.04"
-
-# GitHub Container Registry
-image="ghcr.io/owner/repo:tag"
-
-# Amazon ECR
-image="123456.dkr.ecr.us-east-1.amazonaws.com/repo:tag"
-
-# Google Container Registry
-image="gcr.io/project/image:tag"
-```
-
-<Note>
-Images are pulled on first use and cached in `~/.boxlite/images/`. Layer-level caching ensures fast subsequent starts. For private registries, use registry-specific authentication (Docker credentials, etc.).
-</Note>
-
-#### `cpus: int`
-
-Number of CPU cores allocated to the box.
-
-**Default:** 1
-
-**Range:** 1 to host CPU count
-
-**Example:**
-
-```python
-cpus=2  # 2 CPU cores
-cpus=4  # 4 CPU cores
-```
-
-<Note>
-CPU scheduling is proportional (shares-based). It does not reserve physical cores, just scheduling weight. Monitor actual usage with `box.metrics().cpu_time_ms`.
-</Note>
-
-#### `memory_mib: int`
-
-Memory limit in mebibytes (MiB).
-
-**Default:** 2048
-
-**Range:** 128 to 65536 (64 GiB)
-
-**Example:**
-
-```python
-memory_mib=1024   # 1 GB
-memory_mib=2048   # 2 GB
-memory_mib=4096   # 4 GB
-```
-
-<Note>
-1 MiB = 1024 KiB = 1,048,576 bytes. Minimum 128 MiB is required for most images. Out of memory kills the box process. Monitor with `box.metrics().memory_usage_bytes`.
-</Note>
-
-#### `disk_size_gb: int | None`
-
-Create a persistent QCOW2 disk image.
-
-**Default:** `None` (ephemeral storage only)
-
-**Range:** 1 to 1024 (1 TB)
-
-**Example:**
-
-```python
-disk_size_gb=None   # Ephemeral (default)
-disk_size_gb=10     # 10 GB persistent disk
-disk_size_gb=100    # 100 GB persistent disk
-```
-
-<Note>
-Disk persists across stop/restart. Stored at `~/.boxlite/boxes/{box-id}/disk.qcow2`. Uses copy-on-write (thin provisioned). Deleted when box is removed.
-</Note>
-
-#### `working_dir: str`
-
-Working directory for command execution inside the box.
-
-**Default:** `"/root"`
-
-**Example:**
-
-```python
-working_dir="/app"
-working_dir="/home/user/project"
-```
-
-<Note>
-Directory must exist in the container image. Commands execute with this as `$PWD`.
-</Note>
-
-#### `env: List[Tuple[str, str]]`
-
-Environment variables as (key, value) pairs.
-
-**Default:** `[]` (inherit from image)
-
-**Example:**
-
-```python
-env=[
-    ("DATABASE_URL", "postgresql://localhost/db"),
-    ("API_KEY", "secret"),
-    ("DEBUG", "true"),
-    ("PATH", "/custom/bin:/usr/bin:/bin"),  # Override PATH
-]
-```
-
-<Note>
-Variables are appended to the image environment. Use to override image defaults (e.g., `PATH`). Sensitive values (API keys, passwords) are visible in box metadata.
-</Note>
-
-#### `volumes: List[Tuple[str, str, str]]`
-
-Volume mounts as (host_path, guest_path, mode) tuples.
-
-**Format:** `(host_path, guest_path, "ro"|"rw")`
-
-**Default:** `[]` (no mounts)
-
-**Example:**
-
-```python
-volumes=[
-    # Read-only mount (data input)
-    ("/host/config", "/etc/app/config", "ro"),
-
-    # Read-write mount (data output)
-    ("/host/data", "/mnt/data", "rw"),
-
-    # Home directory mount
-    (os.path.expanduser("~/Documents"), "/mnt/docs", "ro"),
-]
-```
-
-<Note>
-Uses virtiofs for high-performance file sharing. Host path must exist before box creation. Guest path is created automatically if missing. Changes to `rw` mounts are visible on host immediately.
-</Note>
-
-#### `ports: List[Tuple[int, int, str]]`
-
-Port forwarding as (host_port, guest_port, protocol) tuples.
-
-**Format:** `(host_port, guest_port, "tcp"|"udp")`
-
-**Default:** `[]` (no port forwarding)
-
-**Example:**
-
-```python
-ports=[
-    (8080, 80, "tcp"),      # HTTP
-    (8443, 443, "tcp"),     # HTTPS
-    (5432, 5432, "tcp"),    # PostgreSQL
-    (53, 53, "udp"),        # DNS
-    (3000, 8000, "tcp"),    # Custom mapping
-]
-```
-
-<Note>
-Uses gvproxy for NAT port mapping. Host port must be available (not in use). Multiple boxes can forward to same host port (error if conflict). Supports both TCP and UDP protocols.
-</Note>
-
-#### `auto_remove: bool`
-
-Automatically remove box when stopped.
-
-**Default:** `True`
-
-**Example:**
-
-```python
-auto_remove=True   # Auto cleanup (default)
-auto_remove=False  # Manual cleanup required
-```
-
-<Note>
-When `True`, box is removed when context exits or `stop()` is called. When `False`, box persists after stop and can be restarted with `runtime.get(box_id)`. Manual cleanup is done with `await box.remove()`.
-</Note>
+For complete BoxOptions parameter documentation, see the SDK-specific pages:
+
+- [Python BoxOptions](/reference/python/box-types#boxoptions) — `image`, `cpus`, `memory_mib`, `volumes`, `ports`, `env`, etc.
+- [Node.js JsBoxOptions](/reference/nodejs/index#jsoptions) — TypeScript interface
+- [Rust BoxOptions](/reference/rust/box-config) — Struct definition with `RootfsSpec`, `SecurityOptions`, etc.
+- [C JSON Schema](/reference/c/memory-json-threading#json-schema-reference) — JSON format for `boxlite_create_box()`
 
 ### Runtime Options
 
@@ -335,137 +143,30 @@ Base directory for BoxLite runtime data.
 └── db/           # SQLite databases (boxes.db, images.db)
 ```
 
-**Example:**
-
-```python
-# Custom home directory
-runtime = boxlite.Boxlite(boxlite.Options(home_dir="/custom/path"))
-```
-
 ### Environment Variables
 
-#### `BOXLITE_HOME`
-
-Override default runtime home directory.
-
-**Default:** `~/.boxlite`
-
-**Example:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BOXLITE_HOME` | `~/.boxlite` | Override runtime home directory |
+| `RUST_LOG` | - | Debug logging level (`trace`, `debug`, `info`, `warn`, `error`) |
+| `BOXLITE_TMPDIR` | System temp | Override temporary directory |
 
 ```bash
-export BOXLITE_HOME=/custom/boxlite
-python script.py
-```
-
-#### `RUST_LOG`
-
-Enable debug logging for troubleshooting.
-
-**Levels:** `trace`, `debug`, `info`, `warn`, `error`
-
-**Example:**
-
-```bash
-# Debug logging
+# Example: enable debug logging
 RUST_LOG=debug python script.py
 
-# Trace logging (very verbose)
-RUST_LOG=trace python script.py
-
-# Module-specific logging
+# Example: module-specific logging
 RUST_LOG=boxlite::runtime=debug python script.py
-```
-
-#### `BOXLITE_TMPDIR`
-
-Override temporary directory for BoxLite operations.
-
-**Default:** System temp directory (`/tmp` on Linux/macOS)
-
-**Example:**
-
-```bash
-export BOXLITE_TMPDIR=/custom/tmp
-python script.py
 ```
 
 ## Error Codes & Handling
 
-For a detailed breakdown of error types and handling patterns, see the error documentation for each SDK:
+For detailed error types and handling patterns, see the SDK-specific error pages:
 
-- [Python SDK Errors & Metrics](/reference/python/errors-metrics)
-
-### Error Types
-
-BoxLite uses a centralized error enum with specific variants for different error categories.
-
-| Error | Description |
-|-------|-------------|
-| `UnsupportedEngine` | Platform or hypervisor not supported |
-| `Engine(String)` | Hypervisor or VM engine error |
-| `Config(String)` | Invalid box configuration |
-| `Storage(String)` | Filesystem or disk operation error |
-| `Image(String)` | OCI image pull or extraction error |
-| `Portal(String)` | Host-guest communication error (gRPC over vsock) |
-| `Network(String)` | Network configuration or connectivity error |
-| `Execution(String)` | Command execution error |
-| `Internal(String)` | Internal BoxLite error |
-| `NotFound(String)` | Box or resource not found |
-| `AlreadyExists(String)` | Box or resource already exists |
-| `InvalidState(String)` | Box is in wrong state for requested operation |
-
-### Error Handling Pattern (Python)
-
-```python
-import boxlite
-
-async def safe_execution():
-    try:
-        async with boxlite.SimpleBox(image="python:slim") as box:
-            result = await box.exec("python", "script.py")
-
-            # Check exit code
-            if result.exit_code != 0:
-                print(f"Command failed: {result.stderr}")
-                return
-
-    except Exception as e:
-        # All BoxLite errors are raised as Python exceptions
-        print(f"Error: {e}")
-
-        # Enable debug logging for details
-        # RUST_LOG=debug python script.py
-```
-
-### Error Handling Pattern (Rust)
-
-```rust
-use boxlite::{BoxliteRuntime, BoxliteError, BoxliteResult};
-
-fn main() -> BoxliteResult<()> {
-    let runtime = BoxliteRuntime::default_runtime();
-
-    match runtime.create(options) {
-        Ok((box_id, litebox)) => {
-            // Success
-        }
-        Err(BoxliteError::UnsupportedEngine) => {
-            eprintln!("Platform not supported");
-            return Err(BoxliteError::UnsupportedEngine);
-        }
-        Err(BoxliteError::Image(msg)) => {
-            eprintln!("Image error: {}", msg);
-            // Handle image-specific error
-        }
-        Err(e) => {
-            eprintln!("Unexpected error: {}", e);
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-```
+- [Python Errors & Metrics](/reference/python/errors-metrics)
+- [Node.js Errors & Metrics](/reference/nodejs/errors-metrics)
+- [Rust Errors & Metrics](/reference/rust/errors-metrics)
+- [C Errors & Metrics](/reference/c/errors-metrics)
 
 ## File Formats
 
