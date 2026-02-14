@@ -7,7 +7,6 @@ icon: "python"
 
 Complete API reference for the BoxLite Python SDK.
 
-**Version:** 0.5.11
 **Python:** 3.10+
 **Platforms:** macOS (Apple Silicon), Linux (x86_64, ARM64)
 
@@ -86,7 +85,7 @@ Configuration options for creating a box.
 | `memory_mib` | `int` | `2048` | Memory limit in MiB (128-65536) |
 | `disk_size_gb` | `int \| None` | `None` | Persistent disk size in GB (None = ephemeral) |
 | `working_dir` | `str` | `"/root"` | Working directory inside container |
-| `env` | `Dict[str, str]` | `{}` | Environment variables as key-value pairs |
+| `env` | `List[Tuple[str, str]]` | `[]` | Environment variables as (key, value) pairs |
 | `volumes` | `List[Tuple[str, str, bool]]` | `[]` | Volume mounts as (host_path, guest_path, read_only) |
 | `ports` | `List[Tuple[int, int, str]]` | `[]` | Port forwarding as (host_port, guest_port, protocol) |
 | `auto_remove` | `bool` | `True` | Auto cleanup when stopped |

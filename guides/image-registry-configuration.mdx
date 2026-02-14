@@ -85,79 +85,85 @@ The SDKs are "pure" by design. They **do not** automatically load any configurat
 1. **Programmatic Options**: You explicitly pass the list of registries when initializing the runtime.
 2. **Default**: `docker.io` (if you pass an empty list or nothing).
 
-<CodeGroup>
-```python Python
-import boxlite
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import boxlite
 
-# Configure a runtime to search ghcr.io first, then docker.io
-options = boxlite.Options(
-    image_registries=["ghcr.io", "docker.io"]
-)
-runtime = boxlite.Boxlite(options)
+    # Configure a runtime to search ghcr.io first, then docker.io
+    options = boxlite.Options(
+        image_registries=["ghcr.io", "docker.io"]
+    )
+    runtime = boxlite.Boxlite(options)
 
-# When creating a box, 'alpine' will be tried as:
-# 1. ghcr.io/library/alpine
-# 2. docker.io/library/alpine
-async with boxlite.SimpleBox(image="alpine", runtime=runtime) as box:
-    await box.exec("echo", "Hello!")
-```
+    # When creating a box, 'alpine' will be tried as:
+    # 1. ghcr.io/library/alpine
+    # 2. docker.io/library/alpine
+    async with boxlite.SimpleBox(image="alpine", runtime=runtime) as box:
+        await box.exec("echo", "Hello!")
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { JsBoxlite, SimpleBox } from '@boxlite-ai/boxlite';
 
-```javascript Node.js
-import { JsBoxlite, SimpleBox } from '@boxlite-ai/boxlite';
+    // Configure a runtime to search ghcr.io first, then docker.io
+    const runtime = new JsBoxlite({
+      imageRegistries: ['ghcr.io', 'docker.io']
+    });
 
-// Configure a runtime to search ghcr.io first, then docker.io
-const runtime = new JsBoxlite({
-  imageRegistries: ['ghcr.io', 'docker.io']
-});
+    // Pass the custom runtime to the box constructor
+    const box = new SimpleBox({
+      image: 'alpine',
+      runtime: runtime
+    });
 
-// Pass the custom runtime to the box constructor
-const box = new SimpleBox({
-  image: 'alpine',
-  runtime: runtime
-});
-
-await box.exec('echo', 'Hello!');
-```
-</CodeGroup>
+    await box.exec('echo', 'Hello!');
+    ```
+  </Tab>
+</Tabs>
 
 ### Advanced: Loading Config in SDKs
 
 If you want your SDK application to respect a configuration file, you can manually load it. This puts the control in your hands.
 
-<CodeGroup>
-```python Python
-import boxlite
-import json
-from pathlib import Path
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import boxlite
+    import json
+    from pathlib import Path
 
-def load_boxlite_options(config_path: str):
-    """Load BoxLite options from a configuration file."""
-    with open(config_path) as f:
-        config = json.load(f)
+    def load_boxlite_options(config_path: str):
+        """Load BoxLite options from a configuration file."""
+        with open(config_path) as f:
+            config = json.load(f)
 
-    return boxlite.Options(
-        image_registries=config.get("image_registries", [])
-    )
+        return boxlite.Options(
+            image_registries=config.get("image_registries", [])
+        )
 
-# Use it
-runtime = boxlite.Boxlite(load_boxlite_options("./config.json"))
-```
+    # Use it
+    runtime = boxlite.Boxlite(load_boxlite_options("./config.json"))
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    import { readFileSync } from 'fs';
+    import { JsBoxlite } from '@boxlite-ai/boxlite';
 
-```typescript Node.js
-import { readFileSync } from 'fs';
-import { JsBoxlite } from '@boxlite-ai/boxlite';
+    function loadBoxliteRuntime(configPath: string): JsBoxlite {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+      return new JsBoxlite({
+        imageRegistries: config.image_registries ?? [],
+      });
+    }
 
-function loadBoxliteRuntime(configPath: string): JsBoxlite {
-  const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-  return new JsBoxlite({
-    imageRegistries: config.image_registries ?? [],
-  });
-}
-
-// Use it
-const runtime = loadBoxliteRuntime('./config.json');
-```
-</CodeGroup>
+    // Use it
+    const runtime = loadBoxliteRuntime('./config.json');
+    ```
+  </Tab>
+</Tabs>
 
 ---
 
