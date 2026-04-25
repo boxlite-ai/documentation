@@ -7,23 +7,38 @@
     "light": "#FFFFFF",
     "dark": "#000000"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
   "navigation": {
     "tabs": [
       {
         "tab": "BoxLite",
         "groups": [
           {
-            "group": "Getting Started",
+            "group": "Introduction",
             "pages": [
               "index",
-              "getting-started/index",
+              "getting-started/design-principles"
+            ]
+          },
+          {
+            "group": "Get Started",
+            "pages": [
+              "getting-started/install",
               "getting-started/quickstart-python",
               "getting-started/quickstart-nodejs",
               "getting-started/quickstart-rust",
-              "getting-started/quickstart-c",
+              "getting-started/quickstart-c"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
               "getting-started/core-concepts",
-              "getting-started/design-principles"
+              "concepts/lifecycle",
+              "concepts/execution",
+              "concepts/filesystem",
+              "concepts/network",
+              "concepts/snapshot"
             ]
           },
           {
@@ -39,11 +54,12 @@
               "tutorials/interactive-terminal",
               "tutorials/run-any-language",
               "tutorials/long-running-services",
+              "tutorials/snapshot-fork-restore",
               "tutorials/error-handling"
             ]
           },
           {
-            "group": "Guides",
+            "group": "How-to Guides",
             "pages": [
               "guides/index",
               "guides/ai-agent-integration",
@@ -95,6 +111,20 @@
                   "reference/c/memory-json-threading",
                   "reference/c/errors-metrics"
                 ]
+              },
+              {
+                "group": "Go SDK",
+                "icon": "golang",
+                "pages": [
+                  "reference/go/index"
+                ]
+              },
+              {
+                "group": "REST API",
+                "icon": "globe",
+                "pages": [
+                  "reference/rest/index"
+                ]
               }
             ]
           },
@@ -112,13 +142,6 @@
             "pages": [
               "faq",
               "guides/changelog"
-            ]
-          },
-          {
-            "group": "Development",
-            "pages": [
-              "development/cli",
-              "development/rust-style"
             ]
           }
         ]

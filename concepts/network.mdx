@@ -1,0 +1,82 @@
+---
+title: "Network"
+sidebarTitle: "Network"
+description: "Outbound allowlists, port forwarding, and host-side secret injection — what the SDK exposes for shaping a box's network."
+icon: "network-wired"
+---
+
+Networking in BoxLite has four moving parts: the bridge that gets traffic in and out, an outbound allowlist, inbound port forwarding, and host-side secret substitution. They compose, but each is small enough to understand on its own.
+
+## NetworkSpec
+
+`BoxOptions.network` accepts a network config with two fields:
+
+| Field | Values | Purpose |
+|---|---|---|
+| `mode` | `"enabled"` (default) \| `"disabled"` | Whether the guest has any network at all |
+| `allow_net` | list of host patterns | Outbound destinations the guest may reach |
+
+`mode="disabled"` removes the guest interface entirely — the box has no network at all, host or otherwise. `mode="enabled"` is the default and is the only mode that respects `allow_net`.
+
+### Allowlist semantics
+
+`allow_net` is a list of host patterns the guest is allowed to reach for outbound traffic. Anything not on the list is dropped before it leaves the host. Patterns are matched against the destination host of HTTP(S) traffic and DNS.
+
+For an AI-agent box, the typical shape is:
+
+```python
+boxlite.SimpleBox(
+    image="python:slim",
+    network=boxlite.NetworkConfig(
+        mode="enabled",
+        allow_net=["api.openai.com", "pypi.org", "files.pythonhosted.org"],
+    ),
+)
+```
+
+If you want a box that genuinely cannot phone home, set `mode="disabled"` — but be aware this also blocks `pip install` and any image-pull-time package fetches.
+
+## Inbound — port forwarding
+
+`BoxOptions.ports` is a list of `(host_port, guest_port, protocol)` tuples (`protocol` ∈ `"tcp" | "udp"`). When the box is running, the host port is mapped to the guest port — exactly the model `docker run -p` uses, but on a real micro-VM.
+
+This is what makes [Tutorials → Run services with port forwarding](/tutorials/long-running-services) work: start a server inside the guest, expose its port, hit it from the host.
+
+Per-box network metrics are reported back via `BoxMetrics.network_bytes_sent` / `network_bytes_received` (visible on `GET /v1/{prefix}/boxes/{box_id}/metrics`).
+
+## Secrets — host-side substitution
+
+`BoxOptions.secrets` is the safe alternative to passing API keys in environment variables. Each entry has four fields:
+
+| Field | Purpose |
+|---|---|
+| `name` | Human-readable label, e.g. `"openai_api_key"`. |
+| `hosts` | Host patterns where injection happens (e.g. `["api.openai.com"]`). |
+| `placeholder` | The string the guest sees. Defaults to `<BOXLITE_SECRET:{name}>`. |
+| `value` | The real value. Never enters the VM. |
+
+BoxLite intercepts the guest's outbound HTTPS at the host boundary and substitutes the placeholder with the real value, only for matching hosts. Inside the guest you see — and your code logs — only the placeholder string. The real secret never crosses into the VM, so a guest compromise can't exfiltrate it directly.
+
+Secrets are also surfaced as environment variables. A secret named `openai` with placeholder `<BOXLITE_SECRET:openai>` becomes `BOXLITE_SECRET_OPENAI=<BOXLITE_SECRET:openai>` inside the box (uppercase, with non-alphanumeric characters in the name replaced by `_`). Guest code can read the env var and embed the placeholder anywhere — Authorization headers, JSON bodies, query strings — and the proxy will rewrite it on the way out.
+
+## No host-side privileges required
+
+BoxLite ships its own user-space network bridge, so the host never needs kernel-level networking changes — no TUN devices, no `sudo`, no daemon. Inbound and outbound traffic both pass through this bridge, which is why allowlists and port forwarding work uniformly across macOS, Linux (KVM), and Windows (WSL2).
+
+## Picking a configuration
+
+| Scenario | `mode` | `allow_net` | `ports` | `secrets` |
+|---|---|---|---|---|
+| Untrusted code, no network at all | `Disabled` | — | — | — |
+| Untrusted code that needs `pip install` | `Enabled` | `["pypi.org", "files.pythonhosted.org"]` | — | — |
+| Agent calling one API | `Enabled` | `["api.openai.com"]` | — | one `Secret` for the API key |
+| Run a server, hit it from host | `Enabled` | (set if outbound is needed) | `[(host_port, guest_port, "tcp")]` | — |
+
+Each row maps directly onto a box-creation call — see the per-language [SDK reference](/reference/index) for the exact field names.
+
+## See also
+
+- [Tutorials → Run services with port forwarding](/tutorials/long-running-services) — task form for the inbound case.
+- [Architecture → Networking & storage](/architecture/networking-storage) — host-side network bridge and storage internals.
+- [Architecture → Security & isolation](/architecture/security) — how the network boundary fits the broader threat model.
+- [How-to guides → AI Agent Integration](/guides/ai-agent-integration) — `network_enabled` interaction with security presets.

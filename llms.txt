@@ -2,14 +2,21 @@
 
 > BoxLite is a local-first micro-VM sandbox for AI agents — stateful, lightweight, hardware-level isolation, no daemon required.
 
-## Getting Started
+## Introduction
 
 - [Introduction](/index.mdx): BoxLite overview, features, and quick start
-- [Installation](/getting-started/index.mdx): Install BoxLite for Python, Node.js, Rust, or C
+- [Why BoxLite](/getting-started/design-principles.mdx): Design principles and how BoxLite compares to other sandboxes
+
+## Get Started
+
+- [Installation](/getting-started/install.mdx): Install BoxLite for Python, Node.js, Rust, or C
 - [Python Quick Start](/getting-started/quickstart-python.mdx): Get started with BoxLite in Python
 - [Node.js Quick Start](/getting-started/quickstart-nodejs.mdx): Get started with BoxLite in Node.js
 - [Rust Quick Start](/getting-started/quickstart-rust.mdx): Get started with BoxLite in Rust
 - [C Quick Start](/getting-started/quickstart-c.mdx): Get started with BoxLite in C
+
+## Concepts
+
 - [Core Concepts](/getting-started/core-concepts.mdx): Boxes, images, execution model, and lifecycle
 
 ## Tutorials
@@ -26,14 +33,13 @@
 - [Run services with port forwarding](/tutorials/long-running-services.mdx): Start servers, forward ports, access from host
 - [Handle errors and debug](/tutorials/error-handling.mdx): Exit codes, exceptions, timeouts, streaming
 
-## Guides
+## How-to Guides
 
-- [Guides Overview](/guides/index.mdx): Advanced patterns and configuration guides
+- [How-to Guides Overview](/guides/index.mdx): Production patterns and configuration guides
 - [AI Agent Integration](/guides/ai-agent-integration.mdx): Concurrency, timeouts, security presets
 - [Building from Source](/guides/building-from-source.mdx): Compile BoxLite from source
 - [Image Registry Configuration](/guides/image-registry-configuration.mdx): Configure OCI image registries
 - [macOS Sandbox Debugging](/guides/macos-sandbox-debugging.mdx): Debug sandbox issues on macOS
-- [Changelog](/guides/changelog.mdx): Release history
 
 ## SDK Reference
 
@@ -74,15 +80,7 @@
 - [Security & Isolation](/architecture/security.mdx): Security model and isolation guarantees
 - [Networking & Storage](/architecture/networking-storage.mdx): Network and storage configuration
 
-## BoxRun
-
-- [BoxRun Overview](/boxrun/index.mdx): Managed sandbox platform
-- [BoxRun Quick Start](/boxrun/quickstart.mdx): Get started with BoxRun
-- [BoxRun CLI](/boxrun/cli.mdx): Command-line reference
-- [BoxRun Python SDK](/boxrun/python-sdk.mdx): Python SDK for BoxRun
-- [BoxRun REST API](/boxrun/rest-api.mdx): REST API reference
-- [BoxRun Configuration](/boxrun/configuration.mdx): Configuration options
-
-## FAQ
+## Resources
 
 - [FAQ & Troubleshooting](/faq.mdx): Common questions and solutions
+- [Changelog](/guides/changelog.mdx): Release history

@@ -1,0 +1,109 @@
+---
+title: "Execution model"
+sidebarTitle: "Execution"
+description: "How exec, run, streaming, PTY, and timeouts work — the contract between your code and the guest."
+icon: "terminal"
+---
+
+`exec` is the workhorse of every box. This page describes what actually happens when you call it, the difference between `exec` and `run`, and how stdin/stdout/stderr/timeouts/PTY interact.
+
+## `exec` is the primitive; `run` is sugar
+
+- `SimpleBox.exec(cmd, *args)` is the underlying call. It spawns a new process inside the guest and gives you control over its lifecycle.
+- `CodeBox.run(code)` is a thin wrapper that calls `exec("python", "-c", code)`, with `install_package(...)` doing `exec("pip", "install", ...)` underneath. `CodeBox` extends `SimpleBox`, so `exec` is still available on a `CodeBox`.
+
+Picking between them is a matter of ergonomics, not capability — anything `run` does, `exec` can do verbatim.
+
+## Two return shapes
+
+Different SDK surfaces return different shapes by design:
+
+| Surface | Return type | Output | When to use |
+|---|---|---|---|
+| **Python `box.exec(...)`** | `Execution` handle | Streams via `execution.stdout()` / `stderr()`; collect or iterate | When you want streaming, kill, resize_tty |
+| **Python `await execution.wait()`** | `ExecResult` | Buffered `stdout` / `stderr` strings, `exit_code` | When you just want the final outcome |
+| **Node `SimpleBox.exec(...)`** | `ExecResult` (await once) | Buffered `stdout` / `stderr` strings, `exitCode` | The simple, one-shot case |
+| **Node `JsBoxlite` lower-level** | `Execution` handle | Streams; `await execution.wait()` for `ExecResult` | When you need streams or signal control |
+| **REST `POST .../exec`** | `{execution_id}` (immediate) | Stream via SSE on `.../output`; `exit` event carries `exit_code` | Always async on the wire |
+
+The two-shape design is intentional: the simple wrappers (`SimpleBox.exec` in Node, `CodeBox.run` in Python) buffer everything for a one-liner; the lower-level handles let you tail output in real time and kill the process. See [Reference](/reference/index) for each language's exact signature.
+
+## Streaming
+
+When you have an `Execution` handle, stdout and stderr are async iterators. Each yielded item is a chunk (line-buffered by the runtime), not a single character.
+
+```python
+execution = await box.exec("python", "-u", "-c",
+    "import time; [print(i) or time.sleep(0.5) for i in range(5)]")
+async for line in execution.stdout():
+    print("got:", line, end="")
+result = await execution.wait()
+```
+
+The REST equivalent is the SSE stream at `GET /v1/{prefix}/boxes/{box_id}/executions/{exec_id}/output` — events have `stdout` / `stderr` / `exit` types, and `stdout` / `stderr` payloads are base64-encoded.
+
+## stdin
+
+Each `Execution` exposes an stdin handle (`execution.stdin()` in Python, `execution.stdin()` in the Node low-level API). It is a write-only channel — feed bytes in, the guest sees them on file descriptor 0.
+
+This is what `InteractiveBox` uses to drive a shell session.
+
+## Timeouts and kill
+
+`exec` itself does not enforce a timeout. Cancelling the awaitable in your SDK only cancels your local future — the guest process keeps running. To actually stop a guest process, call:
+
+```python
+await execution.kill()           # default signal SIGKILL
+await execution.kill("SIGTERM")  # custom signal
+```
+
+Because of this, the canonical timeout pattern in production is:
+
+```python
+try:
+    result = await asyncio.wait_for(execution.wait(), timeout=30)
+except asyncio.TimeoutError:
+    await execution.kill()
+    raise
+```
+
+This pattern is documented end-to-end in [How-to guides → AI Agent Integration](/guides/ai-agent-integration#timeout-handling-and-zombie-prevention).
+
+## Exit codes
+
+`exit_code` is the guest process's exit status — straight from the kernel. The same conventions as Linux apply:
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Success |
+| `1`–`125` | Application-defined |
+| `127` | Command not found |
+| `128 + N` | Killed by signal `N` (`137` = `SIGKILL`, `143` = `SIGTERM`) |
+
+Exit code `137` from a memory-limited box almost always means the in-guest OOM killer fired. The box itself stays `running`; only the offending process dies. See [How-to guides → AI Agent Integration → Memory limits and OOM](/guides/ai-agent-integration#memory-limits-and-oom) for the recovery pattern.
+
+## PTY (`tty=True`)
+
+Pass `tty=True` to `exec` to allocate a pseudo-terminal. Two effects:
+
+1. The guest sees a real TTY on fds 0/1/2, so programs that switch behaviour based on `isatty(stdin)` (REPLs, `top`, colourised CLIs) will use the TTY path.
+2. `execution.resize_tty(rows, cols)` becomes valid (both arguments are unsigned integers). Calling it on a non-TTY execution returns an error.
+
+`InteractiveBox` is the high-level wrapper around this — it sets up the TTY, hooks stdin/stdout, and gives you `wait()` to block until the session ends.
+
+## Working directory, env, user
+
+Available on every `exec`:
+
+- `cwd` — directory inside the guest. Defaults to the image's `WORKDIR` (often `/`).
+- `env` — extra environment variables, merged on top of the box's own `env`.
+- `user` — `"name"` or `"uid:gid"`. Without this, the guest entrypoint's default user runs the command.
+
+These are the levers you tune when integrating an AI agent that expects a specific account or working directory.
+
+## See also
+
+- [Lifecycle](/concepts/lifecycle) — `exec` triggers an implicit start when the box is `configured` or `stopped`.
+- [Tutorials → Execute AI-generated code](/tutorials/code-execution) — the same primitives in task form.
+- [Tutorials → Interactive terminal](/tutorials/interactive-terminal) — TTY-driven sessions.
+- [Tutorials → Handle errors and debug](/tutorials/error-handling) — exit codes, exceptions, timeouts.

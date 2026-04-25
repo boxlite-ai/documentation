@@ -1,0 +1,77 @@
+---
+title: "Snapshot, clone, export"
+sidebarTitle: "Snapshot"
+description: "Three different ways to capture box state, and what each one can and cannot do."
+icon: "camera"
+---
+
+These are three operations that look similar from the outside but solve different problems. They share one important boundary: **all three are disk-only.** None of them captures memory, page cache, or in-flight I/O.
+
+## What is captured
+
+Every snapshot exposes the same shape across the SDKs and the REST API:
+
+| Field | Purpose |
+|---|---|
+| `id` | Server-generated identifier |
+| `box_id` | The box this snapshot belongs to |
+| `name` | Your label, unique per box (≤ 255 characters; `.` and `..` are rejected) |
+| `created_at` | Unix timestamp of capture |
+| `size_bytes` / `container_disk_bytes` | Disk footprint, in bytes |
+
+Behind the metadata, BoxLite keeps a single QCOW2 disk image per snapshot under the BoxLite home directory (`~/.boxlite/boxes/{box_id}/snapshots/`). That disk image is the immutable container disk at the moment of capture. Nothing else is captured.
+
+## What is not captured
+
+- **Process state.** Running PIDs are not preserved. After `restore()`, the box is brought up like a fresh start — your daemons, shell sessions, and exec'd commands are gone.
+- **Memory pages.** No memory checkpoint exists today. `SnapshotOptions` is currently a forward-compatible empty struct in the public SDKs — the field is reserved for future memory-capture work.
+- **Host volumes.** Volume mounts are a host concern; they aren't part of the snapshot, so writes to a volume between snapshot and restore are not undone.
+- **Open network connections.** Sockets are dropped when the VM shuts down for the snapshot.
+
+If a workflow assumes "rewind to exactly what was running" — including a half-finished syscall — BoxLite cannot do that today. Plan for "rewind disk state, then re-run from a known prefix instead."
+
+## Snapshot vs clone vs export
+
+| Op | Captures | Result | Stays inside the runtime? |
+|---|---|---|---|
+| `snapshot(name)` | Container disk at point in time | A named entry under the source box | Yes |
+| `clone()` | Container disk at point in time | A **new box** with its own `box_id`, ready to run | Yes |
+| `export()` / `import()` | Container disk + box config metadata | A portable archive on disk | No (movable across hosts) |
+
+In other words:
+
+- **Snapshot** is "I want to roll this *same* box back to here later." It's the cheapest of the three because nothing is duplicated up front.
+- **Clone** is "I want a second, independent box that starts from the same disk." Use this when you want to fork execution paths or stamp out N parallel copies.
+- **Export/import** is "I want to ship this state to another machine," or archive it. The archive is a regular file you can rsync.
+
+The three options structs are placeholders today (`SnapshotOptions`, `CloneOptions`, `ExportOptions` are empty in the public SDKs); the operations themselves are real and shipping.
+
+## Restore is destructive on the source
+
+`restore(name)` rolls the box's *current* disk back to the snapshot's disk. It is destructive — the writes you've done since the snapshot are gone. Two practical consequences:
+
+1. The runtime refuses to remove a snapshot whose disk the current box still depends on. The error is explicit: `"current disk depends on this snapshot. Restore a different snapshot first."`
+2. If you want to keep both timelines, take a fresh snapshot of the current state first, then restore.
+
+If you want both branches to remain live and runnable in parallel, use `clone` instead of `snapshot + restore`.
+
+## State machine interaction
+
+Snapshot, clone, and export all need a quiescent disk. The SDK briefly moves the box through the `paused` state for the duration of the operation, then returns it to `running`. This is one of the only places the `paused` state shows up in the public lifecycle (see [Lifecycle](/concepts/lifecycle)).
+
+## Where each operation surfaces
+
+| Surface | Snapshot create | Snapshot restore | Clone | Export / Import |
+|---|---|---|---|---|
+| Python | `await box.snapshot(name)` / `await box.restore(name)` | yes | `await box.clone()` | `await box.export(path)` / `runtime.import_box(path)` |
+| Node.js | same shape | yes | `await box.clone()` | `await box.export(path)` |
+| REST | `POST .../boxes/{id}/snapshots` | `POST .../snapshots/{name}/restore` | `POST .../clone` | `POST .../export`, `POST .../boxes/import` |
+| CLI | `boxlite snapshot ...` | `boxlite restore ...` | `boxlite clone ...` | `boxlite export ...` / `boxlite import ...` |
+
+For a full end-to-end walkthrough, see [Tutorials → Snapshot, fork, restore](/tutorials/snapshot-fork-restore).
+
+## See also
+
+- [Lifecycle](/concepts/lifecycle) — the `paused` state that snapshots use under the hood.
+- [Filesystem](/concepts/filesystem) — what's on `disk.qcow2` and what's outside it.
+- [REST API reference → Snapshots](/reference/rest/index#snapshots-over-rest) — the wire format.

@@ -1,0 +1,75 @@
+---
+title: "Filesystem"
+sidebarTitle: "Filesystem"
+description: "How files move in and out of a box, and how disks persist (or don't) across stop and restart."
+icon: "folder"
+---
+
+A box has its own filesystem rooted at the image's rootfs. This page is about the three mechanisms you actually have for moving data across that boundary, and what survives a `stop()`.
+
+## Three ways data crosses the boundary
+
+| Mechanism | Direction | Granularity | When to use |
+|---|---|---|---|
+| `copy_into` / `copy_out` | Both | Files or directories | One-shot transfers; results retrieval; dropping in a script |
+| Volume mount | Both, persistent while running | Path-level (host dir ↔ guest dir) | The host is the source of truth (a workspace, an artifact directory) |
+| stdin / stdout | Both, in-process | Bytes | Inline data with no on-disk artefact |
+
+`copy_into` / `copy_out` are exposed on the box object in every SDK; volumes are configured at box creation via `BoxOptions.volumes`. See the per-language [SDK reference](/reference/index) for the exact signatures.
+
+## Ephemeral vs persistent disks
+
+Every box has a container disk built from the OCI image. Whether changes outlive the VM depends on the `disk_size_gb` option on `BoxOptions`:
+
+- **`disk_size_gb` not set (default)** — disk lives only as long as the box. `stop()` followed by `auto_remove=true` drops everything. This is the right default for ad-hoc execution.
+- **`disk_size_gb = N`** — a persistent QCOW2 image is allocated for the container disk. `stop()` releases the VM but keeps the image; the next `start()` re-uses it. Files written under `/`, installed packages, and any in-place edits all survive.
+
+The on-disk layout per box, under the BoxLite home directory (`~/.boxlite/` by default):
+
+```
+~/.boxlite/boxes/{box_id}/
+├── disks/
+│   ├── disk.qcow2          # live container disk (COW child)
+│   └── guest-rootfs.qcow2  # the kernel/init rootfs
+└── snapshots/
+    └── snap-N/disk.qcow2   # immutable per-snapshot disk image
+```
+
+QCOW2 means the disk is sparse and grows as you write. Allocating `disk_size_gb=10` does not actually consume 10 GB on the host — it's a ceiling, not an upfront cost.
+
+## Volume mounts
+
+`BoxOptions.volumes` takes a list of `{ host_path, guest_path, read_only }` entries. A volume is the right answer when:
+
+- The host directory is the canonical place where data lives (e.g., a build directory you want to inspect from your editor).
+- You want to share data between multiple boxes without an intermediate copy.
+- You want write-protected access — set `read_only=true`.
+
+Volumes are wired only while the box is `running`. They are not part of the snapshot, the clone, or the export — they are a host concern, not a box concern.
+
+## Picking between copy and volume
+
+The rule of thumb:
+
+- **Inputs are small and per-task** → `copy_into`. Cheap, isolated, no host coupling.
+- **Inputs are big or shared** → volume. The host stays the source of truth; the box reads (or writes) in place.
+- **Outputs are artefacts** → `copy_out` after `exec()` finishes — predictable, atomic, simple.
+- **Outputs need to be tailed live** → write to a host-side volume, or use `exec` streaming if the data is line-oriented.
+
+## Cross-box sharing
+
+There is no built-in "shared filesystem" between boxes. The supported ways to share data are:
+
+1. A host-side volume mounted into both boxes (the simplest, fastest path).
+2. `copy_out` from one, `copy_into` the other.
+3. `clone()` if you want two boxes that start from the same point in time but then diverge — see [Snapshot, clone, export](/concepts/snapshot).
+
+## What does and doesn't roll back
+
+A snapshot captures only the **container disk** (`disk.qcow2`), not host volumes or in-flight writes from the guest's page cache. If you `restore()` a snapshot, anything you wrote on a mounted host volume is still there — that's a feature, not a bug.
+
+## See also
+
+- [Tutorials → Upload & download files](/tutorials/file-transfer) — task form, with all three methods.
+- [Architecture → Networking & storage](/architecture/networking-storage) — implementation details (QCOW2, COW chains, GC).
+- [Snapshot, clone, export](/concepts/snapshot) — what's captured and what isn't.
