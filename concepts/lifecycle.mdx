@@ -1,0 +1,83 @@
+---
+title: "Box lifecycle"
+sidebarTitle: "Lifecycle"
+description: "States a box moves through — from create to remove — and which operations are valid in each state."
+icon: "circle-nodes"
+---
+
+A box has a small, well-defined state machine. Reading this page once will save you a lot of guessing about why an SDK call returned `InvalidState`.
+
+## States
+
+A box is always in exactly one of these states:
+
+| State | Meaning |
+|---|---|
+| `configured` | Persisted to the database; no VM process yet. The state every newly-created box starts in. |
+| `running` | VM is alive and the in-guest agent is accepting commands. |
+| `stopping` | A graceful shutdown is in progress (transient). |
+| `stopped` | VM process terminated; the rootfs and any persistent disk are preserved. The box can be restarted. |
+| `paused` | VM frozen via `SIGSTOP` (used internally during snapshot or export for point-in-time consistency). |
+| `unknown` | The runtime can't determine the state — only seen during error recovery. |
+
+## Transitions
+
+The transitions BoxLite allows are:
+
+```
+configured ──────► running        (start succeeds)
+configured ──────► stopped        (start fails)
+running   ──────► stopping ──► stopped
+running   ──────► stopped         (crash)
+running   ◄──────► paused         (snapshot/export pause and resume)
+stopped   ──────► running          (restart)
+unknown   ──────► any              (recovery)
+```
+
+Anything not in that list is rejected by the SDK with an `InvalidState` error.
+
+## Which operations are valid in which state
+
+Each public lifecycle method has a precondition table baked into the state enum:
+
+| Operation | Valid from |
+|---|---|
+| `start()` | `configured`, `stopped` |
+| `stop()` | `running`, `paused` |
+| `remove()` | `configured`, `stopped`, `unknown` |
+| `exec()` | `configured`, `running`, `stopped` (for `configured` and `stopped`, an implicit `start()` runs first) |
+
+Implicit-start on `exec()` is the reason `async with boxlite.SimpleBox(...) as box: await box.exec(...)` works without an explicit `start()` — the wrapper relies on it.
+
+## Cross-process reattach
+
+A box's identity is its `box_id` (a ULID-style string the runtime hands you on `create`). Boxes are persisted in the runtime's local SQLite store, so any process running on the same host can reattach by id:
+
+```python
+runtime = boxlite.Boxlite.default()
+box = await runtime.get(box_id)   # state preserved, no re-create
+await box.exec("echo", "still here")
+```
+
+This works across process restarts and across users sharing the same `home_dir`. It's also how a long-running CLI client reconnects after a crash.
+
+## Auto-remove and detach
+
+`BoxOptions` exposes two flags that interact with the lifecycle:
+
+- `auto_remove` — defaults to `true`. When the box reaches `stopped` and `auto_remove` is set, the runtime also removes it. Most quickstart-style code relies on this behaviour.
+- `detach` — defaults to `false`. When set, the box keeps running after the parent process exits; you must reattach by id and stop it explicitly.
+
+`auto_remove=true` together with `detach=true` is rejected at creation time with a configuration error — a detached box that vanishes when its parent dies cannot be managed.
+
+## Where each state shows up in the SDKs
+
+- Python and Node SDKs surface state via `box.info()` / `box.status` and `runtime.list()`.
+- The REST API returns the lowercase string (`"configured"`, `"running"`, …) as the `status` field on `GET /v1/{prefix}/boxes/{box_id}`.
+- The `paused` state is currently driven only by the runtime itself during snapshot/export. There is no public `pause()` API.
+
+## See also
+
+- [Tutorials → Quick Start](/getting-started/quickstart-python) for the happy path through `configured → running → stopped`.
+- [Snapshot, clone, export](/concepts/snapshot) — uses the `paused` state internally.
+- [Execution](/concepts/execution) — what `exec` actually does, including implicit start.

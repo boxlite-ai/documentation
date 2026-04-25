@@ -1,10 +1,11 @@
 ---
-title: "Design principles"
-description: "The ideas behind BoxLite's architecture and API decisions."
+title: "Why BoxLite"
+sidebarTitle: "Why BoxLite"
+description: "The ideas behind BoxLite — embeddable, stateful, snapshottable, hardware-isolated — and how it differs from other sandboxes."
 icon: "compass"
 ---
 
-# Design principles
+# Why BoxLite
 
 BoxLite is built on a simple belief: AI agents deserve sandboxes that are secure, stateful, and trivially easy to adopt. Every design decision we make traces back to four principles.
 
@@ -77,3 +78,20 @@ Together they define what we think a sandbox for AI agents should be: something 
 ```
 $ pip install boxlite
 ```
+
+---
+
+## How BoxLite compares to other sandboxes
+
+A neutral, dimension-by-dimension look at where BoxLite sits in the landscape. We deliberately do not name specific products here — sandbox tools evolve fast, and the dimensions matter more than the names of the moment.
+
+| Dimension | Hosted cloud sandbox | Container-based local sandbox | Process-level sandbox | **BoxLite** |
+|---|---|---|---|---|
+| Deployment model | Cloud account required | Daemon or root often required | In-process | **Library import, no daemon, no root** |
+| Isolation level | VM or strong container | Shared host kernel | Same process / user | **Hardware-virtualized micro-VM** |
+| State persistence | Often ephemeral | Sometimes; image rebuild common | None | **Stateful by default, survives stop/restart** |
+| Snapshot / fork | Varies, often paid feature | Rare | None | **First-class disk snapshots** |
+| Multi-language SDK | Usually 1–2 languages | N/A | Language-bound | **Python, Node.js, Rust, Go, C** |
+| Where it runs | Vendor cloud | Your machine + daemon | Your process | **Your machine, your code, no extra services** |
+
+BoxLite's wedge is the combination: VM-grade isolation, embedded SDK ergonomics, and stateful boxes — without depending on a hosted control plane. Hosted offerings remain a good fit when fleet management and remote scale are the primary needs. BoxLite is for the rest of the time, when you want sandboxing to behave like SQLite: local, embedded, and out of the way.

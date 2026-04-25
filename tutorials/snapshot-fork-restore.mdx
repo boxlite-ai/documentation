@@ -1,0 +1,210 @@
+---
+title: "Fork and restore a sandbox state"
+sidebarTitle: "Snapshot, fork, restore"
+description: "Branch two execution paths from the same sandbox state, evolve them independently, and keep the original as your restore point — like git branch for environments."
+icon: "code-branch"
+---
+
+You've gotten a box into an interesting state — packages installed, data written, configuration applied — and now you want to **try two different things from that point** without losing the baseline. This tutorial walks through the supported way to do that.
+
+We'll use `clone_box()`, which produces a new, fully independent box that starts from the source box's disk at the moment of cloning. Two boxes, two timelines, one shared origin.
+
+## Prerequisites
+
+- BoxLite Python SDK ≥ 0.8.2 — `pip install boxlite` (Python 3.10+).
+- macOS Apple Silicon, Linux with KVM, or Windows under WSL2 — the same prerequisites as any other BoxLite tutorial.
+
+## Step 1 — get the source box to an interesting state
+
+We'll start by creating a box, dropping a marker file in `/root`, and reading it back. The marker stands in for whatever real work you'd do — installing packages, writing config, building artefacts.
+
+```python tutorials/snapshot_fork_demo.py
+import asyncio
+import boxlite
+
+
+async def cat(box, path):
+    """Read a file out of the guest, line by line."""
+    h = await box.exec("cat", [path])
+    chunks = []
+    stdout = h.stdout()
+    if stdout is not None:
+        async for line in stdout:
+            chunks.append(line.decode() if isinstance(line, bytes) else line)
+    await h.wait()
+    return "".join(chunks).strip()
+
+
+async def write(box, path, value):
+    h = await box.exec("sh", ["-c", f"echo {value} > {path}"])
+    await h.wait()
+
+
+async def main():
+    runtime = boxlite.Boxlite.default()
+
+    source = await runtime.create(
+        boxlite.BoxOptions(image="alpine:latest", auto_remove=False),
+        name="source",
+    )
+    print(f"source.id = {source.id}")
+
+    await write(source, "/root/marker.txt", "baseline")
+    print(f"source baseline: {await cat(source, '/root/marker.txt')!r}")
+```
+
+Two notes about this snippet:
+
+- `auto_remove=False` is on purpose — we want both boxes to outlive the script's `stop()` call so we can compare the timelines.
+- The runtime-level handle returned by `runtime.create(...)` exposes `box.exec(...)` directly. This is the lower-level surface where you can stream stdout/stderr; the `cat()` helper above shows the pattern (consume the iterator first, then `await wait()` for the exit code).
+
+Running just step 1 prints:
+
+```text
+source.id = egsJA9Qr4vZR
+source baseline: 'baseline'
+```
+
+## Step 2 — fork by cloning the running box
+
+```python
+    clone = await source.clone_box(name="clone")
+    print(f"clone.id  = {clone.id}")
+    print(f"clone sees: {await cat(clone, '/root/marker.txt')!r}")
+```
+
+`clone_box()` works while the source is running. Internally the runtime auto-quiesces the source box (briefly moves it through `paused`, see [Lifecycle](/concepts/lifecycle)) so the clone gets a consistent, point-in-time copy of the disk. The source returns to `running` automatically — you don't need to manage the pause yourself.
+
+The clone's disk is **independent**: it's a fresh copy-on-write image rooted at the source's disk state. The two boxes share nothing after this call returns.
+
+```text
+clone.id  = 2kSCsg5kLWUm
+clone sees: 'baseline'
+```
+
+The clone correctly inherits the marker file we wrote in step 1.
+
+## Step 3 — diverge
+
+Now write something different in each box.
+
+```python
+    await write(source, "/root/marker.txt", "branch_a")
+    await write(clone,  "/root/marker.txt", "branch_b")
+```
+
+## Step 4 — verify independence
+
+```python
+    print(f"source after branch A: {await cat(source, '/root/marker.txt')!r}")
+    print(f"clone  after branch B: {await cat(clone,  '/root/marker.txt')!r}")
+```
+
+Output:
+
+```text
+source after branch A: 'branch_a'
+clone  after branch B: 'branch_b'
+```
+
+Two boxes, two timelines, no contamination. This is the basic shape you'd reach for whenever you want to A/B a build, fan out an evaluation, or speculatively try something risky while preserving the baseline.
+
+## Step 5 — clean up
+
+```python
+    for b in (clone, source):
+        try:
+            await b.stop()
+        except Exception:
+            pass
+        await runtime.remove(b.id, force=True)
+    print("cleaned up")
+```
+
+Because we set `auto_remove=False`, neither box was removed by its `stop()`. We tear them down explicitly via `runtime.remove(box_id, force=True)`. `force=True` removes a box regardless of state — the safest default for cleanup paths.
+
+## When to reach for clone vs snapshot vs export
+
+- **Clone** — what we just did. Two live boxes from the same point; both can run, both can be modified, neither blocks the other.
+- **Snapshot** — captures the disk under the current box itself, no second box. Use it when you want to roll the *same* box back to a known state later.
+- **Export / Import** — produces a portable archive on disk. Use it to ship a state to another host or to back it up.
+
+All three are disk-only — none of them captures memory, in-flight syscalls, or open sockets. See [Snapshot, clone, export](/concepts/snapshot) for the full breakdown.
+
+## Full script
+
+The complete file used to validate every output above:
+
+```python tutorials/snapshot_fork_demo.py
+import asyncio
+import boxlite
+
+
+async def cat(box, path):
+    h = await box.exec("cat", [path])
+    chunks = []
+    stdout = h.stdout()
+    if stdout is not None:
+        async for line in stdout:
+            chunks.append(line.decode() if isinstance(line, bytes) else line)
+    await h.wait()
+    return "".join(chunks).strip()
+
+
+async def write(box, path, value):
+    h = await box.exec("sh", ["-c", f"echo {value} > {path}"])
+    await h.wait()
+
+
+async def main():
+    runtime = boxlite.Boxlite.default()
+
+    source = await runtime.create(
+        boxlite.BoxOptions(image="alpine:latest", auto_remove=False),
+        name="source",
+    )
+    print(f"source.id = {source.id}")
+
+    await write(source, "/root/marker.txt", "baseline")
+    print(f"source baseline: {await cat(source, '/root/marker.txt')!r}")
+
+    clone = await source.clone_box(name="clone")
+    print(f"clone.id  = {clone.id}")
+    print(f"clone sees: {await cat(clone, '/root/marker.txt')!r}")
+
+    await write(source, "/root/marker.txt", "branch_a")
+    await write(clone,  "/root/marker.txt", "branch_b")
+
+    print(f"source after branch A: {await cat(source, '/root/marker.txt')!r}")
+    print(f"clone  after branch B: {await cat(clone,  '/root/marker.txt')!r}")
+
+    for b in (clone, source):
+        try:
+            await b.stop()
+        except Exception:
+            pass
+        await runtime.remove(b.id, force=True)
+    print("cleaned up")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Save it as `snapshot_fork_demo.py` and run with `python snapshot_fork_demo.py`. End-to-end output observed during validation:
+
+```text
+source.id = egsJA9Qr4vZR
+source baseline: 'baseline'
+clone.id  = 2kSCsg5kLWUm
+clone sees: 'baseline'
+source after branch A: 'branch_a'
+clone  after branch B: 'branch_b'
+cleaned up
+```
+
+## See also
+
+- [Snapshot, clone, export](/concepts/snapshot) — when each primitive is the right one
+- [Lifecycle](/concepts/lifecycle) — the `paused` state the runtime uses during clone
+- [`examples/python/03_lifecycle/clone_export_import.py`](https://github.com/boxlite-ai/boxlite/blob/main/examples/python/03_lifecycle/clone_export_import.py) — upstream walkthrough of clone alongside export/import

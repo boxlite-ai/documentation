@@ -1,0 +1,235 @@
+---
+title: "Go SDK reference"
+sidebarTitle: "Go SDK"
+description: "Install and use BoxLite from Go — installation, runtime, box options, and execution."
+icon: "golang"
+---
+
+The Go SDK lives at `github.com/boxlite-ai/boxlite/sdks/go` and links the BoxLite runtime as a CGO static library. It mirrors the same primitives as the Python and Node.js SDKs, with idiomatic Go signatures (functional options, `context.Context`).
+
+<Note>
+  Requires Go 1.24+ with CGO enabled. The first install downloads a prebuilt native library (`libboxlite.a`, ~110 MB on darwin-arm64) into your Go module cache. Set `GITHUB_TOKEN` if you hit GitHub API rate limits during setup.
+</Note>
+
+## Install
+
+```bash
+go get github.com/boxlite-ai/boxlite/sdks/go
+go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup
+```
+
+The `cmd/setup` step is one-time per module cache: it downloads the prebuilt native library and header for your platform and places them next to the Go sources.
+
+## Quick start
+
+```go main.go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+func main() {
+    rt, err := boxlite.NewRuntime()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rt.Close()
+
+    ctx := context.Background()
+    box, err := rt.Create(ctx, "python:slim",
+        boxlite.WithNetwork(boxlite.NetworkSpec{Mode: boxlite.NetworkModeEnabled}),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rt.Remove(ctx, box.ID())
+
+    if err := box.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    defer box.Stop(ctx)
+
+    result, err := box.Exec(ctx, "python", "-c", "print('Hello from BoxLite Go!')")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("STDOUT:", result.Stdout)
+    fmt.Println("EXIT:", result.ExitCode)
+}
+```
+
+Run it:
+
+```bash
+go run main.go
+# STDOUT: Hello from BoxLite Go!
+#
+# EXIT: 0
+```
+
+The output above was captured live on macOS Apple Silicon against the `main` branch of the BoxLite repository. See [Known issue](#known-issue-boxlite-v0-8-2-release) below for what to do on the released `v0.8.2`.
+
+## Runtime
+
+```go
+rt, err := boxlite.NewRuntime(opts ...RuntimeOption) (*Runtime, error)
+```
+
+| Method | Purpose |
+|---|---|
+| `rt.Create(ctx, image, opts...)` | Create a new box; returns `*Box` |
+| `rt.Get(ctx, idOrName)` | Reattach to an existing box by id or name |
+| `rt.ListInfo(ctx)` | Snapshot of all boxes' metadata |
+| `rt.Remove(ctx, idOrName)` | Remove a stopped box |
+| `rt.ForceRemove(ctx, idOrName)` | Remove regardless of state |
+| `rt.Metrics(ctx)` | Aggregate runtime metrics |
+| `rt.Images()` | Image manager (`Pull`, `List`) |
+| `rt.Close()` | Release the runtime lock; required for clean shutdown |
+| `rt.Shutdown(ctx, timeout)` | Graceful shutdown of all running boxes |
+
+### Runtime options
+
+| Option | Effect |
+|---|---|
+| `WithHomeDir(dir)` | Override `$BOXLITE_HOME` (default `~/.boxlite`) |
+| `WithRegistries(refs...)` | Add custom OCI registry hosts |
+
+## Box
+
+Returned by `rt.Create` and `rt.Get`. Methods:
+
+| Method | Purpose |
+|---|---|
+| `box.ID() string` | Box id (ULID) |
+| `box.Name() string` | Box name (empty if unset) |
+| `box.Start(ctx) error` | Start a `configured` or `stopped` box |
+| `box.Stop(ctx) error` | Stop a `running` box |
+| `box.Close() error` | Release the box handle (does not stop the box) |
+| `box.Info(ctx) (*BoxInfo, error)` | Current state, PID, image, resources |
+| `box.Metrics(ctx) (*BoxMetrics, error)` | Per-box metrics (CPU, memory, network, exec counters) |
+| `box.Exec(ctx, name string, args ...string) (*ExecResult, error)` | Run one command and collect stdout/stderr/exit |
+| `box.Command(name string, args ...string) *Cmd` | Build a configurable command (see `Cmd` below) |
+
+`Exec` is the simple, buffered form — it returns once the guest process exits and gives you the full output. Use `Command` when you need to set environment variables, capture streams differently, or kill mid-run.
+
+### Box options
+
+The full list:
+
+| Option | Effect |
+|---|---|
+| `WithName(string)` | Set a unique box name |
+| `WithCPUs(n int)` | Number of CPU cores |
+| `WithMemory(mib int)` | Memory in MiB |
+| `WithRootfsPath(string)` | Use a pre-prepared rootfs directory instead of an image |
+| `WithEnv(key, value string)` | Append an environment variable (call repeatedly) |
+| `WithVolume(host, guest string)` | Read-write bind mount |
+| `WithVolumeReadOnly(host, guest string)` | Read-only bind mount |
+| `WithWorkDir(string)` | Working directory inside the guest |
+| `WithEntrypoint(args ...string)` | Override the image entrypoint |
+| `WithCmd(args ...string)` | Override the image cmd |
+| `WithNetwork(NetworkSpec)` | Outbound mode + allowlist (see below) |
+| `WithSecret(Secret)` | Host-side HTTPS secret substitution |
+| `WithAutoRemove(bool)` | Auto-remove on stop (default `true`) |
+| `WithDetach(bool)` | Survive parent exit (default `false`); incompatible with `WithAutoRemove(true)` |
+
+## Cmd — fine-grained execution
+
+`box.Command(name, args...)` returns a `Cmd` that mirrors the shape of `os/exec.Cmd`:
+
+```go
+cmd := box.Command("python", "-c", "print('hi')")
+cmd.Env = []string{"FOO=bar"}
+cmd.Stdout = os.Stdout       // any io.Writer
+cmd.Stderr = os.Stderr
+if err := cmd.Run(ctx); err != nil { ... }
+```
+
+Use it when streaming directly into Go writers, when you need to attach stdin (`cmd.Stdin = ...`), or when you want fine-grained signal control.
+
+## Networking
+
+```go
+type NetworkSpec struct {
+    Mode     NetworkMode
+    AllowNet []string
+}
+
+const (
+    NetworkModeEnabled  NetworkMode = "Enabled"
+    NetworkModeDisabled NetworkMode = "Disabled"
+)
+```
+
+`Disabled` removes the guest network interface entirely. `Enabled` is the default and is the only mode that respects `AllowNet`. See [Network](/concepts/network) for the broader picture.
+
+## Secrets
+
+```go
+type Secret struct {
+    Name        string
+    Value       string
+    Hosts       []string
+    Placeholder string  // default "<BOXLITE_SECRET:{Name}>"
+}
+```
+
+`WithSecret(...)` enables host-side substitution: the placeholder string in your guest's outbound HTTPS traffic is rewritten to `Value` only for matching `Hosts`. The real secret never enters the VM. Same model as the Python and Node SDKs — see [Network → Secrets](/concepts/network#secrets-host-side-substitution).
+
+## Result types
+
+```go
+type ExecResult struct {
+    ExitCode int
+    Stdout   string
+    Stderr   string
+}
+
+type BoxInfo struct {
+    ID        string
+    Name      string
+    Image     string
+    State     State    // configured / running / stopping / stopped / paused / unknown
+    Running   bool
+    PID       int
+    CPUs      int
+    MemoryMiB int
+    CreatedAt int64
+}
+```
+
+Aggregate `RuntimeMetrics` and per-box `BoxMetrics` follow the same shape as the metrics surfaced over REST.
+
+## Parity with other SDKs
+
+The Go SDK currently does **not** expose the high-level box-type wrappers (`SimpleBox`, `CodeBox`, `BrowserBox`, `ComputerBox`, `InteractiveBox`) that the Python and Node.js SDKs offer. Those wrappers are a thin convenience layer; their behaviour is reproducible in Go by combining `rt.Create` + `WithCmd` / `WithEntrypoint` and the matching image. The runtime is the same.
+
+For runtime-level parity (lifecycle, exec, file transfer, snapshot, clone, export, networking, secrets), the Go SDK is on par with Python and Node.
+
+## Known issue: BoxLite v0.8.2 release
+
+The released `v0.8.2` of the Go SDK and its bundled native library disagree on the network-mode wire format, so box creation against `v0.8.2` fails immediately with:
+
+```
+boxlite: internal error: Invalid JSON options: unknown variant `Isolated`,
+expected `Enabled` or `Disabled` (code=1)
+```
+
+The fix is already on the `main` branch (the API on this page — `WithNetwork(NetworkSpec)`, `WithSecret(Secret)`, etc. — is what `main` exports) and will ship in the next tagged release. To use the SDK today, clone the repository and point a Go module replace at the local checkout:
+
+```text
+replace github.com/boxlite-ai/boxlite/sdks/go => /path/to/boxlite/sdks/go
+```
+
+The same checkout produces a matching native library via the repository's `make dev:go` target.
+
+## See also
+
+- [SDK reference overview](/reference/index) — feature comparison across all SDKs
+- [Python SDK](/reference/python/index) and [Node.js SDK](/reference/nodejs/index) — the reference shapes the Go SDK mirrors
+- [Network](/concepts/network) and [Lifecycle](/concepts/lifecycle) — primitives that map 1:1 across SDKs

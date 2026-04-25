@@ -1,0 +1,197 @@
+---
+title: "REST API reference"
+sidebarTitle: "REST API"
+description: "HTTP endpoints exposed by `boxlite serve` — language-neutral access to BoxLite from any client."
+icon: "globe"
+---
+
+`boxlite serve` starts a long-running HTTP server that exposes the full BoxLite runtime over REST. Use it when you want to drive boxes from a language without a first-party SDK, or when you want a single process to mediate many short-lived clients.
+
+The full request and response schemas live in the OpenAPI specification at [`openapi/rest-sandbox-open-api.yaml`](https://github.com/boxlite-ai/boxlite/blob/main/openapi/rest-sandbox-open-api.yaml). This page summarises the surface and walks through the create → start → exec → cleanup flow.
+
+## Start the server
+
+```bash
+boxlite serve --port 8100
+# BoxLite REST API server listening on http://0.0.0.0:8100
+```
+
+The CLI binary ships separately from the SDKs. Install it with `cargo install boxlite-cli` or download the prebuilt archive for your platform from the [BoxLite releases page](https://github.com/boxlite-ai/boxlite/releases).
+
+## URL shape
+
+Every runtime endpoint is prefixed by an API version and a tenant identifier:
+
+```
+/v1/{prefix}/...
+```
+
+For a single-host installation, `prefix` is always `default`. The two unprefixed endpoints are `/v1/config` (server capabilities) and `/v1/oauth/tokens` (authentication).
+
+<Note>
+  The current single-host server assumes a single trusted user. The authentication endpoint is wired but not enforced for local installations. Treat the server as you would any local-only daemon — do not expose `0.0.0.0:8100` to a network you don't control.
+</Note>
+
+## Endpoint groups
+
+| Group | Endpoints |
+|---|---|
+| Configuration | `GET /v1/config` |
+| Authentication | `POST /v1/oauth/tokens` |
+| Boxes | `POST /v1/{prefix}/boxes`, `GET /v1/{prefix}/boxes`, `GET /v1/{prefix}/boxes/{box_id}`, `HEAD /v1/{prefix}/boxes/{box_id}`, `DELETE /v1/{prefix}/boxes/{box_id}`, `POST /v1/{prefix}/boxes/{box_id}/start`, `POST /v1/{prefix}/boxes/{box_id}/stop` |
+| Execution | `POST /v1/{prefix}/boxes/{box_id}/exec`, `GET /v1/{prefix}/boxes/{box_id}/executions/{exec_id}`, `GET /v1/{prefix}/boxes/{box_id}/executions/{exec_id}/output` (SSE), `POST .../input`, `POST .../signal`, `POST .../resize`, `WS /v1/{prefix}/boxes/{box_id}/exec/tty` |
+| Files | `POST /v1/{prefix}/boxes/{box_id}/files` (upload), `GET /v1/{prefix}/boxes/{box_id}/files` (download) |
+| Snapshots | `POST /v1/{prefix}/boxes/{box_id}/snapshots`, `GET .../snapshots`, `GET .../snapshots/{name}`, `DELETE .../snapshots/{name}`, `POST .../snapshots/{name}/restore` |
+| Clone & archive | `POST /v1/{prefix}/boxes/{box_id}/clone`, `POST /v1/{prefix}/boxes/{box_id}/export`, `POST /v1/{prefix}/boxes/import` |
+| Images | `POST /v1/{prefix}/images/pull`, `GET /v1/{prefix}/images`, `GET /v1/{prefix}/images/{image_id}`, `HEAD /v1/{prefix}/images/{image_id}` |
+| Metrics | `GET /v1/{prefix}/metrics`, `GET /v1/{prefix}/boxes/{box_id}/metrics` |
+
+## Server capabilities
+
+Probe the server before driving any flow — capability flags tell you which optional surfaces are wired.
+
+```bash
+curl -s http://localhost:8100/v1/config
+```
+
+```json
+{
+  "capabilities": {
+    "snapshots_enabled": true,
+    "clone_enabled": true,
+    "export_enabled": true,
+    "import_enabled": true
+  }
+}
+```
+
+## End-to-end flow
+
+The four steps below match what every SDK does internally.
+
+### 1. Create a box
+
+```bash
+curl -s -X POST http://localhost:8100/v1/default/boxes \
+  -H 'Content-Type: application/json' \
+  -d '{"rootfs":{"image":"alpine:latest"},"network":"Enabled"}'
+```
+
+```json
+{
+  "box_id": "k14sYHce2Rqi",
+  "name": null,
+  "status": "configured",
+  "created_at": "2026-04-25T15:48:04.718781+00:00",
+  "updated_at": "2026-04-25T15:48:04.719016+00:00",
+  "pid": null,
+  "image": "alpine:latest",
+  "cpus": 2,
+  "memory_mib": 512,
+  "labels": {}
+}
+```
+
+The returned `box_id` is the only identifier you need afterwards. `status: "configured"` means the VM is provisioned but not yet booted.
+
+### 2. Start the box
+
+```bash
+curl -s -X POST http://localhost:8100/v1/default/boxes/k14sYHce2Rqi/start
+```
+
+```json
+{
+  "box_id": "k14sYHce2Rqi",
+  "status": "running",
+  "pid": 39338,
+  "image": "alpine:latest",
+  "cpus": 2,
+  "memory_mib": 512
+}
+```
+
+### 3. Execute a command
+
+`exec` returns immediately with an `execution_id`. The execution itself runs asynchronously.
+
+```bash
+curl -s -X POST http://localhost:8100/v1/default/boxes/k14sYHce2Rqi/exec \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"echo","args":["Hello from REST!"]}'
+```
+
+```json
+{ "execution_id": "61357ee0-f841-4502-8a3b-fc3cf5b24ac0" }
+```
+
+Poll status, or — preferred — stream output as Server-Sent Events:
+
+```bash
+curl -N "http://localhost:8100/v1/default/boxes/k14sYHce2Rqi/executions/61357ee0-f841-4502-8a3b-fc3cf5b24ac0/output"
+```
+
+```text
+event: stdout
+data: {"data":"SGVsbG8gZnJvbSBSRVNUIQo="}
+
+event: stderr
+data: {"data":"..."}
+
+event: exit
+data: {"duration_ms":8482,"exit_code":0}
+```
+
+<Note>
+  `stdout` and `stderr` payloads are **base64-encoded** in the SSE `data` field — decode before displaying. The terminal `exit` event carries `duration_ms` and `exit_code`, mirroring what the SDKs surface as `ExecResult`.
+</Note>
+
+### 4. Clean up
+
+```bash
+curl -X POST http://localhost:8100/v1/default/boxes/k14sYHce2Rqi/stop
+curl -X DELETE http://localhost:8100/v1/default/boxes/k14sYHce2Rqi
+```
+
+## Snapshots over REST
+
+```bash
+curl -s -X POST http://localhost:8100/v1/default/boxes/k14sYHce2Rqi/snapshots \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"demo-snap"}'
+```
+
+```json
+{
+  "id": "6YfnIqpz",
+  "box_id": "k14sYHce2Rqi",
+  "name": "demo-snap",
+  "created_at": 1777132120,
+  "container_disk_bytes": 268435456,
+  "size_bytes": 655360
+}
+```
+
+A snapshot has both an `id` (server-generated) and a `name` (your label). Path-style URLs use the **name** as the addressable segment: `/snapshots/{name}` and `/snapshots/{name}/restore`. See [Snapshot, clone, export](/concepts/snapshot) for what is and isn't captured (snapshot is **disk-only** — there is no in-memory checkpoint).
+
+## Errors
+
+Errors come back with a uniform envelope:
+
+```json
+{
+  "error": {
+    "message": "invalid state: Cannot remove snapshot: current disk depends on this snapshot. Restore a different snapshot first.",
+    "type": "InternalError",
+    "code": 500
+  }
+}
+```
+
+`code` mirrors the HTTP status. `type` enumerates the runtime error kind (`InvalidState`, `NotFound`, `InternalError`, …); see the OpenAPI components for the full list.
+
+## See also
+
+- [Python](/reference/python/index), [Node.js](/reference/nodejs/index), [Rust](/reference/rust/index), [C](/reference/c/index) SDK references — same primitives, library form
+- [Snapshot, clone, export](/concepts/snapshot) — what snapshots can and cannot capture
+- [`openapi/rest-sandbox-open-api.yaml`](https://github.com/boxlite-ai/boxlite/blob/main/openapi/rest-sandbox-open-api.yaml) — full request and response schemas
