@@ -106,7 +106,7 @@ An OCI image has two directives: `ENTRYPOINT` (the executable) and `CMD` (defaul
 
 Note: some images (such as `python:alpine`) put the default command in CMD rather than ENTRYPOINT. To pass arguments like `-c`, you must explicitly set `entrypoint=["python3"]`, otherwise the arguments have nothing to attach to.
 
-> Important: `entrypoint + cmd` runs as the container init, so **the box stops when it exits**. Keep it long-running if you want to `exec` afterwards, as the example below does. See [What stops a box](/manage-sandbox/lifecycle#what-stops-a-box) for the rules that follow from this.
+> Important: `entrypoint + cmd` becomes the box's **main command**, so **the box stops when it exits**. Keep it long-running if you want to `exec` afterwards, as the example below does. See [The main command](/manage-sandbox/lifecycle#the-main-command) for the rules that follow.
 
 ```python
 import asyncio
@@ -118,14 +118,14 @@ async def main():
         async with boxlite.SimpleBox(
             image="python:alpine",
             entrypoint=["python3"],
-            # init must be long-running, otherwise the container goes Stopped and exec is no longer possible
-            cmd=["-c", "import time; print('init running'); time.sleep(120)"],
+            # the main command must be long-running, or the box stops and exec is refused
+            cmd=["-c", "import time; print('service up'); time.sleep(120)"],
             cpus=1,
             memory_mib=512,
         ) as box:
             print(f"box started: {box.id}")
-            await asyncio.sleep(2)  # wait for init to come up
-            # while init is long-running, other commands can be exec'd, exit=0
+            await asyncio.sleep(2)  # wait for the main command to come up
+            # while the main command runs, other commands can be exec'd, exit=0
             result = await box.exec("python3", "-c", "print('hello from exec')")
             print(f"exec: {result.stdout.strip()} (exit={result.exit_code})")  # exit=0
     except Exception as e:
@@ -267,13 +267,13 @@ If the image's default command is in CMD (not ENTRYPOINT), setting `cmd=["-c", .
 
 ### After setting `entrypoint + cmd` to a short-lived command, `exec` reports `incompatible container status: Stopped`
 
-`entrypoint + cmd` is the **container init process**. A short-lived init (which exits as soon as it finishes) puts the container into the Stopped state, and a subsequent `exec` raises:
+The box stopped when its main command exited:
 
 ```text
 RuntimeError: internal error: spawn_failed: Container init process exited — cannot exec. ... incompatible container status: `Stopped`
 ```
 
-Fix: if you need to keep `exec`-ing, make init long-lived (sleep / a service); if you only run one command, use a short-lived init and do not exec again. See the entrypoint example above.
+Fix: keep the main command long-running (sleep, or a service), or treat the box as single-shot and do not exec again. [The main command](/manage-sandbox/lifecycle#the-main-command) covers the rules, and [Exit codes](/manage-sandbox/lifecycle#exit-codes) covers how to read what it exited with.
 
 ### `working_dir` pointing to a nonexistent directory makes `exec` raise RuntimeError
 
