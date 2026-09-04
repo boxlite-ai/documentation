@@ -106,10 +106,7 @@ An OCI image has two directives: `ENTRYPOINT` (the executable) and `CMD` (defaul
 
 Note: some images (such as `python:alpine`) put the default command in CMD rather than ENTRYPOINT. To pass arguments like `-c`, you must explicitly set `entrypoint=["python3"]`, otherwise the arguments have nothing to attach to.
 
-> Important: `entrypoint + cmd` controls the **container init process**. If that init command is **short-lived** (it exits as soon as it finishes, e.g. `python3 -c "print(...)"`), the container enters the **Stopped** state after init exits, and you can no longer call `box.exec(...)`; it raises
-> `RuntimeError: internal error: spawn_failed: Container init process exited — cannot exec. ... incompatible container status: \`Stopped\``.
->
-> Therefore: if you want to customize init via `entrypoint + cmd` and also keep `exec`-ing afterward, init must be a **long-lived** process (such as sleep or a service process). The example below changes init to `time.sleep(120)`, after which `exec` reliably returns `exit=0`. If you only run one command and never exec again, a short-lived init is also fine.
+> Important: `entrypoint + cmd` runs as the container init, so **the box stops when it exits**. Keep it long-running if you want to `exec` afterwards, as the example below does. See [What stops a box](/manage-sandbox/lifecycle#what-stops-a-box) for the rules that follow from this.
 
 ```python
 import asyncio
@@ -136,6 +133,30 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+```
+
+### Overriding `cmd` drops the image's working directory
+
+Setting `cmd` replaces the image's command but does not inherit the `WORKDIR` it was written against. Relative paths in the image's own start command then fail — usually as a missing-file or module error naming a path that does exist:
+
+```text
+Error: Cannot find module '/dist/index.js'
+```
+
+Two fixes, in order of preference:
+
+```python
+import boxlite
+
+# Preferred: the launcher the image puts on PATH, which does not depend on the directory
+box = boxlite.SimpleBox(image="<YOUR_IMAGE>", cmd=["myservice", "--port", "8080"])
+
+# Or an absolute path, with the working directory set explicitly
+box = boxlite.SimpleBox(
+    image="<YOUR_IMAGE>",
+    cmd=["node", "/app/dist/index.js"],
+    working_dir="/app",
+)
 ```
 
 ## `user`: running as non-root

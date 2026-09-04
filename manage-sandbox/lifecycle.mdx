@@ -13,6 +13,7 @@ stateDiagram-v2
     [*] --> Created: SimpleBox(...) / runtime.create()
     Created --> Running: async with entry, start(), or first exec()
     Running --> Stopped: stop()
+    Running --> Stopped: init exits
     Stopped --> Running: start() or exec() again
     Stopped --> [*]: runtime.remove(id, force=)
     Running --> [*]: auto_remove=True on stop
@@ -31,7 +32,7 @@ stateDiagram-v2
 |---|---|---|---|
 | **Created** | `SimpleBox(...)` or `await runtime.create(...)` | A handle and a database record. **No VM yet** | Nothing on the box itself — the next `exec` or `async with` entry starts it |
 | **Running** | `async with` entry, `start()`, or the first `exec()` | VM up, rootfs mounted | `exec`, `copy_in` / `copy_out`, `metrics()`. `start()` is idempotent |
-| **Stopped** | `stop()` | VM released, **rootfs and metadata kept** | Still found by `get()` / `list_info()`; `exec` or `start()` brings it back with files intact |
+| **Stopped** | `stop()`, or the init process exiting | VM released, **rootfs and metadata kept** | Still found by `get()` / `list_info()`; `exec` or `start()` brings it back with files intact |
 | **Removed** | `runtime.remove(id, force=)`, or `auto_remove=True` on stop | Nothing | Gone from the runtime and from disk |
 
 Two transitions are worth committing to memory:
@@ -40,6 +41,83 @@ Two transitions are worth committing to memory:
 - **Stop is not remove.** `stop()` frees the VM but keeps the disk, so restarting reuses everything the box had installed. That is what makes a box a reusable workspace rather than a one-shot container.
 
 Read the current state with `box.info().state.status`. **`info()` is async** — `await` it. Field names are exact and easy to get wrong: see [`BoxInfo` / `BoxStateInfo`](#boxinfo-boxstateinfo-state-access).
+
+## What stops a box
+
+Three things stop a box, and only one of them is a call you make.
+
+| Cause | Trigger |
+|---|---|
+| `stop()` | You call it |
+| **The init process exits** | Your `entrypoint + cmd` finishes or crashes |
+| `auto_stop` | Idle timeout, on BoxLite Cloud — see [Box lifecycle](/cloud/box-lifecycle) |
+
+`entrypoint + cmd` runs as the container init, PID 1 inside the box. When it exits, the box stops. An init of `sh -c 'echo "pid=$$"; exit 7'` prints `pid=1` and the status reads `stopped` about a second later.
+
+That gives you two rules:
+
+- **Once init has exited, `exec` is refused**: `RuntimeError: invalid state: Cannot exec box <id>: it is stopped, and its main command has already exited`. Restart with `start()`.
+- **You cannot stop init from inside the box.** `kill -TERM 1` is dropped, because PID 1 in a PID namespace ignores signals it has no handler for. That is kernel behaviour, not a BoxLite bug. Init ends when it exits on its own, or when the host calls `stop()`.
+
+Status flips about a second after init exits. Poll it rather than reading it immediately.
+
+For how `entrypoint` and `cmd` combine, see [Environment and startup](/manage-sandbox/environment#the-relationship-between-entrypoint-and-cmd).
+
+## Three ways to start work in a box
+
+Which one you pick decides whether the box outlives the work.
+
+| Pattern | How | Box lifetime | Cost |
+|---|---|---|---|
+| **Neutral init, then `exec`** | Keep the image's init; run jobs with `exec`, services with `nohup … &` | Independent of the work | A crashed service leaves the box `running` and the port dead |
+| **Work as init** | Set `entrypoint` / `cmd`, then `attach()` | Bound to the work | Requires `runtime.create()`; `SimpleBox` has no `attach()` |
+| **Detached init** | Work as init, plus `detach=True` and `auto_delete=0` | Outlives the process that created it | You remove it yourself |
+
+Most agent work wants the first pattern: the agent is a job, and you still want to read the workspace after it finishes. A long-running service usually wants the second, so that a dead service means a dead box instead of a silent one.
+
+### Work as init, and reading its exit code
+
+`BoxStateInfo` carries `pid`, `running` and `status` — **no exit code**. `attach()` with no arguments follows the init session, and its `wait()` is the only way to get that code.
+
+```python
+import asyncio
+
+from boxlite import BoxOptions, Boxlite
+
+
+async def main() -> None:
+    runtime = Boxlite.default()
+    # attach() lives on the box returned by runtime.create(), not on SimpleBox
+    box = await runtime.create(BoxOptions(
+        image="alpine:latest",
+        cmd=["sh", "-c", "echo 'work done'; exit 7"],
+    ))
+    await box.start()
+
+    execution = await box.attach()          # no argument: follow the init session
+    async for line in execution.stdout():
+        print(line.rstrip())                # -> work done
+
+    result = await execution.wait()
+    print("init exit code:", result.exit_code)   # -> 7
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+`attach()` is async-only; the sync API has no equivalent.
+
+### Detached init
+
+`detach=True` keeps the box alive after the creating process exits. It rejects the default removal behaviour, since a box that removes itself on stop cannot be managed later:
+
+```text
+invalid argument: remove-on-stop is incompatible with detach=true.
+Detached boxes should use auto_delete=0 (or deprecated auto_remove=false) for manual lifecycle control.
+```
+
+Set `auto_delete=0` alongside it, and stop the box yourself when you are done. A local runtime has no idle timeout, so a detached box runs until something stops it.
 
 ## Walking the states in code
 
@@ -719,6 +797,23 @@ async for chunk in execution.stdout():
 ### `exec` exits non-zero without raising
 
 `exec` reports a non-zero exit through `exit_code` / `exitCode`, not by raising. See [Error Handling](/guides/error-handling#troubleshooting).
+
+### The box stopped without anyone calling `stop()`
+
+Its init process exited. `exec` then fails with `invalid state: Cannot exec box <id>: it is stopped, and its main command has already exited`. Either make init long-running, or accept the box as single-shot and read the exit code with `attach()`. See [What stops a box](#what-stops-a-box).
+
+### `kill -TERM 1` leaves the service running
+
+Expected: PID 1 in a PID namespace ignores signals with no handler. Stop the box from the host with `stop()` instead.
+
+### `exec` rejects its arguments with a type error
+
+`Box.exec` takes a list, `SimpleBox.exec` takes varargs. Passing a list to the second raises `TypeError: argument 'args': Can't extract str to Vec`, which does not name the expected shape.
+
+```python
+await box.exec("ls", ["-la"])   # Box, from runtime.create()
+await box.exec("ls", "-la")     # SimpleBox
+```
 
 ### No virtualization causes startup failure (environment constraint)
 
