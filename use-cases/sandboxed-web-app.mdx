@@ -109,7 +109,10 @@ async def main() -> None:
             await box.exec("sh", "-c", "mkdir -p /app")
             await box.exec("sh", "-c", f"echo {encoded} | base64 -d > /app/server.py")
 
-            # 3) Start it in the background so it outlives the exec call
+            # 3) Start it in the background so it outlives the exec call.
+            #    The server runs beside init, not as it, so the box stays up if the
+            #    server dies. Run it as init instead to tie the two together:
+            #    /manage-sandbox/lifecycle#three-ways-to-start-work-in-a-box
             await box.exec("sh", "-c", "nohup python /app/server.py > /tmp/app.log 2>&1 &")
             await asyncio.sleep(2)   # give the server a moment to bind
 

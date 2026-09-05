@@ -46,7 +46,7 @@ Every box object is backed by a `LiteBox`. Source `src/boxlite/src/litebox/`.
 
 - **Lazy initialization**: `runtime.create()` returns a handle immediately and **does not** trigger VM startup; the genuinely expensive operations (image pull → rootfs preparation → VM spawn → guest ready) are deferred to the first API call. So in the Python wrapper layer, entering `async with SimpleBox(...)` is what actually creates and starts the Box.
 - **Responsibilities**: command execution (`exec`), metrics, snapshot/clone/export, graceful shutdown.
-- **Key fact**: `box.info()` is **synchronous** (do not `await`); the returned `BoxInfo` uses `.state` (of type `BoxStateInfo`), and the status string is in `BoxStateInfo.status`.
+- **Key fact**: `info()` must be awaited on every type. The returned `BoxInfo` uses `.state` (of type `BoxStateInfo`), and the status string is in `BoxStateInfo.status`.
 
 ### ShimController and the VMM
 

@@ -195,7 +195,7 @@ The microVM boundary is always on. Two further knobs narrow what the code inside
 ```python
 import asyncio
 from boxlite import SimpleBox, SecurityOptions, NetworkSpec
-from boxlite.boxlite import AdvancedBoxOptions  # not exported at the top level
+from boxlite import AdvancedBoxOptions
 
 async def main():
     try:
@@ -310,6 +310,87 @@ Each BoxLite box is a microVM and needs underlying virtualization:
 - Linux: requires KVM (`/dev/kvm` available); WSL2 needs KVM and the user in the `kvm` group.
 - macOS arm64: uses Apple's Hypervisor.framework and needs **no `/dev/kvm`**. macOS Intel is not supported.
 - Environments without virtualization (most CI containers) -> the box fails to start and raises a standard `RuntimeError` (the process does not crash; it can be caught).
+
+---
+
+## A tour: shell command and CodeBox side by side
+
+Moved here from the section index, which is now a summary and an index.
+
+
+The most fundamental agent tool is **exec** — running a command inside the sandbox and reading the result. Both snippets below run as-is.
+
+<CodeGroup>
+
+```python Python
+import asyncio
+from boxlite import SimpleBox, CodeBox
+
+async def main():
+    # ---- 1. Run an arbitrary shell command (the most general agent tool) ----
+    try:
+        # auto_remove=True is the wrapper-layer default: cleaned up on exiting async with
+        async with SimpleBox(image="alpine:latest") as box:
+            # exec takes (command, *args); returns ExecResult
+            result = await box.exec("echo", "hello from an agent")
+
+            # Important: a non-zero exit code does NOT raise; you must check exit_code
+            if result.exit_code != 0:
+                print("command failed:", result.stderr)
+            else:
+                print("stdout:", result.stdout.strip())
+    except RuntimeError as e:
+        # Image pull failure / no virtualization raises a standard RuntimeError (not BoxliteError)
+        print("startup or pull failed:", e)
+
+    # ---- 2. Run agent-generated Python code (CodeBox defaults to python:slim) ----
+    try:
+        async with CodeBox() as code_box:
+            # run() executes a code string and returns stdout (str)
+            generated_code = "print(sum(range(1, 11)))"
+            output = await code_box.run(generated_code)
+            print("code output:", output.strip())
+    except RuntimeError as e:
+        print("CodeBox failed:", e)
+
+asyncio.run(main())
+```
+
+```typescript Node.js
+// The package name is @boxlite-ai/boxlite (not 'boxlite', not '@boxlite/sdk')
+import { SimpleBox, CodeBox } from "@boxlite-ai/boxlite";
+
+async function main(): Promise<void> {
+  // ---- 1. Run an arbitrary shell command ----
+  try {
+    // await using: cleaned up automatically at end of scope per autoRemove (default true)
+    await using box = new SimpleBox({ image: "alpine:latest" });
+
+    const result = await box.exec("echo", "hello from an agent");
+
+    if (result.exitCode !== 0) {
+      console.error("command failed:", result.stderr);
+    } else {
+      console.log("stdout:", result.stdout.trim());
+    }
+  } catch (e) {
+    console.error("failed:", e);
+  }
+
+  // ---- 2. Run agent-generated code (CodeBox image defaults to python:slim) ----
+  try {
+    await using codeBox = new CodeBox();
+    const output = await codeBox.run("print(sum(range(1, 11)))");
+    console.log("code output:", output.trim());
+  } catch (e) {
+    console.error("CodeBox failed:", e);
+  }
+}
+
+main();
+```
+
+</CodeGroup>
 
 ---
 

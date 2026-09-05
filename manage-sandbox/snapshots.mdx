@@ -203,9 +203,16 @@ Snapshot, clone, and export all require the sandbox to start first, and starting
 - **macOS**: uses Apple's Hypervisor.framework and **does not need** `/dev/kvm`.
 - Without virtualization, `create`/`start` fail with a standard exception (the process itself stays alive and can be caught with try/except and surfaced).
 
-### `clone_box(...)` / `export(...)` reports "source box unavailable" or disappears under auto_remove
+### Cloning under the default `auto_remove` makes context exit fail
 
-If the source box is created with the default `auto_remove=True`, it may be reclaimed before the clone/export. For a source box used in snapshot/clone/export flows, pass `auto_remove=False` explicitly:
+Clone and export both work while the source box is running. The problem shows up at teardown: with the default `auto_remove=True`, leaving the context tries to remove a box the clone still depends on, and the exit itself raises:
+
+```text
+RuntimeError: invalid state: Cannot remove box: boxes [<clone-id>] have clone dependencies on it.
+Remove those first or use force=true.
+```
+
+Pass `auto_remove=False` on any box you intend to clone or export, and remove it yourself once the clones are gone:
 
 ```python
 import boxlite
@@ -213,17 +220,26 @@ import boxlite
 opts = boxlite.BoxOptions(image="alpine:latest", auto_remove=False)
 ```
 
+Looking a clone source up after it is gone returns `None` rather than raising, so the failure you actually see is `AttributeError: 'NoneType' object has no attribute 'clone_box'`.
+
 ### `AttributeError: ... has no attribute 'remove'` (calling remove on a box)
 
 Removing a sandbox must be called on the **runtime**: `await runtime.remove(box.id, force=True)`, **not** `box.remove()`. To list sandboxes, use `runtime.list_info()`, not `runtime.list()`.
 
 ### `await box.info()` errors / coroutine was never awaited
 
-`box.info()` is a **synchronous** method; call `box.info()` directly and do not `await` it. It returns a `BoxInfo`, and the state is at `box.info().state` (a `BoxStateInfo`, whose field is named `.status`).
+`info()` must be awaited on every type: `info = await box.info()`. It returns a `BoxInfo` whose state is at `info.state` (a `BoxStateInfo`, whose field is named `.status`).
 
-### `box.snapshot.create("v1")` reports a missing keyword argument
+### `SnapshotHandle.create() takes 0 positional arguments but 1 was given`
 
-`create`'s `name` is keyword-only and must be written as `await box.snapshot.create(name="v1")`; it cannot be passed positionally as `create("v1")`.
+`create`'s signature is `create(*, options=None, name)` — `name` is keyword-only:
+
+```python
+await box.snapshot.create(name="v1")    # correct
+# await box.snapshot.create("v1")       # TypeError, as above
+```
+
+Two neighbouring constraints, both measured: restoring while the box runs raises `invalid state: Cannot restore snapshot while box is running. Stop the box first.`, and removing the snapshot the current disk sits on raises `invalid state: Cannot remove snapshot: current disk depends on this snapshot. Restore a different snapshot first.`
 
 ### restore behavior: stop first; the handle is invalidated
 

@@ -156,7 +156,7 @@ import { DEFAULT_CPUS, DEFAULT_MEMORY_MIB } from "@boxlite-ai/boxlite";
 | `stop` | `() => Promise<void>` | async | Stop |
 | `getId` | `() => Promise<string>` | async | Get the ID asynchronously |
 | `getInfo` | `() => Promise<JsBoxInfo>` | async | Get info asynchronously |
-| `info` | `() => JsBoxInfo` | **sync** | Get info (throws if called before creation) |
+| `info` | `() => Promise<JsBoxInfo>` | async | Get info. Rejects with `Box not yet created. Call exec() first.` if the box does not exist yet |
 | `id` / `name` / `created` | getter | **sync** | Accessing before creation throws |
 | `[Symbol.asyncDispose]` | `() => Promise<void>` | async | Supports `await using` |
 
@@ -400,8 +400,8 @@ main();
 
 | Method | Signature | Notes |
 |---|---|---|
-| `info` | `() => JsBoxInfo` | sync |
-| `exec` | `(cmd, args?, env?, tty?) => Promise<JsExecution>` | Execute a command |
+| `info` | `() => Promise<JsBoxInfo>` | async |
+| `exec` | `(command, args?, env?, tty?, user?, timeoutSecs?, workingDir?) => Promise<JsExecution>` | Execute a command |
 | `stop` | `() => Promise<void>` | Stop the box |
 | `metrics` | `() => Promise<JsBoxMetrics>` | Resource metrics |
 
@@ -590,11 +590,11 @@ When `pathPrefix` is unset, the client builds URLs without the segment (`/v1/box
 
 ### `JsBoxInfo` / state
 
-`box.info()` (**sync**) returns `JsBoxInfo`: `{ id, name?, state: JsBoxStateInfo, createdAt, image, cpus, memoryMib, healthStatus }`.
+`await box.info()` returns `JsBoxInfo`: `{ id, name?, state: JsBoxStateInfo, createdAt, image, cpus, memoryMib, healthStatus }`.
 
 > `cpus` / `memoryMib`: the configured resource values. To read the real allocation, run `nproc` / read `/proc/meminfo` inside the box.
 
-State lives in `JsBoxStateInfo`: `{ status: string; running: boolean; pid?: number }`. Correct access: `box.info().state.status`.
+State lives in `JsBoxStateInfo`: `{ status: string; running: boolean; pid?: number }`. Correct access: `(await box.info()).state.status`.
 
 ---
 
@@ -651,7 +651,7 @@ try {
 Error: Box not yet created. Call exec() first or use getId() async method.
 ```
 
-Cause: the box is created lazily, so sync members like `box.id` / `box.info()` are unavailable before the first `exec()`/`start`. Use `await box.getId()` / `await box.getInfo()` instead, or run one command first.
+Cause: the box is created lazily. The synchronous `box.id` getter is unavailable before creation, and `info()` — which returns a `Promise`, like every Node accessor here — rejects. Use `await box.getId()` / `await box.getInfo()`, which create the box first, or run one command before reading either.
 
 ### Startup failure in a non-virtualization environment
 
@@ -666,6 +666,17 @@ On Linux without KVM, or on macOS Intel, the VM cannot start, and `exec()` throw
 `playwright-core` is an optional peerDependency; without it, `import { chromium } from "playwright-core"` fails. Only BrowserBox needs it: `npm install playwright-core`. Also, `endpoint()` (direct CDP) does not support WebKit; use `playwrightEndpoint()` for WebKit.
 
 ---
+
+### `Cannot find package 'boxlite'` / module not found
+
+The package name has a scope. Both install and import must use `@boxlite-ai/boxlite`:
+
+```javascript
+// Wrong
+import { SimpleBox } from "boxlite"; // does not exist
+// Correct
+import { SimpleBox } from "@boxlite-ai/boxlite";
+```
 
 ## See Also
 

@@ -74,8 +74,9 @@ async def main() -> None:
             marker = await box.exec("cat", "/tmp/marker.txt")
             print("read back:", marker.stdout.strip())
 
-            # info() is synchronous — do not await it
-            print("box info:", type(box.info()).__name__)
+            # on SimpleBox and its subclasses, info() is a coroutine
+            info = await box.info()
+            print("box info:", type(info).__name__)
     except RuntimeError as exc:
         print(f"sandbox failed to start: {exc}")
 
@@ -140,7 +141,7 @@ The last line is the one that matters: a file written by one `exec` was read bac
 | The command runs but nothing happens | Command and arguments were joined into one string | `exec("ls", "-la")`, not `exec("ls -la")` |
 | A setup step failed but the script continued | `exec` does not raise on a non-zero exit | Check `result.exit_code` after each step |
 | `wait()` returns immediately | Host stdin is not a TTY | Run from a real terminal, or use the `exec` form |
-| `await box.info()` raises | `info()` is synchronous | Call it without `await` |
+| `box.info()` has no `.state` | `info()` returns a coroutine on this type | `info = await box.info()` |
 | The box is gone after the script ends | `auto_remove` defaults to `True` | Set `name=...` and `auto_remove=False` to keep it |
 
 ## Next steps

@@ -6,7 +6,7 @@ This is the official documentation site for **BoxLite** — a local-first micro-
 
 - **BoxLite repo**: https://github.com/boxlite-ai/boxlite
 - **BoxRun repo**: https://github.com/boxlite-ai/boxrun
-- **Current versions**: BoxLite Python v0.5.11 (stable), Node.js v0.2.8, C v0.5.11; BoxRun latest
+- **Current versions**: BoxLite Python v0.10.0, Node.js v0.10.0, Rust crate v0.10.0, Go v0.10.0. The Node darwin-arm64 native package is published only up to v0.9.7, so `npm install @boxlite-ai/boxlite@latest` fails to load on Apple Silicon — see the Node quickstart troubleshooting.
 - **Platforms**: macOS (Apple Silicon), Linux (KVM), Windows (WSL2)
 
 ## Tech Stack

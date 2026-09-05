@@ -9,7 +9,7 @@ Every signature below is verified against the built module (`go get github.com/b
 
 ## Prerequisites
 
-- Go 1.24+ with CGO enabled (the default) — see [Go quickstart](/getting-started/quickstart-go) for the full install flow (`go get` + `cmd/setup`).
+- Go 1.24+ with CGO enabled (the default) — see [Go quickstart](/getting-started/quickstart) for the full install flow (`go get` + `cmd/setup`).
 
 ```bash
 go get github.com/boxlite-ai/boxlite/sdks/go
@@ -176,11 +176,11 @@ boxlite: internal error: spawn_failed: ... executable 'definitely-not-a-binary' 
 
 ### Nil-pointer dereference after a failed `Exec`
 
-See the [Go quickstart](/getting-started/quickstart-go#a-failed-exec-panics-with-a-nil-pointer-dereference) — a start failure returns `(nil, err)`; check `err` first.
+See the [Go quickstart](#a-failed-exec-panics-with-a-nil-pointer-dereference) — a start failure returns `(nil, err)`; check `err` first.
 
 ### `Cmd.Run`/`Output` return `nil` on a non-zero exit
 
-This is intentional and matches `Box.Exec`, but it is the opposite of `os/exec`'s behavior — see the [Go quickstart](/getting-started/quickstart-go#a-non-zero-exit-code-was-not-reported-as-an-error).
+This is intentional and matches `Box.Exec`, but it is the opposite of `os/exec`'s behavior — see the [Go quickstart](#a-non-zero-exit-code-was-not-reported-as-an-error).
 
 ### `ld: warning: ignoring duplicate libraries: '-lresolv'`
 
@@ -188,11 +188,48 @@ A harmless link-time warning on macOS, reproduced on every build against this SD
 
 ### `context deadline exceeded` from `cmd/setup`
 
-The one-time native-library download can exceed the tool's internal timeout on a slow connection. Re-running it resumes from whatever was already extracted — see the [Go quickstart](/getting-started/quickstart-go#setup-download-times-out).
+The one-time native-library download can exceed the tool's internal timeout on a slow connection. Re-running it resumes from whatever was already extracted — see the [Go quickstart](#setup-download-times-out).
 
 ---
 
 ## Next steps
 
-- [Go quickstart](/getting-started/quickstart-go) for the full install flow and a runnable first program.
+- [Go quickstart](/getting-started/quickstart) for the full install flow and a runnable first program.
 - [Box types](/manage-sandbox/sandbox-types) and [Manage sandboxes](/manage-sandbox/index) for the capabilities every SDK shares, expressed here as `BoxOption` functional options instead of keyword arguments.
+
+## Go-specific troubleshooting
+
+Carried over from the per-language quickstart, which is now one page for all languages.
+
+### Setup download times out
+
+```text
+boxlite-setup: download failed: tar: context deadline exceeded (Client.Timeout or context cancellation while reading body)
+```
+
+`cmd/setup` downloads a large (~100+ MB) archive under a fixed timeout. On a slow connection this can fail partway through — reproduced on this machine after successfully extracting `libboxlite.a` but before reaching `boxlite.h`. Re-run `go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup`; it detects the already-extracted files and resumes from there. It succeeded on the fourth attempt in this environment.
+
+### A failed `Exec` panics with a nil-pointer dereference
+
+```text
+panic: runtime error: invalid memory address or nil pointer dereference
+```
+
+A start failure (for example, a missing binary) returns `(nil, err)` from `Exec`, not a `res` with a nonzero `ExitCode`. Always check `err` before reading `res`:
+
+```go
+res, err := box.Exec(ctx, "definitely-not-a-binary")
+if err != nil {
+	log.Fatal(err) // res is nil here — do not dereference it
+}
+fmt.Println(res.ExitCode)
+```
+
+### A non-zero exit code was not reported as an error
+
+`Exec`, `Cmd.Run`, and `Cmd.Output` all return `nil` for `err` when the command itself ran and simply exited non-zero — check `ExitCode` yourself:
+
+```go
+res, _ := box.Exec(ctx, "sh", "-c", "exit 7")
+fmt.Println(res.ExitCode) // 7, err was nil
+```

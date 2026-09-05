@@ -1,224 +1,50 @@
 ---
 title: "Agent tools"
-description: "The capabilities an agent calls inside an isolated sandbox: run commands, run generated code, move files, and drive a terminal, desktop, or browser."
+sidebarTitle: "Agent tools"
+description: "The capabilities an agent calls: run code, run any command, drive a terminal, a browser, or a desktop, and expose it all over MCP."
 ---
 
-Agent-produced commands are untrusted — they may delete files, exfiltrate data, or install anything. Each box is a disposable microVM, so moving only the execute step inside leaves the host untouched.
+These are the things an agent *does* inside a box. Each page owns one capability, its parameters, and a runnable example.
 
-## Navigation
+If the agent should live **inside** the box rather than call into it, see [Agent in a box](/agent-in-box/index) instead.
 
-The capabilities an agent needs, grouped by purpose. Each capability below has its own subpage with a Quick Example, a parameter table, and Troubleshooting:
+## In this section
 
-| Capability | Which agent need it solves | Main SDK entry point |
-|---|---|---|
-| Run commands (exec) | Run arbitrary shell commands; get stdout/stderr/exit code | `SimpleBox.exec(cmd, *args)` / lower-level `Box.exec` |
-| Run code (CodeBox) | Run agent-generated Python / any-language code; install packages on demand | `CodeBox.run` / `run_script` / `install_package(s)` |
-| Read and write files | Feed context and data in; copy artifacts out | `box.copy_in(...)` / `box.copy_out(...)` |
-| Interactive terminal (PTY) | Interactive programs that need a TTY (REPLs, `top`, debuggers) | `InteractiveBox` (Python / Node); lower-level `Box.exec(tty=True)` |
-| Desktop operations (computer use) | Mouse / keyboard / screenshots to drive GUI apps | `ComputerBox` (Python / Node) |
-| Browser automation | Connect Playwright / CDP to a browser inside the sandbox | `BrowserBox` (Python / Node) |
-| Run Claude Code / AI CLIs | Run agent CLIs such as Claude Code inside the sandbox | `SkillBox.call` / `install_skill`, or `box.exec("claude", ...)` |
+<CardGroup cols={2}>
+  <Card title="Run Python" icon="python" href="/agent-tools/code-execution-python">
+    `CodeBox` and stdout back — the shortest path from an LLM's output to a result.
+  </Card>
+  <Card title="Run any command" icon="terminal" href="/agent-tools/code-execution-any-language">
+    Any shell command or executable, in any language, in a disposable microVM.
+  </Card>
+  <Card title="Pseudo-terminal" icon="keyboard" href="/agent-tools/pseudo-terminal">
+    A real interactive terminal, like `docker exec -it`.
+  </Card>
+  <Card title="Browser automation" icon="globe" href="/agent-tools/browser-automation">
+    A real Chromium, Firefox, or WebKit, exposed over CDP.
+  </Card>
+  <Card title="Computer use" icon="desktop" href="/agent-tools/computer-use">
+    A full Linux desktop the agent can see and click.
+  </Card>
+  <Card title="GitHub operations" icon="code-branch" href="/agent-tools/github-operations">
+    Clone, commit, push, and open pull requests from inside a sandbox.
+  </Card>
+  <Card title="Drive from an agent loop" icon="rotate" href="/agent-tools/drive-from-agent-loop">
+    One safe door: the model proposes, your loop executes.
+  </Card>
+  <Card title="MCP server" icon="plug" href="/agent-tools/mcp-server">
+    Expose sandboxed execution to any Model Context Protocol client.
+  </Card>
+</CardGroup>
 
-Subpages in this section:
+## Which page do I want?
 
-- [Run any language / command](/agent-tools/code-execution-any-language) — `SimpleBox.exec`
-- [Run Python code](/agent-tools/code-execution-python) — `CodeBox`
-- [Interactive shell (PTY)](/agent-tools/pseudo-terminal) — `InteractiveBox`
-- [Browser automation](/agent-tools/browser-automation) — `BrowserBox`
-- [Computer use](/agent-tools/computer-use) — `ComputerBox`
-- [GitHub operations](/agent-tools/github-operations)
-- [Drive a sandbox from your agent loop](/agent-tools/drive-from-agent-loop) — the host-side LLM tool-use loop
-- [MCP tool handler](/agent-tools/mcp-server)
-
----
-
-## Which Box should I use?
-
-You do not need to build a Box from scratch for each capability. BoxLite provides **Box types with preset images and wrapper methods**. Pick one by the agent's task, then call the matching method:
-
-| Box type | When to choose it | Default image |
-|---|---|---|
-| `SimpleBox` | Run any command, move files, most general | You pass `image` (one of `image` / `rootfs_path` is required) |
-| `CodeBox` | The agent writes code for you to execute (data analysis, scripts) | `python:slim` |
-| `InteractiveBox` | Interactive programs that need a PTY | You pass `image` (positional, required) |
-| `ComputerBox` | Desktop GUI automation (mouse / keyboard / screenshots) | `lscr.io/linuxserver/webtop:ubuntu-xfce` |
-| `BrowserBox` | Web automation (Playwright / CDP) | `mcr.microsoft.com/playwright:v1.58.0-jammy` |
-| `SkillBox` | Run AI CLIs such as Claude Code inside the sandbox | `ghcr.io/boxlite-ai/boxlite-skillbox:0.1.0` |
-
-> The images for `CodeBox` / `BrowserBox` / `ComputerBox` / `SkillBox` are **fixed** (the constructor still accepts an `image` override for `CodeBox`, but the others do not). `SimpleBox` / `InteractiveBox` require you to provide `image`. See each subpage for the full parameter set.
-
----
-
-## Quick Example (minimal happy path)
-
-The most fundamental agent tool is **exec** — running a command inside the sandbox and reading the result. Both snippets below run as-is.
-
-<CodeGroup>
-
-```python Python
-import asyncio
-from boxlite import SimpleBox, CodeBox
-
-async def main():
-    # ---- 1. Run an arbitrary shell command (the most general agent tool) ----
-    try:
-        # auto_remove=True is the wrapper-layer default: cleaned up on exiting async with
-        async with SimpleBox(image="alpine:latest") as box:
-            # exec takes (command, *args); returns ExecResult
-            result = await box.exec("echo", "hello from an agent")
-
-            # Important: a non-zero exit code does NOT raise; you must check exit_code
-            if result.exit_code != 0:
-                print("command failed:", result.stderr)
-            else:
-                print("stdout:", result.stdout.strip())
-    except RuntimeError as e:
-        # Image pull failure / no virtualization raises a standard RuntimeError (not BoxliteError)
-        print("startup or pull failed:", e)
-
-    # ---- 2. Run agent-generated Python code (CodeBox defaults to python:slim) ----
-    try:
-        async with CodeBox() as code_box:
-            # run() executes a code string and returns stdout (str)
-            generated_code = "print(sum(range(1, 11)))"
-            output = await code_box.run(generated_code)
-            print("code output:", output.strip())
-    except RuntimeError as e:
-        print("CodeBox failed:", e)
-
-asyncio.run(main())
-```
-
-```typescript Node.js
-// The package name is @boxlite-ai/boxlite (not 'boxlite', not '@boxlite/sdk')
-import { SimpleBox, CodeBox } from "@boxlite-ai/boxlite";
-
-async function main(): Promise<void> {
-  // ---- 1. Run an arbitrary shell command ----
-  try {
-    // await using: cleaned up automatically at end of scope per autoRemove (default true)
-    await using box = new SimpleBox({ image: "alpine:latest" });
-
-    const result = await box.exec("echo", "hello from an agent");
-
-    if (result.exitCode !== 0) {
-      console.error("command failed:", result.stderr);
-    } else {
-      console.log("stdout:", result.stdout.trim());
-    }
-  } catch (e) {
-    console.error("failed:", e);
-  }
-
-  // ---- 2. Run agent-generated code (CodeBox image defaults to python:slim) ----
-  try {
-    await using codeBox = new CodeBox();
-    const output = await codeBox.run("print(sum(range(1, 11)))");
-    console.log("code output:", output.trim());
-  } catch (e) {
-    console.error("CodeBox failed:", e);
-  }
-}
-
-main();
-```
-
-</CodeGroup>
-
----
-
-## Parameters and Returns (entry-point quick reference)
-
-This is a navigation page; it lists only the **core entry points and return types** for each capability. See each subpage for the full parameter set and defaults.
-
-### Run commands
-
-| Entry point | Signature (key parameters) | Returns | Notes |
-|---|---|---|---|
-| `SimpleBox.exec` | `exec(cmd, *args, env=None, user=None, timeout=None, cwd=None)` | `ExecResult` | `timeout` is a **float**; `env` is a **dict** |
-| `Box.exec` (lower-level) | `exec(command, args=None, env=None, tty=False, user=None, timeout_secs=None, cwd=None)` | `Execution` | the timeout parameter is named **`timeout_secs`**; `env` is `list[tuple]` |
-| Node `SimpleBox.exec` | `exec(cmd, args?, env?, { cwd?, user?, timeoutSecs? })` | `Promise<ExecResult>` | `env` is `Record<string,string>` |
-
-### Run code (`CodeBox`, extends `SimpleBox`)
-
-| Entry point | Signature | Returns | Notes |
-|---|---|---|---|
-| `run` | `run(code, timeout=None)` | `str` (stdout) | `timeout` is an **int** and is not enforced — use `exec` for a hard timeout |
-| `run_script` | `run_script(script_path)` | `str` | runs a script file from the host |
-| `install_package` | `install_package(package)` | `str` | equivalent to `pip install <package>` |
-| `install_packages` | `install_packages(*packages)` | `str` | install several at once |
-
-### Read and write files
-
-| Entry point | Signature (key parameters) | Description |
-|---|---|---|
-| `copy_in` | `copy_in(host_path, container_dest, *, overwrite=True, follow_symlinks=False, include_parent=True)` | host -> Box |
-| `copy_out` | `copy_out(container_src, host_dest, ...)` | Box -> host |
-
-### `ExecResult` fields (Python wrapper layer)
-
-| Field | Type | Description |
-|---|---|---|
-| `exit_code` | `int` | Exit code; **a non-zero value does not raise** — check it yourself |
-| `stdout` | `str` | Standard output |
-| `stderr` | `str` | Standard error |
-| `error_message` | `str` / `None` | Non-`None` only when the process died unexpectedly |
-
-> The Node fields are camelCase: `exitCode` / `stdout` / `stderr`.
-
----
-
-## Troubleshooting
-
-### An `exec` command "failed" but raised nothing
-
-When a command exits with a non-zero code, `exec` **does not raise**; it returns `ExecResult(exit_code != 0)`.
-
-```python
-result = await box.exec("false")  # exit_code = 1
-if result.exit_code != 0:
-    ...
-```
-
-By contrast, a **missing command** or an **image pull failure** raises a **standard `RuntimeError`** (in Node, a **bare `Error`** with `instanceof BoxliteError === false` and a message such as `internal error: spawn_failed: ...`). Use a broad `except RuntimeError` / `catch` as your fallback; do not catch only `BoxliteError`.
-
-### Wrong package or class name
-
-- The Python package is **`boxlite`**. Install the latest published version; check it with `pip show boxlite`.
-- The Node runtime class is **`JsBoxlite`** (there is no bare `Boxlite`). For day-to-day use, the wrapper layer (`SimpleBox` / `CodeBox`, etc.) is enough; you do not need to touch the runtime class directly.
-
-### Mistakenly `await`ing `box.info()`
-
-`info()` is a **synchronous** method (it does not touch the VM). Writing `await box.info()` raises an error (for example, `TypeError: object BoxInfo can't be used in 'await' expression`). Call `box.info()` directly; read state via `box.info().state.status`.
-
-### Passing a list to `SimpleBox.exec(env=...)`
-
-The wrapper-layer `SimpleBox.exec` requires `env` to be a **dict** (for example, `env={"KEY": "value"}`), not a list. Only the lower-level native `Box.exec` uses `list[tuple[str,str]]`.
-
-### The timeout parameter name / type differs by layer
-
-- The lower-level `Box.exec` uses **`timeout_secs`**.
-- The wrapper-layer `SimpleBox.exec` uses **`timeout` (float)**.
-- `CodeBox.run` uses **`timeout` (int)**. When you need an enforced timeout, use `SimpleBox.exec`'s `timeout`.
-
-### Passing `image` to a fixed-image Box
-
-`BrowserBox` and `ComputerBox` pin their images: their constructors do not accept `image`. `CodeBox` (default `python:slim`) and `SkillBox` (default `ghcr.io/boxlite-ai/boxlite-skillbox:0.1.0`) do accept an `image` override — but `SkillBox`'s installer assumes its default image's Ubuntu layout, so overriding it is an advanced case. If an agent task needs a fully custom image, use `SimpleBox(image=...)` and run the commands / set up the environment yourself.
-
-### Startup failure: no hardware virtualization
-
-BoxLite needs hardware virtualization to launch a microVM:
-
-- **Linux**: requires KVM (`/dev/kvm` must be accessible; on WSL2, enable KVM and put the user in the `kvm` group).
-- **macOS**: uses Apple's Hypervisor.framework, so **no `/dev/kvm` is needed**. macOS Intel is not supported.
-- **Environments without virtualization** (some containers / CI): `start()` fails and raises, but the process stays alive — catch it with `try/except`.
-
-Platform support: macOS ARM64 (supported) · Linux x86_64 (supported) · Linux ARM64 (supported) · Windows WSL2 (supported) · macOS Intel (not supported).
-
----
-
-## Next steps
-
-- Don't have the Box lifecycle mental model yet? Start with [Manage Sandbox](/manage-sandbox/index).
-- Want to understand each Box type and its default resources? See [Box types](/manage-sandbox/sandbox-types).
-- Need to tune CPU / memory? See [Compute Resources](/manage-sandbox/compute-resources).
+| You are asking | Page |
+|---|---|
+| Run code an LLM just wrote | [code execution python](/agent-tools/code-execution-python) |
+| Run a build, a test suite, or any binary | [code execution any language](/agent-tools/code-execution-any-language) |
+| Keep a shell session open across turns | [pseudo terminal](/agent-tools/pseudo-terminal) |
+| Let the agent browse the web | [browser automation](/agent-tools/browser-automation) |
+| Let the agent use a GUI | [computer use](/agent-tools/computer-use) |
+| Wire this into an existing tool-calling loop | [drive from agent loop](/agent-tools/drive-from-agent-loop) |
+| Expose it to Claude Desktop or another MCP client | [mcp server](/agent-tools/mcp-server) |

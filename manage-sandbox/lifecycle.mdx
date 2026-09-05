@@ -13,6 +13,7 @@ stateDiagram-v2
     [*] --> Created: SimpleBox(...) / runtime.create()
     Created --> Running: async with entry, start(), or first exec()
     Running --> Stopped: stop()
+    Running --> Stopped: main command exits
     Stopped --> Running: start() or exec() again
     Stopped --> [*]: runtime.remove(id, force=)
     Running --> [*]: auto_remove=True on stop
@@ -31,7 +32,7 @@ stateDiagram-v2
 |---|---|---|---|
 | **Created** | `SimpleBox(...)` or `await runtime.create(...)` | A handle and a database record. **No VM yet** | Nothing on the box itself — the next `exec` or `async with` entry starts it |
 | **Running** | `async with` entry, `start()`, or the first `exec()` | VM up, rootfs mounted | `exec`, `copy_in` / `copy_out`, `metrics()`. `start()` is idempotent |
-| **Stopped** | `stop()` | VM released, **rootfs and metadata kept** | Still found by `get()` / `list_info()`; `exec` or `start()` brings it back with files intact |
+| **Stopped** | `stop()`, or the main command exiting | VM released, **rootfs and metadata kept** | Still found by `get()` / `list_info()`; `exec` or `start()` brings it back with files intact |
 | **Removed** | `runtime.remove(id, force=)`, or `auto_remove=True` on stop | Nothing | Gone from the runtime and from disk |
 
 Two transitions are worth committing to memory:
@@ -39,7 +40,91 @@ Two transitions are worth committing to memory:
 - **Creation is lazy.** Constructing a box returns a handle; the microVM comes up on first use. A box that never runs costs nothing but a database row.
 - **Stop is not remove.** `stop()` frees the VM but keeps the disk, so restarting reuses everything the box had installed. That is what makes a box a reusable workspace rather than a one-shot container.
 
-Read the current state with `box.info().state.status`. **`info()` is synchronous** — do not await it, and it triggers no VM operation. Field names are exact and easy to get wrong: see [`BoxInfo` / `BoxStateInfo`](#boxinfo-boxstateinfo-state-access).
+Read the current state with `info = await box.info()`. **It must be awaited on every type** — the native `Box` returns an awaitable Future and `SimpleBox` returns a coroutine; neither yields `BoxInfo` directly. Field names are exact and easy to get wrong: see [`BoxInfo` / `BoxStateInfo`](#boxinfo-boxstateinfo-state-access).
+
+## The main command
+
+Every box has one **main command**: the `entrypoint + cmd` it was created with, running as the container init — PID 1 inside the box. It is the process the box exists to run, and the box's lifetime is tied to it.
+
+A main command of `sh -c 'echo "pid=$$"; exit 7'` prints `pid=1`, confirming it is init rather than a process alongside one.
+
+Three things stop a box, and only one of them is a call you make:
+
+| Cause | Trigger |
+|---|---|
+| **The main command exits** | It finishes, or it crashes |
+| `stop()` | You call it |
+| `auto_stop` | Idle timeout, on BoxLite Cloud — see [Box lifecycle](/cloud/box-lifecycle) |
+
+Two rules follow:
+
+- **Once the main command has exited, `exec` is refused**: `RuntimeError: invalid state: Cannot exec box <id>: it is stopped, and its main command has already exited`. Bring the box back with `start()`.
+- **You cannot stop the main command from inside the box.** `kill -TERM 1` is dropped, because PID 1 in a PID namespace ignores signals it has no handler for. That is kernel behaviour, not a BoxLite bug. It ends when it exits on its own, or when the host calls `stop()`.
+
+**There is no restart policy.** A main command that crashes stops the box; nothing restarts it. Supervise from the host — check the state and call `start()` — or use the pattern below that keeps your workload off the main command.
+
+Status flips about a second after the main command exits, so poll it rather than reading it immediately.
+
+For how `entrypoint` and `cmd` combine into the main command, see [Environment and startup](/manage-sandbox/environment#the-relationship-between-entrypoint-and-cmd).
+
+## Exit codes
+
+`BoxStateInfo` carries `pid`, `running` and `status` — **no exit code**. To read the main command's exit code, attach to it. `attach()` with no argument follows the main command's session, and its `wait()` returns the code:
+
+```python
+import asyncio
+
+from boxlite import BoxOptions, Boxlite
+
+
+async def main() -> None:
+    runtime = Boxlite.default()
+    # attach() lives on the box returned by runtime.create(), not on SimpleBox
+    box = await runtime.create(BoxOptions(
+        image="alpine:latest",
+        cmd=["sh", "-c", "echo 'work done'; exit 7"],
+    ))
+    await box.start()
+
+    execution = await box.attach()          # no argument: the main command's session
+    async for line in execution.stdout():
+        print(line.rstrip())                # -> work done
+
+    result = await execution.wait()
+    print("exit code:", result.exit_code)   # -> 7
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Two constraints shape that example:
+
+- `attach()` exists on the box returned by `runtime.create()`. **`SimpleBox` has no `attach()`**, and neither does the sync API, so reading a main command's exit code means using `Boxlite` and `BoxOptions` directly.
+- Exit codes from `exec` are separate and easier: `ExecResult.exit_code`, no attach needed. See [Run any language](/agent-tools/code-execution-any-language#parameters-and-returns).
+
+## Three ways to start work in a box
+
+Which one you pick decides whether the box outlives the work.
+
+| Pattern | How | Box lifetime | Cost |
+|---|---|---|---|
+| **Work beside the main command** | Keep the image's main command; run jobs with `exec`, services with `nohup … &` | Independent of the work | A crashed service leaves the box `running` and the port dead |
+| **Work as the main command** | Set `entrypoint` / `cmd`, then `attach()` | Bound to the work | Requires `runtime.create()`; `SimpleBox` has no `attach()` |
+| **Detached main command** | Work as the main command, plus `detach=True` and `auto_delete=0` | Outlives the process that created it | You remove it yourself |
+
+Most agent work wants the first: the agent is a job, and you still want to read its workspace after it finishes. A long-running service usually wants the second, so that a dead service means a dead box rather than a silent one.
+
+### Detached main command
+
+`detach=True` keeps the box alive after the creating process exits. It rejects the default removal behaviour, since a box that removes itself on stop cannot be managed later:
+
+```text
+invalid argument: remove-on-stop is incompatible with detach=true.
+Detached boxes should use auto_delete=0 (or deprecated auto_remove=false) for manual lifecycle control.
+```
+
+Set `auto_delete=0` alongside it, and stop the box yourself when you are done. A local runtime has no idle timeout, so a detached box runs until something stops it.
 
 ## Walking the states in code
 
@@ -76,8 +161,8 @@ async def main():
             result = await execution.wait()
             print(f"  exit_code = {result.exit_code}")  # a non-zero exit code does not raise; check it yourself
 
-            # 3. state query: info() is synchronous; do not await
-            info = box.info()
+            # 3. state query: info() must be awaited
+            info = await box.info()
             print(f"  state = {info.state.status}, running = {info.state.running}")
 
             # 4. stop (shut down the VM, preserve rootfs)
@@ -126,8 +211,8 @@ async function main(): Promise<void> {
     const result = await execution.wait();
     console.log(`  exitCode = ${result.exitCode}`); // a non-zero exit code does not throw; check it yourself
 
-    // 3. state query: info() is synchronous; do not await
-    const info = box.info();
+    // 3. state query — in Node, info() returns a Promise
+    const info = await box.info();
     console.log(`  state = ${info.state.status}`);
 
     // 4. stop (shut down the VM, preserve rootfs)
@@ -152,7 +237,7 @@ main();
 
 </CodeGroup>
 
-> Key point: `Boxlite` is a **synchronous** context manager (`with`), whereas a `Box`'s methods (`exec`/`stop`/`metrics`) are **async** (require `await`). `box.info()` is synchronous and must not be awaited.
+> Key point: `Boxlite` is a **synchronous** context manager (`with`), whereas a `Box`'s methods (`exec`/`stop`/`metrics`) are **async** (require `await`). `box.info()` must be awaited as well.
 
 Verified: real run prints `created: <box-id>`, `hello from box`, `exitCode = 0`, `state = running`, `stopped`, `removed`.
 
@@ -635,23 +720,23 @@ Verified: real run prints `running boxes before shutdown: 3`, `shutdown complete
 | `shutdown(timeout=None)` | — | Shut down all Boxes (seconds; `None`=10s, `-1`=indefinite) |
 | `close()` | — | Close the runtime handle (synchronous) |
 
-### `Box` methods (async, require `await`, except `info()`)
+### `Box` methods (async, all require `await`)
 
 | Method | Returns | Description |
 |---|---|---|
 | `start()` | — | Bring up the VM, idempotent |
 | `stop()` | — | Shut down the VM, preserve the rootfs (unless `auto_remove=True`) |
 | `exec(command, args=None, ...)` | `Execution` | Run a command; triggers a restart on a stopped Box |
-| `info()` | `BoxInfo` | **Synchronous**, do not `await`; does not trigger the VM |
+| `info()` | `BoxInfo` | **Await it**; does not trigger the VM |
 | `metrics()` | `BoxMetrics` | Per-Box metrics |
 | `id` / `name` | str | Properties |
 
 ### `BoxInfo` / `BoxStateInfo` (state access)
 
-`box.info()` returns a `BoxInfo`; its `state` field is a `BoxStateInfo`, and the state string is at `state.status`:
+`await box.info()` returns a `BoxInfo`; its `state` field is a `BoxStateInfo`, and the state string is at `state.status`:
 
 ```python
-info = box.info()           # synchronous
+info = await box.info()     # awaited on every box type
 print(info.state.status)    # state string
 print(info.state.running)   # bool
 print(info.id, info.image, info.cpus, info.memory_mib)
@@ -668,13 +753,16 @@ print(info.id, info.image, info.cpus, info.memory_mib)
 
 ## Troubleshooting
 
-### Awaiting `Box.info()` as if it were async
+### `info()` returns a coroutine, or refuses to be awaited
 
-`info()` is a **synchronous** method.
+`info()` never returns `BoxInfo` directly — it must be awaited on every type. The native `Box` hands back an awaitable Future and `SimpleBox` a coroutine, so forgetting `await` fails slightly differently but always fails.
 
 ```python
-# Wrong: await box.info()  ->  TypeError: object BoxInfo can't be used in 'await' expression
-info = box.info()                 # correct
+info = await box.info()           # every box type
+
+# box.info().state on the native Box  ->  AttributeError: '_asyncio.Future' object has no attribute 'state'
+# box.info().state on a SimpleBox     ->  AttributeError: 'coroutine' object has no attribute 'state'
+
 print(info.state.status)          # not info.status, and not info.state.state
 ```
 
@@ -720,6 +808,23 @@ async for chunk in execution.stdout():
 
 `exec` reports a non-zero exit through `exit_code` / `exitCode`, not by raising. See [Error Handling](/guides/error-handling#troubleshooting).
 
+### The box stopped without anyone calling `stop()`
+
+Its main command exited. `exec` then fails with `invalid state: Cannot exec box <id>: it is stopped, and its main command has already exited`. Either keep the main command long-running, or treat the box as single-shot and read its exit code with `attach()`. See [The main command](#the-main-command).
+
+### `kill -TERM 1` leaves the main command running
+
+Expected: PID 1 in a PID namespace ignores signals with no handler. Stop the box from the host with `stop()` instead.
+
+### `exec` rejects its arguments with a type error
+
+`Box.exec` takes a list, `SimpleBox.exec` takes varargs. Passing a list to the second raises `TypeError: argument 'args': Can't extract str to Vec`, which does not name the expected shape.
+
+```python
+await box.exec("ls", ["-la"])   # Box, from runtime.create()
+await box.exec("ls", "-la")     # SimpleBox
+```
+
 ### No virtualization causes startup failure (environment constraint)
 
 BoxLite requires hardware virtualization:
@@ -753,7 +858,8 @@ async def main():
         async with SimpleBox(image="alpine:latest", auto_remove=True) as box:
             result = await box.exec("echo", "hello")  # ExecResult
             print(result.stdout, "exit:", result.exit_code)
-            print("state:", box.info().state.status)   # info() is synchronous
+            info = await box.info()                    # SimpleBox: info() is a coroutine
+            print("state:", info.state.status)
     except RuntimeError as exc:
         print(f"run failed (check virtualization): {exc}")
 
@@ -762,3 +868,108 @@ if __name__ == "__main__":
 ```
 
 > `SimpleBox.exec`'s timeout parameter is `timeout` (float) and its `env` is a `dict`; whereas the underlying `Box.exec`'s timeout parameter is `timeout_secs` and its `env` is a `list[tuple]`. For detach / cross-process / explicit restart, continue to use `Boxlite` + `Box` directly, because those operations require access to the Box id and the runtime.
+
+## A tour of the whole lifecycle
+
+Moved here from the section index, which is now a summary and an index.
+
+
+Both examples below are directly runnable.
+
+### A. Wrapper layer: lazy create and automatic cleanup (recommended starting point)
+
+`SimpleBox` lazily creates and starts the Box on `async with` entry and, on exit, destroys it automatically according to `auto_remove` (default `True`), without touching the runtime handle directly.
+
+```python
+import asyncio
+from boxlite import SimpleBox
+
+async def main():
+    try:
+        # auto_remove=True is the default: cleanup happens automatically on async with exit
+        async with SimpleBox(image="alpine:latest") as box:
+            print("box id:", box.id)
+
+            # info() must be awaited on every box type
+            info = await box.info()
+            print("state:", info.state.status)  # BoxStateInfo.status is a string
+
+            # a non-zero exit code does not raise; check exit_code yourself
+            result = await box.exec("echo", "hello from boxlite")
+            print("exit_code:", result.exit_code)
+            print("stdout:", result.stdout.strip())
+    except RuntimeError as e:
+        # image pull failure / no virtualization raises a standard RuntimeError
+        print("startup or pull failed:", e)
+
+asyncio.run(main())
+```
+
+### B. Explicit runtime management: create a named Box, reuse it across calls, then remove it explicitly
+
+When you need a long-lived Box or want to reuse one across processes, operate the `Boxlite` runtime directly. Note two things: `Boxlite` enters with a **synchronous** `with`, but its **business methods are `async` and must be awaited**; a single `Box` is still an **async** context manager.
+
+
+<CodeGroup>
+
+```python Python
+import asyncio
+from boxlite import Boxlite, BoxOptions
+
+async def main():
+    with Boxlite.default() as runtime:
+        try:
+            # get_or_create is idempotent: reuse an existing Box with the same name, otherwise create one (async, must await)
+            box, created = await runtime.get_or_create(
+                BoxOptions(image="alpine:latest", auto_remove=False),
+                name="my-worker",
+            )
+            print("created new box?", created)
+
+            # a single Box is an async context manager
+            async with box:
+                result = await box.exec("uname", "-a")
+                print(result.stdout.strip())
+
+            # listing: the runtime method is list_info() (not list()), and it is async, must await
+            for bi in await runtime.list_info():
+                print(bi.id, bi.name, bi.state.status)
+
+        finally:
+            # removal is the runtime's responsibility: await runtime.remove(...), not box.remove()
+            try:
+                await runtime.remove("my-worker", force=True)
+            except Exception as e:
+                print("error during removal (ignorable, may already be cleaned up):", e)
+
+asyncio.run(main())
+```
+
+```typescript Node.js
+import { SimpleBox } from "@boxlite-ai/boxlite";
+
+async function main(): Promise<void> {
+  try {
+    // await using: cleanup happens automatically at scope exit per autoRemove (default true)
+    await using box = new SimpleBox({ image: "alpine:latest" });
+
+    const result = await box.exec("echo", "hello from boxlite");
+    console.log("exitCode:", result.exitCode);
+    console.log("stdout:", result.stdout.trim());
+
+    // in Node, info() returns a Promise on every type
+    const info = await box.info();
+    console.log("state:", info.state.status);
+  } catch (e) {
+    console.error("failed:", e);
+  }
+}
+
+main();
+```
+
+</CodeGroup>
+
+> Node differences: the package is `@boxlite-ai/boxlite`; the runtime class is `JsBoxlite` (there is no bare `Boxlite`); listing uses `listInfo()`; removal uses `runtime.remove(idOrName, force?)`; `SimpleBox` uses `await using` for automatic cleanup; `info()` and `getInfo()` both return a `Promise`.
+
+---

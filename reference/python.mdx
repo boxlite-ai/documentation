@@ -63,7 +63,6 @@ The main symbols importable via the top-level `from boxlite import ...`:
 | Exceptions | `BoxliteError`, `ExecError`, `TimeoutError`, `ParseError` |
 | Snapshot / export | `SnapshotHandle`, `SnapshotInfo`, `SnapshotOptions`, `CloneOptions`, `ExportOptions`, `CopyOptions`, `HealthCheckOptions` |
 
-> Note: `AdvancedBoxOptions` is **not** exported at the top level; you must use `from boxlite.boxlite import AdvancedBoxOptions` (see [4.7 Security options](#security-options-securityoptions-advancedboxoptions)).
 
 ### `Boxlite` (runtime handle)
 
@@ -180,7 +179,7 @@ if __name__ == "__main__":
 
 ### `Box` (native sandbox handle, async context manager)
 
-`Box` is the low-level handle. It is an **async context manager** (`async with`); execution methods must be awaited, but `info()` is **synchronous**.
+`Box` is the low-level handle. It is an **async context manager** (`async with`); every method must be awaited, including `info()`, which returns an awaitable Future.
 
 | Method | Signature | Notes |
 |---|---|---|
@@ -190,8 +189,8 @@ if __name__ == "__main__":
 | `copy_out` | `(container_src, host_dest, copy_options=None)` | async |
 | `clone_box` | `(*, options=None, name=None)` | async, returns a new `Box` |
 | `export` | `(*, options=None, dest)` | async |
-| `attach` | `(execution_id)` | async |
-| `info` | `() -> BoxInfo` | **synchronous**, do not await |
+| `attach` | `(execution_id=None)` | async. **With no argument, attaches to the init session** — the `entrypoint + cmd` process — which is the only way to read its exit code. With an `execution_id`, reattaches to that exec session. Not available on `SimpleBox` or the sync API |
+| `info` | `() -> BoxInfo` | **await it** — returns an awaitable Future |
 | `metrics` | `() -> BoxMetrics` | async |
 
 Properties: `id`, `name`, `snapshot` (`SnapshotHandle`).
@@ -262,11 +261,10 @@ opts = BoxOptions(
 
 ### Security options (`SecurityOptions` + `AdvancedBoxOptions`)
 
-Security configuration is passed via the `advanced` parameter; there is **no** top-level `security=` keyword. `AdvancedBoxOptions` is only available under the `boxlite.boxlite` module.
+Security configuration is passed via the `advanced` parameter; there is **no** top-level `security=` keyword.
 
 ```python
-from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions  # not exported at the top level; must be imported from here
+from boxlite import AdvancedBoxOptions, BoxOptions, SecurityOptions
 
 opts = BoxOptions(
     image="alpine:latest",
@@ -340,7 +338,7 @@ Methods:
 | `copy_in` | `(host_path, container_dest, *, overwrite=True, follow_symlinks=False, include_parent=True)` | — | async |
 | `copy_out` | `(container_src, host_dest, *, ...)` | — | async |
 | `stop` / `shutdown` | `()` | `None` | async (`shutdown` is an alias for `stop`) |
-| `info` | `() -> BoxInfo` | `BoxInfo` | **synchronous** |
+| `info` | `() -> BoxInfo` | `BoxInfo` | **`await box.info()`** — a coroutine here, an awaitable Future on the native `Box`; neither is synchronous |
 
 Properties: `id` (accessing before start raises `RuntimeError`), `created` (whether newly created; `None` before start).
 
@@ -475,10 +473,10 @@ The dataclass returned by `SimpleBox.exec` / `CodeBox.exec`:
 
 ### `BoxInfo` / `BoxStateInfo` (state access)
 
-`box.info()` is a **synchronous** call returning `BoxInfo`. State lives in a two-level structure:
+`info()` returns `BoxInfo` and **must be awaited on every type**. State lives in a two-level structure:
 
 ```python
-info = box.info()           # synchronous; do not await
+info = await box.info()     # awaited on every type
 print(info.state.status)    # correct path: BoxInfo.state -> BoxStateInfo.status (str)
 print(info.state.running)   # bool
 print(info.id, info.image, info.cpus, info.memory_mib)
@@ -620,26 +618,12 @@ Fix: use the bool `read_only` for the third element (`True` = read-only / `False
 BoxOptions(volumes=[("/host", "/mnt", True)])   # read-only
 ```
 
-### `AttributeError: module 'boxlite' has no attribute 'AdvancedBoxOptions'`
-
-`AdvancedBoxOptions` lives in the `boxlite.boxlite` submodule, not the top level — see [Inject secrets and harden a box](/manage-sandbox/secrets-and-security#troubleshooting).
-
-```python
-# Wrong
-import boxlite
-boxlite.AdvancedBoxOptions(...)   # AttributeError
-
-# Correct
-from boxlite.boxlite import AdvancedBoxOptions
-```
-
 ### `AttributeError: ... 'security'` (passing security= at the top level)
 
 `BoxOptions` has no top-level `security=` keyword. Security options must go through `advanced`:
 
 ```python
-from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions
+from boxlite import AdvancedBoxOptions, BoxOptions, SecurityOptions
 
 BoxOptions(image="alpine:latest",
            advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))
@@ -665,7 +649,7 @@ The old field names are deprecated. Use `BoxMetrics.memory_bytes`, `BoxMetrics.c
 
 ### `box.info()` raises a coroutine error / `await` fails
 
-`info()` is a **synchronous** method; do not `await` it. Access state via `box.info().state.status` (not `.status`, not `.state.state`).
+`info()` must be awaited on every type. Access state via `info.state.status` (not `.status`, not `.state.state`).
 
 ### `RuntimeError` on box start (environment constraint)
 

@@ -397,7 +397,7 @@ main();
 | `copy_in(host_path, container_dest, ...)` | async | Copy files from the host into the sandbox |
 | `copy_out(container_src, host_dest, ...)` | async | Copy files from the sandbox to the host |
 | `start()` / `stop()` | async | Start / stop (`async with` manages this automatically) |
-| `info()` | **sync** | Returns `BoxInfo` (do not `await`) |
+| `info()` | **async** | Returns `BoxInfo`; `await box.info()` |
 | `id` | property | Accessing it before start raises `RuntimeError` |
 | `created` | property | Whether the Box was newly created (`True`) or an existing same-named Box was reused (`False`); returns `None` before start |
 
@@ -417,11 +417,10 @@ main();
 | Symptom / error | Cause | Fix |
 |---|---|---|
 | `SimpleBox(...)` raises `ValueError` (missing image/rootfs) | `SimpleBox` requires at least one of `image` and `rootfs_path` | Pass `SimpleBox(image="alpine:latest")` or `rootfs_path=...` |
-| `import boxlite; boxlite.AdvancedBoxOptions` → `AttributeError` | `AdvancedBoxOptions` is not exported at the top level | Use `from boxlite.boxlite import AdvancedBoxOptions`; security options are passed via `BoxOptions(advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))` — there is no top-level `security=` keyword |
 | `SkillBox` raises `ValueError` on entry | No Claude OAuth token was provided | Pass `oauth_token=...` or set the `CLAUDE_CODE_OAUTH_TOKEN` environment variable |
 | A command ran but "succeeded without error yet the result is wrong" | `exec` does not raise on a non-zero exit | Check `result.exit_code != 0` and read `result.stderr` |
 | A missing command / image pull failure raises `RuntimeError` or a bare `Error`, and catching `BoxliteError` does not match | These paths raise a standard `RuntimeError` (Python) / a bare `Error` (Node), **not** `BoxliteError` | Catch with `except RuntimeError` (Python) / a general `catch (err: Error)` (Node); see each example |
 | Startup reports no virtualization / no `/dev/kvm` | The current environment has no hardware virtualization (environment constraint) | Linux requires KVM and the user in the `kvm` group; macOS Apple Silicon uses Hypervisor.framework automatically; WSL2 requires KVM enabled. Environments without virtualization cannot start a microVM |
-| `await box.info()` errors / behaves oddly | `info()` is a **synchronous** method | Call `box.info()` directly, do not `await` it |
+| `box.info()` has no `.state` | `info()` is awaitable on every type | `info = await box.info()` |
 | `BrowserBox.endpoint()` fails to connect to WebKit | `endpoint()` (direct CDP/BiDi) does not support WebKit | Use `playwright_endpoint()` (Playwright Server mode, supports all browsers) |
 | Node: `import { Boxlite } from 'boxlite'` reports a missing module/export | The package name should be `@boxlite-ai/boxlite`, and there is no bare `Boxlite` class | Use `import { CodeBox } from "@boxlite-ai/boxlite"`; the runtime handle class is `JsBoxlite` |

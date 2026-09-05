@@ -55,7 +55,7 @@ The sample goes in explicitly, the verdict comes out explicitly, and there is no
 import asyncio
 
 from boxlite import SimpleBox, NetworkSpec, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions  # not exported at the top level
+from boxlite import AdvancedBoxOptions
 
 
 async def scan_untrusted(sample_host_path: str) -> dict:
@@ -135,7 +135,6 @@ Note the ownership in the listing: the tool ran as uid 1000, not root. The `curl
 |---|---|---|
 | `TypeError: BoxOptions.__new__() got an unexpected keyword argument 'security'` | `security=` is not a top-level parameter | Wrap it: `advanced=AdvancedBoxOptions(security=SecurityOptions.maximum())` |
 | `AttributeError: minimum` on `SecurityOptions` | That preset does not exist | Use `development()`, `standard()`, or `maximum()` |
-| `ImportError` for `AdvancedBoxOptions` | It is not exported at the top level | `from boxlite.boxlite import AdvancedBoxOptions` |
 | The sample is not in the box | `copy_in` is a coroutine that was never awaited | `await box.copy_in(...)` |
 | The tool reports a connection error, not a DNS error | The host was sinkholed to `0.0.0.0`, so the lookup succeeded | Expected with an allowlist; add the host if it is legitimate |
 | Permission denied writing outside `/work` | Privileges were dropped as intended | Write to `/work`, or widen `user=` deliberately |

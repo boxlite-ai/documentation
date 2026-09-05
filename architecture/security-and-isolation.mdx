@@ -3,7 +3,6 @@ title: "Security and isolation"
 description: "How BoxLite's isolation is layered against a guest assumed malicious from the moment it starts, and which layer each SecurityOptions field controls."
 ---
 
-> Import note: `SecurityOptions` is exported at the top level; `AdvancedBoxOptions` lives in the `boxlite.boxlite` submodule.
 
 Two independent lines of defense separate guest from host: a **hardware-level microVM** and a **process-level jailer**. **Defaults differ by layer**: the Rust runtime applies a full jailer when you pass no `SecurityOptions` at all, but constructing `SecurityOptions()` in Python with no fields turns every switch **off**. For untrusted code, always pass `SecurityOptions.standard()` or `.maximum()` rather than relying on any default.
 

@@ -121,7 +121,7 @@ The following scenarios all use the same shim binary (5.4MB) plus dylibs (libkru
 
 The measured 1371ms delta is dominated by two components, both code-signature validation: the spawn→main gap (990ms) and the krun FFI call (427ms). The sandbox policy itself is negligible by comparison. (The two components were timed in separate runs, so they do not sum exactly to the end-to-end delta.)
 
-> The jailer / sandbox is controlled by the security options: `BoxOptions(advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))`. `AdvancedBoxOptions` is not exported at the top level, so use `from boxlite.boxlite import AdvancedBoxOptions`; the `SecurityOptions` presets are `development() / standard() / maximum()` (there is no `.minimum()`).
+> The jailer / sandbox is controlled by the security options: `BoxOptions(advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))`. The `SecurityOptions` presets are `development() / standard() / maximum()` (there is no `.minimum()`).
 
 ## Pipeline Stage Metrics (from `box.metrics()`)
 
@@ -182,7 +182,7 @@ cargo test -p boxlite --test timing_profile boot_timing_profile \
 | `RuntimeError`, `start()` fails immediately | The current environment has no hardware virtualization (no KVM; non-macOS without a hypervisor) | Linux needs KVM with the user in the `kvm` group; WSL2 needs KVM enabled; macOS uses Hypervisor.framework (no `/dev/kvm` required, supports Apple Silicon). This is an environment constraint — the exception can be caught and the process does not exit. |
 | The first box is slow, later boxes are markedly faster | The kernel code-signature validation cache is populated by inode: cold on the first start, hot on reuse | Expected behavior. When starting many boxes in a batch, warm the first one first, or adopt the "shared bin/ directory" approach above. |
 | `await box.metrics()` raises `'coroutine' was never awaited` or similar | `Box.metrics()` is **async** and must be awaited | Use `await box.metrics()`; the `Boxlite` runtime is a **synchronous** CM and `Box` is an **async** CM — do not confuse the two await conventions. |
-| `await box.info()` behaves unexpectedly / errors | `Box.info()` is a **synchronous** method and must not be awaited | Call `box.info()` directly; it returns `BoxInfo`, and the status is in `box.info().state.status`. |
+| `box.info()` has no `.state`, or reports an un-awaited coroutine | `info()` is awaitable on every type: the native `Box` returns a Future, `SimpleBox` returns a coroutine | `info = await box.info()`, then read `info.state.status` |
 | `AttributeError: ... memory_usage_bytes` / `cpu_time_ms` / `active_boxes` | An old/wrong field name was used | Use the real fields: `BoxMetrics.memory_bytes`, `cpu_percent`, `total_create_duration_ms`, `stage_*_ms`; for the runtime use `RuntimeMetrics.num_running_boxes`. |
 | Some `stage_*_ms` is `None` | That stage was not timed or that path did not run (for example, some stages are not populated with the jailer off) | The `stage_*` fields are `Optional`; check for None before reading, and do not perform arithmetic directly. |
 | `ModuleNotFoundError` / import failure (Node: `Cannot find module 'boxlite'`) | Wrong package name | The Python package is `boxlite`; the Node package is `@boxlite-ai/boxlite` (not `boxlite`, not `@boxlite/sdk`). |

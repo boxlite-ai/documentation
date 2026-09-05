@@ -330,14 +330,12 @@ Not all failures are caused by Sandbox. Also check:
 To tell whether the problem is caused by the isolation layer, temporarily switch
 the security level in the SDK. **Note: security options are passed via
 `advanced=AdvancedBoxOptions(security=...)`; there is no top-level `security=`
-keyword**, and `AdvancedBoxOptions` lives only under the `boxlite.boxlite`
-submodule (not exported at the top level):
+keyword**:
 
 ```python
 import asyncio
 import boxlite
-from boxlite import SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions  # not exported at the top level; import from the submodule
+from boxlite import AdvancedBoxOptions, SecurityOptions
 
 async def main() -> None:
     # Presets: development() / standard() / maximum() (there is no .minimum())

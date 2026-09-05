@@ -1,0 +1,326 @@
+---
+title: "Quickstart"
+sidebarTitle: "Quickstart"
+description: "Install BoxLite and run your first sandbox — the same five steps in Python, Node.js, Rust, Go, and C."
+---
+
+Five steps get you a running box: **create it, start it, run something inside, read the output, tear it down.** Every language below does exactly that.
+
+## Prerequisites
+
+- **Hardware virtualization on this machine** — KVM on Linux, Apple Silicon on macOS, WSL2 on Windows. If you do not have it, the box will not start; take the [BoxLite Cloud track](/cloud/quickstart) instead, which needs none.
+- The toolchain for your language: Python 3.9+, Node.js 18+, Rust 1.88+, Go 1.24+ with CGO, or a C11 compiler.
+
+Platform matrix, offline installs, and the CLI are on [Installation](/getting-started/installation).
+
+## Install
+
+<CodeGroup>
+
+```bash Python
+pip install boxlite
+
+# Verify
+python3 -c "import boxlite; print(boxlite.__version__)"
+```
+```bash Node.js
+npm install @boxlite-ai/boxlite
+```
+```bash Rust
+cargo add boxlite
+cargo add tokio --features macros,rt-multi-thread
+cargo add futures
+```
+```bash Go
+go get github.com/boxlite-ai/boxlite/sdks/go
+
+# One-time: fetches the prebuilt native library for your platform
+go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup
+```
+```bash C
+# The C SDK is built from source; see the C track on Installation.
+git clone https://github.com/boxlite-ai/boxlite && cd boxlite
+make sdk-c
+```
+
+</CodeGroup>
+
+<Note>
+**Apple Silicon + Node.js:** the darwin-arm64 native package is published only up to v0.9.7, so `npm install @boxlite-ai/boxlite@latest` installs a version that fails to load. Pin `@boxlite-ai/boxlite@0.9.7` on Apple Silicon.
+</Note>
+
+## Your first box
+
+<CodeGroup>
+
+```python Python
+# hello.py — your first BoxLite sandbox
+import asyncio
+import boxlite
+
+async def main() -> None:
+    try:
+        # async with: the box is created and started on entry, and stopped and cleaned up on exit (auto_remove defaults to True)
+        async with boxlite.SimpleBox(image="python:alpine") as box:
+            print(f"Sandbox started: {box.id}")
+
+            # exec does not raise on a non-zero exit code; check exit_code yourself
+            result = await box.exec("python", "-c", "print('Hello from BoxLite!')")
+
+            print("stdout:", result.stdout.strip())
+            print("exit_code:", result.exit_code)
+            if result.exit_code != 0:
+                print("stderr:", result.stderr.strip())
+    except RuntimeError as exc:
+        # Image pull failure / startup failure without virtualization both raise a standard RuntimeError
+        print(f"Sandbox failed to run: {exc}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+```javascript Node.js
+// hello.mjs — your first BoxLite sandbox
+import { SimpleBox } from "@boxlite-ai/boxlite";
+
+async function main() {
+  // alpine:latest is small and quick to pull, suitable for smoke tests.
+  // Without cpus/memoryMib, the runtime's default VM size applies.
+  // Pass cpus/memoryMib explicitly to control the footprint.
+  const box = new SimpleBox({ image: "alpine:latest" });
+
+  try {
+    // exec(cmd, ...args) -> { exitCode, stdout, stderr }
+    const result = await box.exec("echo", "Hello from BoxLite!");
+
+    // Important: a non-zero exit code does not raise; check exitCode yourself.
+    if (result.exitCode !== 0) {
+      throw new Error(`Command failed (exit ${result.exitCode}): ${result.stderr}`);
+    }
+
+    console.log("stdout:", result.stdout.trim());
+    console.log("exitCode:", result.exitCode);
+  } catch (err) {
+    // Image pull failure / missing command, etc. raise a standard Error (not necessarily a BoxliteError).
+    console.error("Execution error:", err);
+    process.exitCode = 1;
+  } finally {
+    // The box is lazily created; stop() stops and cleans up (autoRemove defaults to true).
+    await box.stop();
+  }
+}
+
+main();
+```
+```rust Rust
+use boxlite::{BoxCommand, BoxOptions, BoxliteRuntime, RootfsSpec};
+use futures::StreamExt; // provides .next() for the stdout stream
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Get the global default runtime (construction is synchronous; do not .await)
+    let runtime = BoxliteRuntime::default_runtime();
+
+    // 2. Configure a box based on the alpine image
+    let options = BoxOptions {
+        rootfs: RootfsSpec::Image("alpine:latest".into()),
+        ..Default::default()
+    };
+
+    // 3. Create the box (pass None as name to let the runtime auto-name it). create/exec/stop are async
+    let litebox = runtime.create(options, None).await?;
+    println!("Created box: {}", litebox.id());
+
+    // 4. Execute a command — note the method is exec (not run)
+    let mut execution = litebox
+        .exec(BoxCommand::new("echo").arg("Hello from BoxLite!"))
+        .await?;
+
+    // 5. Read stdout as a stream (each item is one line String)
+    if let Some(mut stdout) = execution.stdout() {
+        while let Some(line) = stdout.next().await {
+            println!("{}", line);
+        }
+    }
+
+    // 6. Wait for completion and check the exit code (a non-zero code does not error automatically; check it yourself)
+    let result = execution.wait().await?;
+    if !result.success() {
+        eprintln!("Command exited with a non-zero code: {}", result.exit_code);
+    }
+
+    // 7. Cleanup: stop the box
+    litebox.stop().await?;
+
+    Ok(())
+}
+```
+```go Go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// 1. Get the runtime (synchronous construction; no .Close() needed until you're done with it)
+	rt, err := boxlite.NewRuntime()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rt.Close()
+
+	// 2. Create a box (default rootfs is set by the image argument)
+	box, err := rt.Create(ctx, "alpine:latest")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer box.Close()
+
+	// 3. Execute a command — Exec implicitly starts the box on first call
+	res, err := box.Exec(ctx, "echo", "Hello from BoxLite!")
+	if err != nil {
+		// A nil res accompanies a non-nil err: check err before touching res
+		log.Fatal(err)
+	}
+
+	// 4. A non-zero exit code does not become an error — check it yourself
+	if res.ExitCode != 0 {
+		fmt.Printf("command failed (exit=%d): %s", res.ExitCode, res.Stderr)
+		return
+	}
+	fmt.Print(res.Stdout)
+}
+```
+```c C
+#include <stdio.h>
+#include "boxlite.h"
+
+int main(void) {
+    CBoxliteSimple *box = NULL;
+    CBoxliteError error = {0};  /* must be zero-initialized */
+
+    /* Create and automatically start a box. Passing 0 for cpus/memory = use defaults. */
+    BoxliteErrorCode code =
+        boxlite_simple_new("python:slim", 0, 0, &box, &error);
+    if (code != Ok) {
+        fprintf(stderr, "create box failed (code %d): %s\n",
+                error.code, error.message ? error.message : "unknown");
+        boxlite_error_free(&error);  /* free error.message on the failure path too */
+        return 1;
+    }
+
+    /* Run inside the box: python -c "print('Hello from BoxLite!')" */
+    const char *args[] = {"-c", "print('Hello from BoxLite!')"};
+    CBoxliteExecResult *result = NULL;
+    code = boxlite_simple_run(box, "python", args, 2, &result, &error);
+    if (code == Ok) {
+        printf("exit code: %d\n", result->exit_code);
+        printf("stdout: %s", result->stdout_text ? result->stdout_text : "");
+        if (result->stderr_text && result->stderr_text[0]) {
+            fprintf(stderr, "stderr: %s", result->stderr_text);
+        }
+        boxlite_result_free(result);  /* free the result (includes stdout/stderr strings) */
+    } else {
+        fprintf(stderr, "exec failed (code %d): %s\n",
+                error.code, error.message ? error.message : "unknown");
+        boxlite_error_free(&error);
+    }
+
+    boxlite_simple_free(box);  /* automatically stop + remove + free the runtime */
+    return 0;
+}
+```
+
+</CodeGroup>
+
+Run it:
+
+<CodeGroup>
+
+```bash Python
+python hello.py
+```
+```bash Node.js
+node hello.mjs
+```
+```bash Rust
+cargo run
+```
+```bash Go
+go run hello.go
+```
+```bash C
+./hello
+```
+
+</CodeGroup>
+
+```text
+Hello from BoxLite!
+```
+
+## What keeps the box alive
+
+This applies in every language, and it is the first thing that surprises people.
+
+A box is tied to the scope that owns it. In Python and Node the `async with` / `await using` block owns it, and **the box is destroyed when that block exits** — including when an exception unwinds it. In Rust, Go, and C the box lives until you remove it explicitly, so a program that exits early leaves it running.
+
+Two consequences:
+
+- **Do not return a box handle out of the block that created it.** The box is already gone by the time the caller sees it.
+- **In Rust, Go, and C, tear down in the error path too.** A `defer`, a `Drop`, or an explicit cleanup label — otherwise a crashed program leaves a box behind, and on Cloud a leftover box keeps costing you money. See [What a box costs](/cloud/box-costs).
+
+## Next: running untrusted code
+
+`SimpleBox` runs commands you wrote. For code an LLM produced, **`CodeBox`** is the type you want — it adds a language-aware execution surface on top of the same isolation.
+
+`CodeBox` is available in **Python and Node.js**. In Rust, Go, and C, run untrusted code through `SimpleBox` and the exec API.
+
+See [Run code in a sandbox](/agent-tools/code-execution-python) for the full treatment.
+
+## Parameters and returns
+
+The per-language signatures, types, and return shapes live in the SDK reference:
+
+<CardGroup cols={3}>
+  <Card title="Python" icon="python" href="/reference/python" />
+  <Card title="Node.js" icon="node-js" href="/reference/nodejs" />
+  <Card title="Rust" icon="rust" href="/reference/rust" />
+  <Card title="Go" icon="golang" href="/reference/go" />
+  <Card title="C" icon="c" href="/reference/c" />
+  <Card title="CLI" icon="terminal" href="/reference/cli" />
+</CardGroup>
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| The box fails to start with a virtualization error | The machine has no KVM, no Apple Silicon hypervisor, or is a nested VM or container | Use the [Cloud track](/cloud/quickstart), which needs no local virtualization. Full matrix on [Installation](/getting-started/installation) |
+| `npm install` succeeds but the module fails to load on a Mac | The darwin-arm64 native package stops at v0.9.7 while the JS package is newer | Pin `@boxlite-ai/boxlite@0.9.7` |
+| A non-zero exit code does not raise an exception | `exec` returns the exit code rather than raising | Check `result.exit_code` yourself, as every example above does |
+| The box is gone before you use it | The `async with` / `await using` block that owned it exited | Keep the work inside the block, or use the runtime API to create a box you own explicitly |
+| A crashed program left a box running | Rust, Go, and C do not tear down on scope exit | Tear down in the error path — `defer`, `Drop`, or an explicit cleanup |
+| `cargo build` fails on a missing `protoc` | The Rust build needs Protocol Buffers | Install `protobuf` for your platform, then rebuild |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Box types" icon="cubes" href="/manage-sandbox/sandbox-types">
+    SimpleBox, CodeBox, BrowserBox, ComputerBox — which type for which job.
+  </Card>
+  <Card title="Agent tools" icon="wrench" href="/agent-tools/index">
+    Run code, drive a PTY, a browser, or a desktop from your agent.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture/index">
+    What actually happens when you call `exec`.
+  </Card>
+  <Card title="BoxLite Cloud" icon="cloud" href="/cloud/quickstart">
+    The same SDK against a hosted runtime — no local virtualization.
+  </Card>
+</CardGroup>

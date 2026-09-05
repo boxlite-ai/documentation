@@ -117,7 +117,7 @@ The MCP layer has no BoxLite-specific parameters. The table below covers the `Si
 | `ModuleNotFoundError: No module named 'boxlite.mcp'` | The MCP layer lives in your own code, not in the SDK | Use your MCP framework and wrap `SimpleBox.exec` as shown above |
 | The tool returned `exit_code: 1` with no exception | `exec` does not raise on a non-zero exit | Inspect `result.exit_code` and pass it back to the client |
 | `RuntimeError` instead of `BoxliteError` | Missing virtualization or an image pull failure | Catch `RuntimeError` separately and retry |
-| `ModuleNotFoundError: No module named '@boxlite-ai/boxlite'` (Node) | Wrong package name | The Node package is `@boxlite-ai/boxlite`, not `boxlite` |
+| `Cannot find package 'boxlite'` / `Cannot find module 'boxlite'` (Node) | Wrong package name | The Node package is scoped: `@boxlite-ai/boxlite` |
 
 ## Related
 

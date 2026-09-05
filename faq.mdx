@@ -231,13 +231,13 @@ asyncio.run(main())
 
 ### How do I enable stronger isolation / security?
 
-Security options go through `advanced`. There is **no top-level `security=` keyword** on `BoxOptions`, and `AdvancedBoxOptions` is only importable from `boxlite.boxlite` (it is not re-exported at the top level). Presets are `development()`, `standard()`, and `maximum()` (there is no `minimum()`).
+Security options go through `advanced`. There is **no top-level `security=` keyword** on `BoxOptions`. Presets are `development()`, `standard()`, and `maximum()` (there is no `minimum()`).
 
 ```python
 # Python — maximum isolation preset
 import asyncio
 from boxlite import SimpleBox, SecurityOptions, BoxliteError
-from boxlite.boxlite import AdvancedBoxOptions  # NOT exported at top level
+from boxlite import AdvancedBoxOptions
 
 async def main() -> None:
     try:
@@ -282,17 +282,17 @@ asyncio.run(main())
 
 ### How do I read a box's state and metrics?
 
-`box.info()` is **synchronous** (do not `await` it). State lives in `info().state.status`. Metric field names are `memory_bytes` and `cpu_percent` (not `memory_usage_bytes` / `cpu_time_ms`).
+`info()` must be awaited on every type: `info = await box.info()`. State lives in `info.state.status`. Metric field names are `memory_bytes` and `cpu_percent` (not `memory_usage_bytes` / `cpu_time_ms`).
 
 > Note: `metrics()` lives on the **native** `Box` (the object returned by `runtime.create(opts)`),
 > not on the `SimpleBox`/`CodeBox` wrappers — `SimpleBox` exposes `info()` but **not** `metrics()`
 > (`AttributeError: 'SimpleBox' object has no attribute 'metrics'`). Use the native box for metrics.
 > On the native box, `exec(command, args_list)` returns an `Execution`; `await execution.wait()`
 > yields an `ExecResult` carrying only `exit_code` / `error_message` (stdout/stderr stream off the
-> `Execution`). `info()` is still synchronous; `metrics()` is async.
+> `Execution`). `info()` and `metrics()` are both async.
 
 ```python
-# Python — synchronous info(), async metrics() on the native Box
+# Python — async info() and metrics() on the native Box
 import asyncio
 from boxlite import Boxlite, BoxOptions, BoxliteError
 
@@ -306,7 +306,7 @@ async def main() -> None:
                     execution = await box.exec("true")  # native exec -> Execution
                     await execution.wait()              # ensure the command ran
 
-                    info = box.info()  # synchronous — do NOT await
+                    info = await box.info()  # awaitable on the native Box too
                     print("status:", info.state.status)
 
                     metrics = await box.metrics()  # async
@@ -436,20 +436,6 @@ A volume's third element is the boolean `read_only`; the strings `"ro"`/`"rw"` a
 
 The CLI is the only place that uses `:ro`/`:rw` strings (`-v host:box:ro`); that is the CLI parser, not the SDK API.
 
-### `AttributeError: module 'boxlite' has no attribute 'AdvancedBoxOptions'`
-
-`AdvancedBoxOptions` lives in the `boxlite.boxlite` submodule, not the top level — see [Inject secrets and harden a box](/manage-sandbox/secrets-and-security#troubleshooting).
-
-```python
-# Wrong
-# from boxlite import AdvancedBoxOptions   # AttributeError
-
-# Right
-from boxlite.boxlite import AdvancedBoxOptions
-```
-
-Also note `SecurityOptions` (with presets `development()/standard()/maximum()`) **is** at the top level; only `AdvancedBoxOptions` lives in `boxlite.boxlite`.
-
 ### `AttributeError` on `memory_usage_bytes` / `active_boxes` / `box.info().status`
 
 These names changed (or never existed). Use the real ones:
@@ -465,7 +451,7 @@ These names changed (or never existed). Use the real ones:
 
 ### `await box.info()` raises / behaves oddly
 
-`info()` is synchronous. Do not `await` it. Same for the Node `info()` getter (use the async `getInfo()` if you want a Promise).
+`info()` must be awaited on every type. In Python the native `Box` returns an awaitable Future and `SimpleBox` returns a coroutine; in Node every type returns a `Promise`. In Node, `info()` rejects if the box has not been created, while `getInfo()` creates it first.
 
 ### A failing command did not raise an exception
 
@@ -516,8 +502,7 @@ echo "kernel.apparmor_restrict_unprivileged_userns=0" | \
 Or, in a development environment where you do not need full sandbox isolation, relax the security preset:
 
 ```python
-from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions
+from boxlite import AdvancedBoxOptions, BoxOptions, SecurityOptions
 
 opts = BoxOptions(
     image="alpine:latest",
