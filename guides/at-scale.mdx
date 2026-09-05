@@ -659,3 +659,94 @@ And security options are passed via `advanced`; there is no top-level
 - [Secrets and Security](/manage-sandbox/secrets-and-security) --- Secret / SecurityOptions detail
 - [Run code in any language](/agent-tools/code-execution-any-language) --- SimpleBox.exec
 - [Deploy in Docker or Kubernetes](/guides/deployment) --- Docker / Kubernetes
+
+## A tour: one agent session, one sandbox
+
+Moved here from the section index, which is now a summary and an index.
+
+
+Below is a **minimal, runnable tool-execution loop for an agent**: it runs the
+command "the model wants to execute" inside a sandbox, checks the exit code, and
+formats the result into a string you can feed back to the model. A hardcoded
+tool call stands in for real LLM output so you can copy and run it directly;
+when you wire in a real model, replace `tool_call` with the model's returned
+tool call.
+
+
+<CodeGroup>
+
+```python Python
+import asyncio
+from boxlite import SimpleBox
+
+async def run_tool_in_sandbox(box: SimpleBox, command: str, *args: str) -> str:
+    """Execute a tool call inside the sandbox; return text to feed back to the LLM."""
+    # A non-zero exit code does not raise; check exit_code yourself
+    result = await box.exec(command, *args, timeout=30.0)  # timeout is in seconds (float)
+    if result.exit_code != 0:
+        return f"[tool error exit={result.exit_code}] {result.stderr.strip()}"
+    return result.stdout.strip()
+
+async def main() -> None:
+    try:
+        # auto_remove=True is the default: leaving async with destroys this session sandbox
+        async with SimpleBox(image="alpine:latest", cpus=1, memory_mib=512) as box:
+            # In a real scenario, this step comes from the LLM's returned tool call
+            tool_call = ("sh", "-c", "echo 'analyzing...' && uname -sm")
+
+            observation = await run_tool_in_sandbox(box, *tool_call)
+            print("observation fed back to LLM:\n", observation)
+            # Append the observation to the conversation history and continue the next agent loop
+    except RuntimeError as e:
+        # Image pull failure or absence of hardware virtualization raises a standard RuntimeError
+        print("sandbox start or pull failed:", e)
+
+asyncio.run(main())
+```
+
+```typescript Node.js
+import { SimpleBox } from "@boxlite-ai/boxlite";
+
+async function runToolInSandbox(
+  box: SimpleBox,
+  command: string,
+  args: string[],
+): Promise<string> {
+  const result = await box.exec(command, args, undefined, { timeoutSecs: 30 });
+  if (result.exitCode !== 0) {
+    return `[tool error exit=${result.exitCode}] ${result.stderr.trim()}`;
+  }
+  return result.stdout.trim();
+}
+
+async function main(): Promise<void> {
+  try {
+    // await using: at scope exit, destroy the session sandbox per autoRemove (default true)
+    await using box = new SimpleBox({
+      image: "alpine:latest",
+      cpus: 1,
+      memoryMib: 512,
+    });
+
+    // In a real scenario, this step comes from the LLM's returned tool call
+    const observation = await runToolInSandbox(box, "sh", [
+      "-c",
+      "echo 'analyzing...' && uname -sm",
+    ]);
+    console.log("observation fed back to LLM:\n", observation);
+  } catch (e) {
+    console.error("sandbox start or pull failed:", e);
+  }
+}
+
+main();
+```
+
+</CodeGroup>
+
+Node differs in three places: the package name is `@boxlite-ai/boxlite`, `SimpleBox` cleans up via `await using`, and the `exec` timeout option is `timeoutSecs`.
+
+> For a complete tool loop where a real LLM drives the sandbox, see
+> [Drive a sandbox from your agent loop](/agent-tools/drive-from-agent-loop).
+
+---

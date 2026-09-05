@@ -667,6 +667,17 @@ On Linux without KVM, or on macOS Intel, the VM cannot start, and `exec()` throw
 
 ---
 
+### `Cannot find package 'boxlite'` / module not found
+
+The package name has a scope. Both install and import must use `@boxlite-ai/boxlite`:
+
+```javascript
+// Wrong
+import { SimpleBox } from "boxlite"; // does not exist
+// Correct
+import { SimpleBox } from "@boxlite-ai/boxlite";
+```
+
 ## See Also
 
 - [Python SDK reference](/reference/python)
