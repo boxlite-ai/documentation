@@ -338,10 +338,6 @@
       "destination": "/reference/c"
     },
     {
-      "source": "/reference/c/index",
-      "destination": "/reference/c"
-    },
-    {
       "source": "/reference/c/memory-json-threading",
       "destination": "/reference/c"
     },
@@ -362,10 +358,6 @@
       "destination": "/reference/nodejs"
     },
     {
-      "source": "/reference/nodejs/index",
-      "destination": "/reference/nodejs"
-    },
-    {
       "source": "/reference/python/box-types",
       "destination": "/reference/python"
     },
@@ -378,10 +370,6 @@
       "destination": "/reference/python"
     },
     {
-      "source": "/reference/python/index",
-      "destination": "/reference/python"
-    },
-    {
       "source": "/reference/rust/box-config",
       "destination": "/reference/rust"
     },
@@ -391,10 +379,6 @@
     },
     {
       "source": "/reference/rust/execution",
-      "destination": "/reference/rust"
-    },
-    {
-      "source": "/reference/rust/index",
       "destination": "/reference/rust"
     },
     {
