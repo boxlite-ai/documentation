@@ -203,16 +203,6 @@ Snapshot, clone, and export all require the sandbox to start first, and starting
 - **macOS**: uses Apple's Hypervisor.framework and **does not need** `/dev/kvm`.
 - Without virtualization, `create`/`start` fail with a standard exception (the process itself stays alive and can be caught with try/except and surfaced).
 
-### `clone_box(...)` / `export(...)` reports "source box unavailable" or disappears under auto_remove
-
-If the source box is created with the default `auto_remove=True`, it may be reclaimed before the clone/export. For a source box used in snapshot/clone/export flows, pass `auto_remove=False` explicitly:
-
-```python
-import boxlite
-
-opts = boxlite.BoxOptions(image="alpine:latest", auto_remove=False)
-```
-
 ### `AttributeError: ... has no attribute 'remove'` (calling remove on a box)
 
 Removing a sandbox must be called on the **runtime**: `await runtime.remove(box.id, force=True)`, **not** `box.remove()`. To list sandboxes, use `runtime.list_info()`, not `runtime.list()`.
@@ -220,10 +210,6 @@ Removing a sandbox must be called on the **runtime**: `await runtime.remove(box.
 ### `await box.info()` errors / coroutine was never awaited
 
 `box.info()` is **async**; `await` it. It returns a `BoxInfo`, and the state is at `(await box.info()).state` (a `BoxStateInfo`, whose field is named `.status`).
-
-### `box.snapshot.create("v1")` reports a missing keyword argument
-
-`create`'s `name` is keyword-only and must be written as `await box.snapshot.create(name="v1")`; it cannot be passed positionally as `create("v1")`.
 
 ### restore behavior: stop first; the handle is invalidated
 
@@ -257,3 +243,31 @@ This is a catchable standard exception. Restore to a different snapshot first, o
 ### Image pull failure raises `RuntimeError`
 
 A missing command or an image pull failure raises a standard `RuntimeError` (Python) / bare `Error` (Node), not `BoxliteError`. See [Error Handling](/guides/error-handling#troubleshooting).
+
+### `SnapshotHandle.create() takes 0 positional arguments but 1 was given`
+
+`create`'s signature is `create(*, options=None, name)` — `name` is keyword-only:
+
+```python
+await box.snapshot.create(name="v1")    # correct
+# await box.snapshot.create("v1")       # TypeError, as above
+```
+
+### Cloning under the default `auto_remove` makes context exit fail
+
+Clone and export both work while the source box is running. The problem shows up at teardown: with the default `auto_remove=True`, leaving the context tries to remove a box the clone still depends on, and the exit itself raises:
+
+```text
+RuntimeError: invalid state: Cannot remove box: boxes [<clone-id>] have clone dependencies on it.
+Remove those first or use force=true.
+```
+
+Pass `auto_remove=False` on any box you intend to clone or export, and remove it yourself once the clones are gone:
+
+```python
+import boxlite
+
+opts = boxlite.BoxOptions(image="alpine:latest", auto_remove=False)
+```
+
+Looking a clone source up after it is gone returns `None` rather than raising, so the failure you actually see is `AttributeError: 'NoneType' object has no attribute 'clone_box'`.
