@@ -5,8 +5,7 @@
 This is the official documentation site for **BoxLite** — a local-first micro-VM sandbox for AI agents. Stateful, lightweight, hardware-level isolation, no daemon required. The site is built with [Mintlify](https://mintlify.com) and deployed automatically on push to `main`.
 
 - **BoxLite repo**: https://github.com/boxlite-ai/boxlite
-- **BoxRun repo**: https://github.com/boxlite-ai/boxrun
-- **Current versions**: BoxLite Python v0.5.11 (stable), Node.js v0.2.8, C v0.5.11; BoxRun latest
+- **Current versions**: BoxLite Python v0.10.0, Node.js v0.10.0, Rust crate v0.10.0, Go v0.10.0, CLI v0.10.0. The Node `darwin-arm64` native package is published only up to v0.9.7, so `npm install @boxlite-ai/boxlite@latest` installs a version that fails to load on Apple Silicon — see boxlite-ai/boxlite#1443.
 - **Platforms**: macOS (Apple Silicon), Linux (KVM), Windows (WSL2)
 
 ## Tech Stack
@@ -161,12 +160,9 @@ Use these terms consistently across all documentation:
 | Term | Usage |
 |------|-------|
 | BoxLite | Local-first micro-VM sandbox (capital B, capital L) |
-| BoxRun | Sandbox management platform (capital B, capital R) |
 | LiteBox | The VM instance type (capital L, capital B) |
 | box | Generic reference to a sandbox instance (lowercase) |
 | SimpleBox / CodeBox / BrowserBox | Python/Node.js SDK box types |
-| BoxHandle | BoxRun SDK handle to a specific box |
-| BoxRunClient | BoxRun Python SDK client class |
 | Guest Agent | The agent running inside the VM |
 | Jailer | The security isolation component |
 | ShimController | Process lifecycle manager |
