@@ -277,6 +277,39 @@ exitCode: 0
 
 ## What keeps the box alive
 
+Worth knowing before you build anything longer than the script above, because it decides when a box disappears.
+
+Every box runs one **main command** — the image's `ENTRYPOINT + CMD`, or whatever you pass as `entrypoint` / `cmd`. It runs as PID 1 inside the box, and **the box stops when it exits**. `python:alpine` above has a long-running main command, which is why `exec` works.
+
+Two consequences:
+
+- Set `cmd` to something short-lived and the box stops as soon as it finishes. A later `exec` is refused until you `start()` again.
+- A crashed main command stops the box, and nothing restarts it. There is no restart policy.
+
+Which means there are two ways to run work, and they behave differently:
+
+```python
+# 1. Work beside the main command — the box outlives the work.
+#    Use this for agent jobs, and when you want to inspect the box afterwards.
+async with boxlite.SimpleBox(image="python:alpine") as box:
+    await box.exec("python", "-c", "print('a job')")
+
+# 2. Work as the main command — the box lives exactly as long as the work.
+#    Use this for services, and for one-shot runs whose exit code you need.
+async with boxlite.SimpleBox(
+    image="python:alpine",
+    entrypoint=["python3"],
+    cmd=["-c", "import time; time.sleep(3600)"],
+) as box:
+    ...
+```
+
+[The main command](/manage-sandbox/lifecycle#the-main-command) covers the full rules, and [Exit codes](/manage-sandbox/lifecycle#exit-codes) covers how to read what the main command exited with.
+
+---
+
+### The scope that owns the box
+
 This applies in every language, and it is the first thing that surprises people.
 
 A box is tied to the scope that owns it. In Python and Node the `async with` / `await using` block owns it, and **the box is destroyed when that block exits** — including when an exception unwinds it. In Rust, Go, and C the box lives until you remove it explicitly, so a program that exits early leaves it running.
