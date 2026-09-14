@@ -59,7 +59,7 @@ Three things stop a box, and only one of them is a call you make:
 Two rules follow:
 
 - **Once the main command has exited, `exec` is refused**: `RuntimeError: invalid state: Cannot exec box <id>: it is stopped, and its main command has already exited`. Bring the box back with `start()`.
-- **You cannot stop the main command from inside the box.** `kill -TERM 1` is dropped, because PID 1 in a PID namespace ignores signals it has no handler for. That is kernel behaviour, not a BoxLite bug. It ends when it exits on its own, or when the host calls `stop()`.
+- **You cannot stop the main command from inside the box.** `kill -TERM 1` is dropped, because PID 1 in a PID namespace ignores signals it has no handler for. That is kernel behavior, not a BoxLite bug. It ends when it exits on its own, or when the host calls `stop()`.
 
 **There is no restart policy.** A main command that crashes stops the box; nothing restarts it. Supervise from the host — check the state and call `start()` — or use the pattern below that keeps your workload off the main command.
 
@@ -117,7 +117,7 @@ Most agent work wants the first: the agent is a job, and you still want to read 
 
 ### Detached main command
 
-`detach=True` keeps the box alive after the creating process exits. It rejects the default removal behaviour, since a box that removes itself on stop cannot be managed later:
+`detach=True` keeps the box alive after the creating process exits. It rejects the default removal behavior, since a box that removes itself on stop cannot be managed later:
 
 ```text
 invalid argument: remove-on-stop is incompatible with detach=true.
