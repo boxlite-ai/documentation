@@ -741,7 +741,7 @@ Source `src/shared/src/errors.rs`. `BoxliteResult<T> = Result<T, BoxliteError>`.
 
 Real variants (**there is no `BoxliteError::Run`** — command-execution errors are `Execution`):
 
-`UnsupportedEngine`, `Engine(String)`, `Config(String)`, `Storage(String)`, `Image(String)`, `Portal(String)`, `Network(String)`, `Rpc(String)`, `RpcTransport(String)`, `Internal(String)`, **`Execution(String)`**, `Unsupported(String)`, `NotFound(String)`, `AlreadyExists(String)`, `InvalidState(String)`, `Database(String)`, `MetadataError(String)`, `InvalidArgument(String)`, `Stopped(String)`, `ResourceExhausted(String)`, `SessionReaped(String)`。
+`UnsupportedEngine`, `Engine(String)`, `Config(String)`, `Storage(String)`, `Image(String)`, `Portal(String)`, `Network(String)`, `Rpc(String)`, `RpcTransport(String)`, `Internal(String)`, **`Execution(String)`**, `Unsupported(String)`, `NotFound(String)`, `AlreadyExists(String)`, `InvalidState(String)`, `Database(String)`, `MetadataError(String)`, `InvalidArgument(String)`, `Stopped(String)`, `ResourceExhausted(String)`, `SessionReaped(String)`.
 
 ```rust
 use boxlite::{BoxliteRuntime, BoxOptions, BoxliteError};

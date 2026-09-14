@@ -100,7 +100,7 @@ Subcommands include `chat`, `model`, `secrets`, `egress`, `gateway`, `proxy`, `s
 
 ## Running the gateway behind a forwarded port
 
-For chat over Telegram, Discord, and similar, run the gateway instead of one-shot prompts and forward its port. The service must bind all interfaces — a forwarded port arrives at the guest's network interface, not its loopback:
+For chat over Telegram, Discord, and similar messaging platforms, run the gateway instead of one-shot prompts and forward its port. The service must bind all interfaces — a forwarded port arrives at the guest's network interface, not its loopback:
 
 ```python
 import asyncio

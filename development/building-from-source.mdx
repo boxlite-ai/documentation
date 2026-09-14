@@ -21,7 +21,7 @@ virtualization to be available.
 > Without virtualization the build can succeed, but running examples will fail
 > to start a box. See Troubleshooting at the end.
 ### Toolchain (installed automatically by `make setup`)
-You do **not** need to install these dependencies one by one --- `make setup`
+You do **not** need to install these dependencies one by one — `make setup`
 calls the right script per platform (`scripts/setup/setup-macos.sh` or
 `setup-ubuntu.sh`, etc.) and installs everything. The table below only documents
 which components get installed and their minimum versions.
@@ -241,7 +241,7 @@ A missing command or an image pull failure raises a standard `RuntimeError` (Pyt
 
 ### Do not hand-write `cargo` / `npm` / `maturin`
 
-The repository convention is to always use `make` targets --- the Makefile
+The repository convention is to always use `make` targets — the Makefile
 encapsulates the correct flags, cross-compilation config, environment, and
 ordering. Calling the low-level tools by hand often misses these.
 **Fix**: check `make help` first to find the corresponding target; only if there

@@ -42,7 +42,7 @@
 
 ### Human tools
 - [Human tools](/human-tools/index.md): Hand a running box to a person — a desktop in their browser, or their own DevTools attached to a browser inside the box.
-- [Share a desktop with a person in a browser](/human-tools/desktop-access.md): Share a Linux desktop running inside a sandbox with a human, through a browser and with no VNC client.
+- [Share a desktop with a person in a browser](/human-tools/desktop-access.md): Share a Linux desktop running inside a sandbox with a human, through a browser, with no VNC client to install.
 - [Inspect an in-box browser from your DevTools](/human-tools/browser-access.md): Attach your own Chrome DevTools to a browser running inside a sandbox, to watch or drive it by hand.
 
 ### From demo to production

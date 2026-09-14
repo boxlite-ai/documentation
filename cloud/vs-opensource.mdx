@@ -36,7 +36,7 @@ This page is the single place where those differences are enumerated. Every othe
 
 **A Cloud box has a lifecycle policy; a self-hosted box does not.** Cloud can stop a box when it goes idle, resume it when you reach for it again, and delete it after it has been stopped for a while. Set the policy in the console, or from code with `auto_stop` and `auto_delete` (both in seconds, `0` to disable) and `auto_resume`. The defaults are the platform's either way: a 15-minute idle stop, no auto-delete, and resume on access — so a box created over the API stops itself after 15 idle minutes unless you pass `auto_stop` explicitly. See [Boxes](/cloud/box-lifecycle).
 
-**Images are prepared for you.** Because image operations are not supported over REST, you do not pull on Cloud. Pick one of the console's base images, or the default `ghcr.io/boxlite-ai/boxlite-agent-base:v0.1.0`, and let the shared Linux base images that come with a Boxes-scoped key do the rest.
+**Images are prepared for you.** Because image operations are not supported over REST, you do not pull on Cloud. Pick one of the console's base images, or the default `ghcr.io/boxlite-ai/boxlite-agent-base:v0.1.0`. A Boxes-scoped key gives you the shared Linux base images automatically.
 
 ## Which should I use?
 

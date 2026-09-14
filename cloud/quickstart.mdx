@@ -4,7 +4,7 @@ sidebarTitle: "Quickstart"
 description: "Create an API key, point the SDK at BoxLite Cloud, and run a command inside a hardware-isolated box — no local virtualization, no daemon, three steps."
 ---
 
-BoxLite Cloud runs your boxes on BoxLite's own resource pool, so the machine that calls the API needs nothing but a URL and an API key. Untrusted code still lands inside a microVM with hardware-level isolation — you just stop paying for the hypervisor underneath it.
+BoxLite Cloud runs your boxes on BoxLite's own resource pool, so the machine that calls the API needs nothing but a URL and an API key. Untrusted code still lands inside a microVM with hardware-level isolation — you no longer operate the hypervisor underneath it.
 
 ## Prerequisites
 
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
 main();
 ```
 
-Two shapes differ from Python: `exec` takes its argument list positionally (`box.exec("echo", ["hi"])`), and a stdout stream is pulled with `next()` until it returns `null` rather than iterated with `for await`. Field names are camelCase throughout — `result.exitCode`, and `diskSizeGb` / `memoryMib` on the options object.
+Two call shapes differ from Python: `exec` takes its argument list positionally (`box.exec("echo", ["hi"])`), and a stdout stream is pulled with `next()` until it returns `null` rather than iterated with `for await`. Field names are camelCase throughout — `result.exitCode`, and `diskSizeGb` / `memoryMib` on the options object.
 </Tab>
 <Tab title="CLI">
 ```bash
