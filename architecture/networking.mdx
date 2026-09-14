@@ -41,7 +41,7 @@ flowchart LR
 
 ### Controlling the Network from the SDK
 
-The network is controlled by `NetworkSpec`, with three modes:
+The network is controlled by `NetworkSpec`. `mode` takes two values, `"enabled"` and `"disabled"`; an allowlist is `mode="enabled"` plus a non-empty `allow_net`:
 
 ```python
 import boxlite

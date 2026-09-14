@@ -9,7 +9,7 @@ One fact shapes everything else: **`box.exec(...)` does not raise on a non-zero 
 
 | Failure scenario | Python raises | Node throws | Catchable by `except BoxliteError`? |
 |---|---|---|---|
-| Command non-zero exit | Does not raise (returns ExecResult) | Does not throw (returns ExecResult) | --- |
+| Command non-zero exit | Does not raise (returns ExecResult) | Does not throw (returns ExecResult) | — |
 | Missing command binary (spawn failure) | Raises `RuntimeError` (message contains `spawn_failed: ... not found in $PATH`) | Throws a bare `Error` (message contains `spawn_failed`) | No (Python: catch with `except RuntimeError`; Node: catch in the `else` branch) |
 | Image pull failure (network instability, etc.) | `RuntimeError` | `Error` | No |
 | Virtualization unavailable / box fails to start | `RuntimeError` | `Error` | No |
@@ -147,12 +147,12 @@ decide whether to raise.
 | `exit_code` | `exitCode` | `int` / `number` | Process exit code; `0` success, non-zero failure. **The SDK does not raise on this** |
 | `stdout` | `stdout` | `str` / `string` | Standard output |
 | `stderr` | `stderr` | `str` / `string` | Standard error |
-| `error_message` | --- | `str \| None` | Python only; non-None when the process died abnormally |
+| `error_message` | — | `str \| None` | Python only; non-None when the process died abnormally |
 
 > Note: the `stdout`/`stderr` above apply to the `ExecResult` returned by the
 > **high-level `SimpleBox.exec(...)`**. If you use the **native**
 > `await (await box.exec(...)).wait()` path, its `ExecResult` **has only
-> `exit_code` and `error_message`** --- accessing `.stdout`/`.stderr` raises
+> `exit_code` and `error_message`** — accessing `.stdout`/`.stderr` raises
 > `AttributeError`. To get output, use `SimpleBox.exec`.
 
 ## Recommended wrapper: a `run_checked` that raises `ExecError`
@@ -198,7 +198,7 @@ if __name__ == "__main__":
 ### Distinguishing a timeout from a general failure
 
 > **Key fact**: when `SimpleBox.exec(timeout=...)` hits a timeout it **does not
-> raise `boxlite.TimeoutError`** --- it terminates the process on the sandbox
+> raise `boxlite.TimeoutError`** — it terminates the process on the sandbox
 > side with `SIGTERM` and returns `ExecResult(exit_code == -15)`. So in the
 > example below, `sleep 5 / timeout=1.0` reaches `print("exit_code:",
 > result.exit_code)` and prints `-15`; the `except TimeoutError` branch **does
@@ -267,7 +267,7 @@ message containing `spawn_failed`, and `err instanceof BoxliteError === false`.
 
 ### `from boxlite import TimeoutError` collides with Python's built-in `TimeoutError`
 
-**Cause**: `boxlite.TimeoutError` is a subclass of `BoxliteError` --- the same
+**Cause**: `boxlite.TimeoutError` is a subclass of `BoxliteError` — the same
 name as `builtins.TimeoutError` but a different class.
 **Fix**: import with an alias:
 
@@ -316,7 +316,7 @@ can be caught and degraded with try/except.
 
 In the C SDK you likewise distinguish two layers: the API call itself returns a
 `BoxliteErrorCode` (such as `NotFound=2`, `InvalidArgument=5`), while the command
-process's exit code is reported separately in `ExecResult.exit_code` --- an API
+process's exit code is reported separately in `ExecResult.exit_code` — an API
 return of `Ok` does not mean the command succeeded. See
 `examples/c/04_error_handling.c`:
 

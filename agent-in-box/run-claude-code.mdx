@@ -356,7 +356,7 @@ async def chat_once(box, stdin, stdout, content, session_id="default"):
 | Missing command (e.g. calling `claude` before installing it) raises a **plain `Error`** / `RuntimeError`, with `instanceof BoxliteError === false` | A missing executable is a low-level spawn failure | Install first and verify with `claude --version`; catch the generic `RuntimeError`/`Error`, not only `BoxliteError` |
 | The first `call()` takes a long time | The first call runs `apt-get` inside the box and installs the Claude CLI/git/python | This is expected; set `auto_remove=False` + a fixed `name` to reuse the box and skip installation on the second start |
 | Context lost across `SkillBox` multi-turn calls | Sessions are not persisted across different `async with` sessions | Multi-turn requires consecutive `call()`s on the **same** box instance; across sessions only dependencies are reused, not conversation context |
-| Writing the security option as `SkillBox(security=...)` raises an error | There is no top-level `security=` keyword | Security options go through `advanced`: `BoxOptions(advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))`, with `from boxlite.boxlite import AdvancedBoxOptions` (it is not exported at the top level) |
+| Writing the security option as `SkillBox(security=...)` raises an error | There is no top-level `security=` keyword | Security options go through `advanced`: `BoxOptions(advanced=AdvancedBoxOptions(security=SecurityOptions.maximum()))`, with `from boxlite import AdvancedBoxOptions
 
 ---
 

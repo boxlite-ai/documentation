@@ -92,7 +92,7 @@ async def scrape(url: str) -> str:
                 await browser.close()
 ```
 
-To use Firefox, pass `browser="firefox"` and connect with `playwright.firefox.connect(ws)` — Firefox speaks WebDriver BiDi rather than CDP. WebKit has no CDP endpoint; it needs the Playwright Server mode described on [Browser automation](/agent-tools/browser-automation#two-connection-modes).
+To use Firefox with Playwright, start the box in Playwright Server mode and connect with `playwright_endpoint()` + `p.firefox.connect(ws)` — the `endpoint()` mode shown above is for Puppeteer, Selenium, and other CDP/BiDi clients. WebKit has no CDP endpoint; it needs the Playwright Server mode described on [Browser automation](/agent-tools/browser-automation#two-connection-modes).
 
 ### Step 2: parse the untrusted HTML in a second sandbox
 

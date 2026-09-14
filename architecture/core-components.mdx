@@ -46,7 +46,7 @@ Every box object is backed by a `LiteBox`. Source `src/boxlite/src/litebox/`.
 
 - **Lazy initialization**: `runtime.create()` returns a handle immediately and **does not** trigger VM startup; the genuinely expensive operations (image pull → rootfs preparation → VM spawn → guest ready) are deferred to the first API call. So in the Python wrapper layer, entering `async with SimpleBox(...)` is what actually creates and starts the Box.
 - **Responsibilities**: command execution (`exec`), metrics, snapshot/clone/export, graceful shutdown.
-- **Key fact**: `box.info()` is **synchronous** (do not `await`); the returned `BoxInfo` uses `.state` (of type `BoxStateInfo`), and the status string is in `BoxStateInfo.status`.
+- **Key fact**: `box.info()` is **async** (`await` it); the returned `BoxInfo` uses `.state` (of type `BoxStateInfo`), and the status string is in `BoxStateInfo.status`.
 
 ### ShimController and the VMM
 
@@ -54,7 +54,7 @@ Every box object is backed by a `LiteBox`. Source `src/boxlite/src/litebox/`.
 
 The VMM abstraction (`src/boxlite/src/vmm/`) is pluggable: the current production implementation is **libkrun** (`src/boxlite/src/vmm/krun/`), which handles hardware virtualization, virtio-fs file sharing, virtio-blk disks, and vsock communication.
 
-> The VMM layer sits behind a trait, so backends are pluggable. Two are declared today: `Libkrun` (production default) and `Firecracker`. Adding one is a runtime-internal change — see `CONTRIBUTING.md`.
+> The VMM layer sits behind a trait, so backends are pluggable. Two are declared today: `Libkrun` (production default) and `Firecracker`. Adding one is a runtime-internal change — see `src/boxlite/src/vmm/`.
 
 The configuration flow that a `Vmm` implementation drives when starting a VM is: create the libkrun context → set Box resources (CPUs, memory) → configure the network (TSI or gvproxy) → mount virtiofs shares → attach disk images → configure vsock ports → set the guest entrypoint → return the VM instance.
 
@@ -121,7 +121,7 @@ Metrics come at two levels, both lock-free atomic counters. **Field names are no
 | `commands_executed_total` / `exec_errors_total` | Cumulative command/error counts (note the `_total` suffix) |
 | `network_bytes_sent` / `network_bytes_received` | Network bytes sent/received (cumulative versions `bytes_sent_total` / `bytes_received_total` also exist) |
 
-> The Node SDK's metric field names carry a `Total` suffix and are camelCase (such as `numRunningBoxes`, `boxesCreatedTotal`, `memoryBytes`, `cpuPercent`), differing from the Python/C/Go names above. When developing across languages, do not assume the field names match.
+> The Node SDK camelCases these names. `BoxMetrics` keeps the trailing `Total` (`commandsExecutedTotal`), while `RuntimeMetrics` keeps the leading `total` (`totalCommandsExecuted`) — napi camelCases the existing name rather than moving the word. When developing across languages, do not assume the field names match.
 
 ---
 

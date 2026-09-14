@@ -16,7 +16,7 @@ This page is the single place where those differences are enumerated. Every othe
 | Entry point | `SimpleBox(...)` or `Boxlite.default()` | `Boxlite.rest(BoxliteRestOptions(url, credential))` |
 | Authentication | None locally, or `boxlite serve --api-key` | A `blk_live_...` key created in the console — see [API keys](/cloud/api-keys) |
 | `path_prefix` | The reference server needs `path_prefix="default"` | Not used |
-| `exec` call shape | Varargs: `box.exec("echo", "hi")` | Keyword list: `box.exec("echo", args=["hi"])` |
+| `exec` call shape | In-process runtime: varargs, `box.exec("echo", "hi")`. A self-hosted `boxlite serve` uses the keyword-list form, like Cloud | Keyword list: `box.exec("echo", args=["hi"])` |
 | Teardown | `async with` context manager, or `stop()` | `await rt.remove(box.id, force=True)` |
 | Persistent storage | Host directory bind mount: `volumes=[(host_path, guest_path)]` | Managed volumes; host bind mounts are ignored — see [Volumes](/cloud/volumes) |
 | Exposing a service | Port forwarding to the host: `ports=[(host_port, guest_port)]` | A tunnel to a guest port, which carries a public URL — see [Network](/cloud/network). Sharing a port with a browser or another person goes through a preview URL — see [Network policy](/cloud/network-policy) |

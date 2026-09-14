@@ -32,8 +32,8 @@ import asyncio
 import boxlite
 from boxlite import BoxOptions, SecurityOptions, SimpleBox
 
-# AdvancedBoxOptions is not exported at the top level; import it from boxlite.boxlite
-from boxlite.boxlite import AdvancedBoxOptions
+# AdvancedBoxOptions is exported at the top level
+from boxlite import AdvancedBoxOptions
 
 async def main() -> None:
     # SimpleBox creates/starts the sandbox only on entering async with, and stops/reclaims it on exit
@@ -93,7 +93,7 @@ import asyncio
 
 import boxlite
 from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions
+from boxlite import AdvancedBoxOptions
 
 async def main() -> None:
     # Boxlite is a synchronous context manager (with), but its data methods (create/remove/...) are async and require await
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 ## Timeouts and zombie-process protection
 
 `asyncio.wait_for()` only cancels the Python coroutine; it does **not** kill the
-process inside the sandbox --- the process keeps running inside the VM. The two
+process inside the sandbox — the process keeps running inside the VM. The two
 correct approaches follow.
 
 ### Approach 1 (recommended): use `SimpleBox.exec(timeout=...)`
@@ -193,7 +193,7 @@ The high-level `SimpleBox.exec` has a built-in `timeout` (float, seconds). On
 timeout, BoxLite terminates the process on the sandbox side via signal, leaving
 no stray process.
 
-> Key point: a `SimpleBox.exec` timeout **does not raise `TimeoutError`** --- it
+> Key point: a `SimpleBox.exec` timeout **does not raise `TimeoutError`** — it
 > returns an `ExecResult` whose `exit_code` is negative (the process is
 > terminated by `SIGTERM`, so `exit_code == -15`). Always check
 > `result.exit_code`; do not use `except TimeoutError`.
@@ -377,8 +377,8 @@ if __name__ == "__main__":
 ## Security: strong isolation
 
 Security options are passed **via `advanced`**; there is no top-level
-`security=` keyword. `AdvancedBoxOptions` is not exported at the top level and
-must be imported from `boxlite.boxlite`.
+`security=` keyword. Import `AdvancedBoxOptions` with
+`from boxlite import AdvancedBoxOptions`.
 
 ```python
 # pip install boxlite
@@ -386,7 +386,7 @@ import asyncio
 
 import boxlite
 from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions  # only in the native module
+from boxlite import AdvancedBoxOptions
 
 async def main() -> None:
     try:
@@ -474,7 +474,7 @@ print("volumes configured")
 > Passing a string raises directly:
 > `TypeError: 'str' object cannot be cast as 'bool'` (see Troubleshooting). The
 > CLI's `-v host:box:ro` syntax uses `ro`/`rw` strings and belongs to the CLI
-> parsing layer --- **it is different from the SDK's bool**, so do not confuse
+> parsing layer — **it is different from the SDK's bool**, so do not confuse
 > them.
 
 ### Inject secrets (Secret / Vault entry point)
@@ -550,7 +550,7 @@ async def main() -> None:
 
             # List remaining sandboxes with list_info() (not list()); it is async and requires await
             for info in await runtime.list_info():
-                # box.info() is synchronous; but runtime.list_info() is async
+                # both box.info() and runtime.list_info() are async — await them
                 # BoxInfo.state is a BoxStateInfo; the status string is in .state.status
                 print(info.id, info.state.status)
     except RuntimeError as exc:
@@ -561,8 +561,8 @@ if __name__ == "__main__":
 ```
 
 > List with `runtime.list_info()` (not `list()`); it is an **async method
-> (requires `await`)**. Note the distinction: `box.info()` is a **synchronous**
-> getter (do not `await` it), whereas `runtime.list_info()` /
+> (requires `await`)**. `box.info()` is async too, so `await` it, as are
+> `runtime.list_info()` /
 > `runtime.metrics()` / `runtime.remove()` / `runtime.create()` /
 > `runtime.shutdown()` are all **async (require `await`)**. `BoxInfo.state` is a
 > `BoxStateInfo`, and the sandbox status string is in `info.state.status`.
@@ -623,7 +623,7 @@ read-only volumes for shared datasets; and inline base64 only for tiny payloads.
 | `exec` returned a non-zero exit and raised nothing | By design | Check `result.exit_code` after every `exec` — see [Error handling](/guides/error-handling#troubleshooting) |
 | `RuntimeError` while pulling an image | Network instability, wrong reference, or missing registry auth | Retry with backoff; verify the image reference and any registry credentials |
 | A process survives `await execution.wait()` after a timeout | The timeout signalled the process but a child kept running | Prefer `SimpleBox.exec(timeout=...)`, which reaps the process tree |
-| `RuntimeError: no running event loop` on a runtime call | `Boxlite` is entered with a synchronous `with`, but its methods are async | `await` every runtime method; only `box.info()` is synchronous |
+| `RuntimeError: no running event loop` on a runtime call | `Boxlite` is entered with a synchronous `with`, but its methods are async | `await` every runtime method; and `box.info()` too is asynchronous |
 | The box fails to start at all | No hardware virtualization available | See [Installation](/getting-started/installation#platform-and-virtualization-requirements-common-to-all-sdks) |
 
 ### Passing a string for a volume -> `TypeError: 'str' object cannot be cast as 'bool'`
@@ -643,7 +643,7 @@ syntax and is unrelated to the SDK API.
 `AdvancedBoxOptions` lives in the `boxlite.boxlite` submodule, not the top level — import it from there:
 
 ```python
-from boxlite.boxlite import AdvancedBoxOptions  # correct
+from boxlite import AdvancedBoxOptions
 ```
 
 And security options are passed via `advanced`; there is no top-level
@@ -652,13 +652,13 @@ And security options are passed via `advanced`; there is no top-level
 
 ## See Also
 
-- [Lifecycle Management](/manage-sandbox/lifecycle) --- create / get / remove / shutdown
-- [Compute Resources](/manage-sandbox/compute-resources) --- cpus / memory_mib / disk_size_gb
-- [Volumes](/manage-sandbox/volumes) --- the read_only bool
-- [Network Access](/manage-sandbox/network-access) --- NetworkSpec and outbound control
-- [Secrets and Security](/manage-sandbox/secrets-and-security) --- Secret / SecurityOptions detail
-- [Run code in any language](/agent-tools/code-execution-any-language) --- SimpleBox.exec
-- [Deploy in Docker or Kubernetes](/guides/deployment) --- Docker / Kubernetes
+- [Lifecycle Management](/manage-sandbox/lifecycle) — create / get / remove / shutdown
+- [Compute Resources](/manage-sandbox/compute-resources) — cpus / memory_mib / disk_size_gb
+- [Volumes](/manage-sandbox/volumes) — the read_only bool
+- [Network Access](/manage-sandbox/network-access) — NetworkSpec and outbound control
+- [Secrets and Security](/manage-sandbox/secrets-and-security) — Secret / SecurityOptions detail
+- [Run code in any language](/agent-tools/code-execution-any-language) — SimpleBox.exec
+- [Deploy in Docker or Kubernetes](/guides/deployment) — Docker / Kubernetes
 
 ## A tour: one agent session, one sandbox
 

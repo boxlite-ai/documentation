@@ -142,7 +142,7 @@ export async function sandboxExec(box: SimpleBox, argv: unknown): Promise<Sandbo
 
 Only this step is BoxLite-specific — Step 2's provider wrappers are the same OpenAI/Anthropic client libraries regardless of which language drives the box, so they are not duplicated per language.
 
-Two behaviours above are worth internalising, because both are how an agent loop dies in production:
+Two behaviors above are worth internalising, because both are how an agent loop dies in production:
 
 | Case | What BoxLite does | What the wrapper must do |
 |---|---|---|

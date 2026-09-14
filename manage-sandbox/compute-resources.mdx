@@ -99,9 +99,9 @@ Some specialized sandboxes have their own higher resource defaults that override
 
 | Box type | CPU default | Memory default (MiB) | Disk default (GB) | Evidence |
 |---|---|---|---|---|
-| `ComputerBox` | 2 | 2048 | — (general default 10) | `sdks/node/lib/constants.ts:9-10`, `sdks/python/boxlite/constants.py:9-11` |
-| `SkillBox` | — (inherits the general default) | 4096 | 10 | `sdks/node/lib/constants.ts:34-35`, `sdks/python/boxlite/skillbox.py:92-93` (`SKILLBOX_MEMORY_MIB`/`SKILLBOX_DISK_SIZE_GB`) |
-| `BrowserBox` | 2 | 2048 | — (general default 10) | `sdks/python/boxlite/browserbox.py:94-95` (`BrowserBoxOptions.cpu=2` / `memory=2048`) |
+| `ComputerBox` | 2 | 2048 | — (general default 10) | `COMPUTERBOX_CPUS`/`COMPUTERBOX_MEMORY_MIB` in `sdks/node/lib/constants.ts`, `sdks/python/boxlite/constants.py` |
+| `SkillBox` | — (inherits the general default) | 4096 | 10 | `SKILLBOX_*` in `sdks/node/lib/constants.ts`, `SkillBox.__init__` in `sdks/python/boxlite/skillbox.py` (`SKILLBOX_MEMORY_MIB`/`SKILLBOX_DISK_SIZE_GB`) |
+| `BrowserBox` | 2 | 2048 | — (general default 10) | `BrowserBoxOptions` in `sdks/python/boxlite/browserbox.py` (`BrowserBoxOptions.cpu=2` / `memory=2048`) |
 | `CodeBox` | — (general default) | — (general default) | — (general default 10) | `sdks/python/boxlite/codebox.py` — passes `cpus` / `memory_mib` through unchanged, so the general defaults above apply |
 
 > The `DEFAULT_CPUS` / `DEFAULT_MEMORY_MIB` constants exported by the Python and Node SDKs are reference values only — they are not applied on the box-creation path, and the Node one does not match the runtime. Treat `src/boxlite/src/runtime/constants.rs` as the single source of truth.
@@ -156,7 +156,7 @@ Symptom:
 - The SDK (Python/Node) passing `cpus=300` raises `OverflowError` directly when constructing `BoxOptions` (Python: `out of range integral type conversion attempted`), because the field is `u8` on the Rust side.
 - The CLI passing `--cpus 300` does not error; it prints a warning (`CPU limit capped at 255`) and truncates the value to 255.
 
-Cause: the CPU count is `u8` (max 255) on the Rust side. The SDK path overflows during the PyO3/napi integer conversion; the CLI path explicitly applies `min(255)` and warns in `src/cli/src/cli.rs:419-423`.
+Cause: the CPU count is `u8` (max 255) on the Rust side. The SDK path overflows during the PyO3/napi integer conversion; the CLI path explicitly applies `min(255)` and warns in the `cpus > 255` guard in `src/cli/src/cli.rs`.
 
 Fix: use a reasonable core count (typically 1-8), not exceeding the host's physical cores, and not exceeding 255.
 

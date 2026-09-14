@@ -616,7 +616,7 @@ void boxlite_execution_free(CExecutionHandle *e);
 enum BoxliteErrorCode boxlite_options_new(const char *image, CBoxliteOptions **out_opts, CBoxliteError *err);
 void boxlite_options_set_cpus(CBoxliteOptions *opts, int cpus);
 void boxlite_options_set_memory(CBoxliteOptions *opts, int memory_mib);
-void boxlite_options_add_volume(CBoxliteOptions *opts, const char *host_path, const char *guest_path, int read_only); /* read_only: 1=read-only 0=read-write */
+void boxlite_options_add_bind_mount(CBoxliteOptions *opts, const char *host_path, const char *guest_path, int read_only); /* read_only: 1=read-only 0=read-write */
 enum BoxliteErrorCode boxlite_options_add_port(CBoxliteOptions *opts, uint16_t host_port, uint16_t guest_port, enum BoxlitePortProtocol protocol, const char *host_ip); /* host_port=0 => same as guest_port */
 void boxlite_options_add_secret(CBoxliteOptions *opts, const char *name, const char *value, const char *placeholder, const char *const *hosts, int hosts_count);
 void boxlite_options_free(CBoxliteOptions *opts);
@@ -643,8 +643,8 @@ All options setters are synchronous; once built, pass the options to `boxlite_cr
 ```c
 /* read_only: 1 = read-only, 0 = read-write.
  * Replace <YOUR_HOST_PATH> with the absolute path to the host directory. */
-boxlite_options_add_volume(opts, "<YOUR_HOST_PATH>", "/data", 1);   /* read-only mount at /data */
-boxlite_options_add_volume(opts, "<YOUR_HOST_PATH>", "/work", 0);   /* read-write mount at /work */
+boxlite_options_add_bind_mount(opts, "<YOUR_HOST_PATH>", "/data", 1);   /* read-only mount at /data */
+boxlite_options_add_bind_mount(opts, "<YOUR_HOST_PATH>", "/work", 0);   /* read-write mount at /work */
 ```
 
 > **Key**: the SDK's third argument is **`int read_only`** (1/0 in C), **not** the CLI-style `:ro`/`:rw` string. Passing a string here will not even compile; the CLI `-v host:box:ro` syntax belongs to the command-line parsing layer and is unrelated to the SDK API.
@@ -764,11 +764,11 @@ while (!st.done) {
 
 ### The third volume argument was passed as the string `"ro"` / `"rw"`
 
-**Symptom**: `boxlite_options_add_volume(opts, host, guest, "ro")` fails to compile with a type error (a `const char *` where an `int` is expected).
+**Symptom**: `boxlite_options_add_bind_mount(opts, host, guest, "ro")` fails to compile with a type error (a `const char *` where an `int` is expected).
 
 **Cause**: the SDK's third argument is `int read_only`, not the CLI's `ro`/`rw` string.
 
-**Fix**: use `1` (read-only) / `0` (read-write): `boxlite_options_add_volume(opts, host, guest, 1);`.
+**Fix**: use `1` (read-only) / `0` (read-write): `boxlite_options_add_bind_mount(opts, host, guest, 1);`.
 
 > Compared with other SDKs: the Python/Node volume third element is likewise a **bool `read_only`** (e.g. Python `(host, guest, True)`), and passing a string raises `TypeError: 'str' object cannot be cast as 'bool'`. Only the CLI `-v host:box:ro` uses the string syntax.
 

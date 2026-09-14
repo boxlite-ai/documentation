@@ -206,7 +206,7 @@ The console is the other way to create a volume, and the one to use when you wan
 
 1. Open **Volumes** in the console and click **New Volume**.
 2. Fill in **Name** — the only field. Pick something you will recognize later, such as `subtitle-models`.
-3. Create it, then give it a few seconds to become ready before you mount it.
+3. Creation waits until the volume is ready, so you can mount it immediately.
 
 The volume now exists independently of any box. You can mount it into a box, destroy that box, and mount it into a different one later. `rt.volumes.list()` and the **Volumes** page report the same set of volumes, and a name set in either place mounts the same way.
 

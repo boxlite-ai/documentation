@@ -147,7 +147,7 @@ RESULT: {
 
 That `stdout` came from `echo` running inside the microVM, serialized back over JSON-RPC.
 
-Now confirm the behaviour that surprises people most — a failing command returns data rather than raising. Change the tool call to:
+Now confirm the behavior that surprises people most — a failing command returns data rather than raising. Change the tool call to:
 
 ```python
 result = await session.call_tool(

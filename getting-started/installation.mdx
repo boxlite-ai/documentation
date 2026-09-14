@@ -23,7 +23,7 @@ BoxLite is not an ordinary container runtime — it starts a real lightweight VM
 | macOS | Intel (x86_64) | Not supported | — |
 | Linux | x86_64 | Supported | KVM enabled, `/dev/kvm` accessible |
 | Linux | ARM64 (aarch64) | Supported | KVM enabled, `/dev/kvm` accessible |
-| Windows | — | Supported via WSL2 | Configure KVM inside WSL2 per the Linux requirements |
+| Windows | x86_64 | Supported via WSL2 | Configure KVM inside WSL2 per the Linux requirements |
 
 > Platform support source: the platform table in the repository root `README.md`. macOS arm64 runs without `/dev/kvm` (it uses Hypervisor.framework).
 
@@ -35,7 +35,7 @@ BoxLite is not an ordinary container runtime — it starts a real lightweight VM
 |---|---|---|
 | Python | 3.10+ | `pip install boxlite` (prebuilt wheel) |
 | Node.js | 18+ | `npm install @boxlite-ai/boxlite` (prebuilt native module) |
-| Rust | Stable toolchain | Build from source (crate name `boxlite`) |
+| Rust | 1.88 or newer (`Cargo.toml` `rust-version`) | Build from source (crate name `boxlite`) |
 | Go | 1.24+, CGO enabled | `go get github.com/boxlite-ai/boxlite/sdks/go` + `go run .../cmd/setup` (prebuilt native library) |
 | C | C11-compatible compiler (GCC/Clang) | Build `libboxlite` from source |
 | CLI | — | One-line script / cargo / source |

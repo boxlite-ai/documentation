@@ -195,7 +195,7 @@ The microVM boundary is always on. Two further knobs narrow what the code inside
 ```python
 import asyncio
 from boxlite import SimpleBox, SecurityOptions, NetworkSpec
-from boxlite.boxlite import AdvancedBoxOptions  # not exported at the top level
+from boxlite import AdvancedBoxOptions
 
 async def main():
     try:
@@ -229,7 +229,7 @@ Details: [Secrets and hardening](/manage-sandbox/secrets-and-security) and [Netw
 
 ### `SimpleBox.exec(cmd, *args, env=None, user=None, timeout=None, cwd=None)`
 
-Source: `sdks/python/boxlite/simplebox.py:175`
+Source: `SimpleBox.exec` in `sdks/python/boxlite/simplebox.py`
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -240,7 +240,7 @@ Source: `sdks/python/boxlite/simplebox.py:175`
 | `timeout` | `float` (seconds) | No | Execution timeout; no timeout by default. A timeout does not raise; the process is killed and returns a non-zero exit code |
 | `cwd` | `str` | No | Working directory inside the container; defaults to the container's configured workdir |
 
-Returns `ExecResult` (a dataclass, `sdks/python/boxlite/exec.py:14`):
+Returns `ExecResult` (a dataclass, `ExecResult` in `sdks/python/boxlite/exec.py`):
 
 | Field | Type | Description |
 |---|---|---|

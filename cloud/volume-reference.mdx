@@ -1,7 +1,7 @@
 ---
 title: "Volume reference"
 sidebarTitle: "Reference"
-description: "How a volume is addressed by name or id, the parameters and return shapes of every volume call, the mount tuple, read-only behaviour, and what differs from open source."
+description: "How a volume is addressed by name or id, the parameters and return shapes of every volume call, the mount tuple, read-only behavior, and what differs from open source."
 ---
 
 One page for everything the volume API does, so the task pages can stay about the task. If you have not created a volume yet, start with [Mount a volume](/cloud/mount-a-volume).
@@ -102,7 +102,7 @@ Read-only managed volumes are not supported. The SDK refuses the mount before th
 read-only managed volumes are not supported yet; mount "training-data" read-write
 ```
 
-Mount read-write and enforce read-only behaviour in your own code, or use a separate volume for data no box should modify.
+Mount read-write and enforce read-only behavior in your own code, or use a separate volume for data no box should modify.
 
 
 ## What is different from open source
@@ -134,7 +134,7 @@ For host-directory mount options, read-only mounts, and `copy_in` / `copy_out`, 
 |---|---|---|
 | The box is refused with a host-path error | A path from your machine was passed as the first element. Cloud takes a managed volume reference there | Pass the volume's name or id: `volumes=[("training-data", "/data")]` |
 | `read-only managed volumes are not supported yet` | A mount asked for read-only, which Cloud does not support | Mount read-write; the SDK refuses rather than silently mounting writable |
-| `volumes tuples must be (host, guest[, read_only])` | A `volumes` entry is a tuple of the wrong length | Give each mount exactly the volume reference and the mount path |
+| `volumes tuples must be (host_path, guest_path[, read_only])` | A `volumes` entry is a tuple of the wrong length | Give each mount exactly the volume reference and the mount path |
 | `volumes entries must be tuple or dict` | A `volumes` entry is neither — most often a bare string | Wrap each mount in a tuple: `volumes=[(volume.name, "/data")]`, not `volumes=[volume.name]` |
 | `rt.volumes(...)` fails when you call it | `volumes` is a property on the runtime, not a method | Drop the parentheses: `await rt.volumes.create()` |
 | A BoxLite error from `create()`, `list()`, `get()`, or `remove()` | The runtime has no volume backend — a local runtime cannot resolve a managed volume reference | Build the runtime with `Boxlite.rest(...)` against Cloud |
