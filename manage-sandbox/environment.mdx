@@ -40,7 +40,8 @@ import boxlite
 async def main():
     try:
         # at construction time, env is list[tuple[str, str]] (note: different from the dict used by exec(env=...))
-        # note that working_dir must be a directory that already exists in the image, otherwise exec raises RuntimeError.
+        # working_dir must already exist in the image: a missing path fails when entering
+        # the context, not on the first exec.
         # alpine ships with /tmp; to use a custom directory like /work, create it first via exec mkdir.
         async with boxlite.SimpleBox(
             image="alpine:latest",
@@ -325,3 +326,21 @@ BoxLite requires hardware virtualization (an environment constraint):
 - Linux: requires KVM (`/dev/kvm` available); under WSL2 the user must be in the `kvm` group.
 - macOS: uses Apple Hypervisor.framework, no `/dev/kvm` required (macOS arm64 supported).
 - No virtualization: startup fails on `async with` entry. The process does not crash and can be caught with `try/except` to report the issue.
+
+### `working_dir` and `exec(cwd=...)` fail at different moments
+
+Both require a directory that **already exists in the image**, but they fail in different places, which changes how you recover.
+
+A missing `working_dir` fails when the box is created — before any command runs:
+
+```text
+RuntimeError: internal error: Container init failed: Failed to create container: ...
+```
+
+A missing `exec(cwd=...)` fails only that call, and **the box stays usable**:
+
+```text
+RuntimeError: internal error: spawn_failed: ... failed to create container
+```
+
+So a bad `working_dir` costs you the box; a bad `cwd` costs you one command. Alpine ships `/tmp`; create anything else first with `exec("mkdir", "-p", "/work")`.
