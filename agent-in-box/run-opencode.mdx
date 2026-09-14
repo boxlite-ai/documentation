@@ -120,7 +120,7 @@ The placeholder goes where the key would have gone in the config JSON. Substitut
 
 ## Long-running use: `opencode serve`
 
-For more than one prompt, run the headless server and forward its port instead of paying the install and start cost per call:
+For more than one prompt, run the headless server and forward its port instead of installing and starting it on every call:
 
 ```python
 async with SimpleBox(image="node:20-slim", disk_size_gb=8, ports=[(4096, 4096)]) as box:

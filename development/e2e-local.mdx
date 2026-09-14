@@ -34,7 +34,7 @@ make test:integration
 make test:integration:core
 ```
 
-> Tip: `make test:integration` actually boots microVMs. On a clean machine the first run compiles the whole toolchain first (roughly 5-10 minutes); subsequent runs reuse the cache and are significantly faster.
+> Tip: `make test:integration` actually boots microVMs. On a clean machine, the first run compiles the whole toolchain (roughly 5-10 minutes); subsequent runs reuse the cache and are significantly faster.
 
 ### `make test` vs `make test:integration:cli`
 
@@ -102,7 +102,7 @@ Note on the single-instance design: the workflow keeps **one persistent** EC2 in
 | Lifecycle | Persistent — stopped between runs, never terminated |
 | Storage | gp3 root volume retained across runs; holds the `~/.cargo`, `target/`, and `~/.boxlite` caches |
 
-Keeping the instance warm is why repeat runs are faster: a clean instance's first run requires a full compile (roughly 5-10 minutes of initialization), after which it reuses the cached toolchain and build artifacts. Running cost is the instance's on-demand rate while a run is in progress, plus the persistent root volume; price it against your own account and region.
+Keeping the instance warm is why repeat runs are faster: a clean instance's first run requires a full compile (roughly 5-10 minutes of initialization), after which it reuses the cached toolchain and build artifacts. Running cost is the instance's on-demand rate while a run is in progress, plus the persistent root volume. Price it against your own account and region.
 
 Authentication uses no long-lived secrets:
 

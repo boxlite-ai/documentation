@@ -132,9 +132,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-> Note: when called through the wrapper, `runtime.create(...)` returns a native
-> `Box` (an async context manager). Here we obtain the box via
-> `await runtime.create(...)` and then stop/remove it manually. The native
+> Note: `runtime.create(...)` returns a native `Box` (an async context manager),
+> not a `SimpleBox`. The example below awaits it and then stops and removes the
+> box explicitly. The native
 > signature of `box.exec(...)` takes `args: list` as its second argument, and
 > its timeout parameter is `timeout_secs` (unlike the high-level
 > `SimpleBox.exec`'s `timeout`).

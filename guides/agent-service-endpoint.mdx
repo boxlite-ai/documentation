@@ -230,7 +230,7 @@ print(info.state.status)    # status string: outer BoxInfo.state -> BoxStateInfo
 print(info.cpus, info.memory_mib, info.image)
 ```
 
-The outer object is `BoxInfo.state` (a `BoxStateInfo`), and the inner field is `status` (a string). Both levels must be written correctly — the Node equivalent, `info.state.status`, is already shown in the Quick Example above.
+The outer object is `BoxInfo.state` (a `BoxStateInfo`), and the inner field is `status` (a string). Both `.state` and `.status` must be chained correctly — the Node equivalent, `info.state.status`, is already shown in the Quick Example above.
 
 ## Troubleshooting
 
