@@ -50,7 +50,7 @@ These two targets are not interchangeable:
   cargo test -p boxlite-cli --tests --no-fail-fast -- --test-threads=4
   ```
 
-The CLI tests are real integration tests, not unit tests: each test pulls images, creates boxes, and runs the actual `boxlite` binary against a microVM. They therefore require the same virtualization environment as the rest of `make test:integration` (KVM on Linux, Hypervisor.framework on macOS). To keep first-run image pulls cheap and avoid registry rate limits, a shared, pre-warmed cache is set up once per test process and the standard test images (`alpine:latest`, `debian:bookworm-slim`, `python:alpine`) are pre-pulled and reused. For how the CLI test harness itself is structured, see the [CLI Development Guide](/development/cli-development).
+The CLI tests are real integration tests, not unit tests: each test pulls images, creates boxes, and runs the actual `boxlite` binary against a microVM. They therefore require the same virtualization environment as the rest of `make test:integration` (KVM on Linux, Hypervisor.framework on macOS). To keep first-run image pulls cheap and avoid registry rate limits, a shared, pre-warmed cache is set up once per test process and the standard test images (`alpine:latest`, `python:alpine`) are pre-pulled and reused. For how the CLI test harness itself is structured, see the [CLI Development Guide](/development/cli-development).
 
 ### Trigger a run in CI
 
@@ -86,8 +86,8 @@ Note on the single-instance design: the workflow keeps **one persistent** EC2 in
 
 | Trigger | Condition |
 |---|---|
-| push to `main` | Changes to runtime code: `src/boxlite/**`, `src/shared/**`, `src/cli/**`, `src/guest/**`, `sdks/**`, any `**/Cargo.toml`, `Cargo.lock`, or the workflow file itself. |
-| pull_request (`labeled` / `synchronize`) | Runs only when the PR carries the `e2e-local` label — the label is a cost gate that only maintainers can add. |
+| push to `main` | Changes to runtime code: `src/boxlite/**`, `src/shared/**`, `src/cli/**`, `src/guest/**`, `src/shim/**`, `src/deps/**`, `sdks/**`, any `**/Cargo.toml`, `Cargo.lock`, `.gitmodules`, or the workflow file itself. |
+| `pull_request_target` (`labeled` / `synchronize`) | Runs only when the PR carries the `e2e-local` label — the label is a cost gate that only maintainers can add. |
 | `workflow_dispatch` | Manual trigger with an optional `debug` input: opens an SSH (tmate) session when a test fails. |
 
 > Note on source prefixes: the trigger paths use the real repository layout `src/<crate>/` (`src/boxlite`, `src/shared`, `src/cli`, `src/guest`) and `sdks/**`, not the old `boxlite/src/` prefix.
@@ -97,7 +97,7 @@ Note on the single-instance design: the workflow keeps **one persistent** EC2 in
 | Attribute | Value |
 |---|---|
 | Instance type | Any instance family that supports nested virtualization (set via `EC2_INSTANCE_TYPE`) |
-| AMI / region | Supplied by the workflow inputs `EC2_AMI_ID` / `AWS_REGION` |
+| AMI / region | Hardcoded in the workflow file (`AWS_REGION: us-east-1`, `EC2_AMI_ID`, `EC2_INSTANCE_TYPE`) — change them there, not via repository variables |
 | Runner label | `boxlite-e2e` (registration label set `self-hosted,linux,x64,kvm,boxlite-e2e`) |
 | Lifecycle | Persistent — stopped between runs, never terminated |
 | Storage | gp3 root volume retained across runs; holds the `~/.cargo`, `target/`, and `~/.boxlite` caches |
@@ -168,8 +168,8 @@ Relevant make targets available locally:
 | `make setup` | Install build dependencies (the local equivalent of CI's dependency-install step). |
 | `make test:integration` | Run all integration suites (CI's core command; requires a VM). |
 | `make test:integration:core` | Core suites only (Rust + CLI), faster than the full run. |
-| `make test:integration:sdk` | SDK integration suites (Python + Node + C; requires a VM). |
-| `make test:integration:python` / `:node` / `:c` / `:rust` / `:cli` | Single-language / single-layer suites (some support `FILTER=<pattern>`). |
+| `make test:integration:sdk` | SDK integration suites (Python + Node + C — deliberately excludes Go; requires a VM). |
+| `make test:integration:python` / `:node` / `:c` / `:rust` / `:cli` / `:go` | Single-language / single-layer suites (some support `FILTER=<pattern>`). |
 
 > The authoritative target list is `make help` (aggregated in `make/help.mk`); the table above is the common subset.
 

@@ -590,7 +590,7 @@ When `pathPrefix` is unset, the client builds URLs without the segment (`/v1/box
 
 ### `JsBoxInfo` / state
 
-`box.info()` (**sync**) returns `JsBoxInfo`: `{ id, name?, state: JsBoxStateInfo, createdAt, image, cpus, memoryMib, healthStatus }`.
+`await box.info()` returns `JsBoxInfo`: `{ id, name?, state: JsBoxStateInfo, createdAt, image, cpus, memoryMib, healthStatus }`.
 
 > `cpus` / `memoryMib`: the configured resource values. To read the real allocation, run `nproc` / read `/proc/meminfo` inside the box.
 
@@ -651,7 +651,7 @@ try {
 Error: Box not yet created. Call exec() first or use getId() async method.
 ```
 
-Cause: the box is created lazily, so sync members like `box.id` / `box.info()` are unavailable before the first `exec()`/`start`. Use `await box.getId()` / `await box.getInfo()` instead, or run one command first.
+Cause: the box is created lazily, so the sync `box.id` getter is unavailable before the first `exec()`/`start`. Use `await box.getId()` / `await box.getInfo()` instead, or run one command first. (`box.info()` is itself async — `await` it.)
 
 ### Startup failure in a non-virtualization environment
 

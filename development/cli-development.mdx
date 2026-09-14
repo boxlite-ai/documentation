@@ -60,7 +60,7 @@ The integration tests live under `src/cli/tests/`:
 
 Use `common::boxlite_bare()` instead when a test needs full control over which registries are used (it skips the default `--registry` flags).
 
-The first `PerTestBoxHome` constructed in a test process triggers a one-time warm-up of a shared cache: it pre-pulls the standard test images (`alpine:latest`, `debian:bookworm-slim`, `python:alpine`) under a cross-process lock and warms the guest rootfs pipeline. Subsequent tests reuse that cache, which keeps the suite fast and avoids registry rate limits.
+The first `PerTestBoxHome` constructed in a test process triggers a one-time warm-up of a shared cache: it pre-pulls the standard test images (`alpine:latest`, `python:alpine`) under a cross-process lock and warms the guest rootfs pipeline. Subsequent tests reuse that cache, which keeps the suite fast and avoids registry rate limits.
 
 ## Writing a test
 
@@ -93,7 +93,7 @@ fn test_run_exit_code_custom() {
 ## Code structure
 
 - **Entry:** `src/cli/src/main.rs` — parses the CLI and dispatches each `Commands` variant to the matching `commands::*::execute(args, &global)` (for example `commands::run::execute`).
-- **Subcommands and flags:** `src/cli/src/cli.rs` — the clap definitions: `Cli`, `Commands`, `GlobalFlags`, `ProcessFlags`, `ResourceFlags`, `NetworkFlags`, `PublishFlags`, `VolumeFlags`, and `ManagementFlags`. `GlobalFlags` carries `--home` and registry flags and exposes helpers for building the runtime and applying flag groups to `BoxOptions`.
+- **Subcommands and flags:** `src/cli/src/cli.rs` — the clap definitions: `Cli`, `Commands`, `GlobalFlags`, `ProcessFlags`, `ResourceFlags`, `NetworkFlags`, `PublishFlags`, `VolumeFlags`, `CapabilityFlags`, `KernelFlags`, and `ManagementFlags`. `GlobalFlags` carries `--home` and registry flags and exposes helpers for building the runtime and applying flag groups to `BoxOptions`.
 - **Command implementations:** `src/cli/src/commands/*.rs` — one module per command (with `auth/` and `serve/` as submodule trees). Each exposes an `execute(args, global)` and shares runtime-construction helpers from `GlobalFlags`.
 
 ## Adding a new subcommand

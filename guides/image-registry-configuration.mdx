@@ -219,7 +219,7 @@ Constructor signature:
 | `search` | `bool` | Optional | `False` | When `True`, this registry participates in lookup fallback for "non-fully-qualified" image names. **Note the default is `False`** |
 | `username` | `str \| None` | Optional | `None` | Basic auth username; must be paired with `password` |
 | `password` | `str \| None` | Optional | `None` | Basic auth password; must be paired with `username` |
-| `bearer_token` | `str \| None` | Optional | `None` | Bearer token auth; mutually exclusive with username/password (takes priority over Basic) |
+| `bearer_token` | `str \| None` | Optional | `None` | Bearer token auth. If you also set `username`/`password`, the bearer token wins — they are not rejected |
 
 ### `JsImageRegistry` (Node)
 

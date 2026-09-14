@@ -58,7 +58,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-> **Do not** write `(host_dir, "/ro", "ro")`. At the SDK layer the third element is a `bool`; passing a string raises `TypeError` (see Troubleshooting). The `"ro"`/`"rw"` string syntax belongs only to the **CLI**'s `-v host:box:ro` and differs from the SDK API.
+> **Do not** write `(host_dir, "/ro", "ro")`. At the SDK layer the third element is a `bool`; passing a string raises `TypeError`. The `"ro"`/`"rw"` string syntax belongs only to the **CLI**'s `-v host:box:ro` and differs from the SDK API.
 
 ---
 

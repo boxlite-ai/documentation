@@ -163,6 +163,16 @@ make_box() {
 A=$(make_box)
 curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes/${A}/exec" "${AUTH[@]}" \
   -d '{"command":"sh","args":["-c","echo '"'"'produced by box A'"'"' > /data/handoff.txt"]}' > /dev/null
+# exec is asynchronous: it returns an execution id. Wait for it before
+# removing the box, or the write can still be in flight.
+EXEC_ID=$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes/${A}/exec" "${AUTH[@]}" \
+  -d '{"command":"sh","args":["-c","true"]}' | jq -r .id)
+for _ in $(seq 30); do
+  STATE=$(curl -fsS "${BOXLITE_REST_URL}/v1/boxes/${A}/executions/${EXEC_ID}" "${AUTH[@]}" | jq -r .state)
+  [ "$STATE" = "completed" ] && break
+  sleep 1
+done
+
 curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${A}?force=true" "${AUTH[@]}"
 
 # Box B is a different box on the same volume.

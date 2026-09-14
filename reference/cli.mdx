@@ -80,11 +80,13 @@ Global options may appear **before or after** the subcommand and apply to all co
 | `info` | — | Show runtime-level system information |
 | `logs` | — | View a sandbox's logs |
 | `stats` | — | View a sandbox's resource usage |
+| `network` | — | Inspect and manage a sandbox's network settings |
+| `volume` | — | Create, list, and remove managed volumes |
 | `serve` | — | Start the long-running REST API service |
 | `auth` | — | Authenticate with a remote BoxLite service (login/logout/status/whoami) |
 | `completion` | — | Generate shell completion scripts (hidden in help) |
 
-> Source: `src/cli/src/cli.rs:55-108`. The `Commands` enum is marked `#[non_exhaustive]`, so new commands may be added in the future.
+> Source: the `Commands` enum in `src/cli/src/cli.rs`. The `Commands` enum is marked `#[non_exhaustive]`, so new commands may be added in the future.
 
 ---
 

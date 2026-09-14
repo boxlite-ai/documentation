@@ -30,7 +30,7 @@ Each guide starts from a box that already runs on your machine — see [Installa
 | [Give an agent a computer](/use-cases/computer-use-agent) | A vision model driving a real Linux desktop | Intermediate |
 | [Scrape and analyze the web safely](/use-cases/web-scraping-agent) | A browser box plus a parsing box, feeding clean data to a model | Intermediate |
 | [Use a custom image as the agent environment](/use-cases/custom-agent-image) | Boxes that boot with your toolchain already installed | Beginner+ |
-| [Run Claude Code in a box](/agent-in-box/run-claude-code) | An autonomous coding agent confined to a microVM | Intermediate |
+| [Run Claude Code](/agent-in-box/run-claude-code) | An autonomous coding agent confined to a microVM | Intermediate |
 
 ## Multi-tenant platform
 
@@ -131,6 +131,6 @@ The C SDK ships its own example set under `examples/c/` (build with CMake; see `
 
 > The C SDK uses `BoxliteErrorCode` for control flow rather than exceptions. Common codes: `Ok` (0), `NotFound` (2), `InvalidState` (4), `InvalidArgument` (5), `Image` (8, image pull failed), `Execution` (10, command failed). Always initialize `CBoxliteError error = {0};` and call `boxlite_error_free(&error)` on failure.
 
-> Link convention: the "concept page" column above links only to pages that already exist within docs-v2; the "repository example" entries are real file paths in the BoxLite source repository under `boxlite/` (not pages on this site), so open and run them inside the repository. A few capabilities without a standalone example script (such as Secrets) are marked with — ; see the corresponding concept page.
+> Link convention: the "concept page" column above links only to pages that exist on this site; the "repository example" entries are real file paths in the BoxLite source repository under `boxlite/` (not pages on this site), so open and run them inside the repository. A few capabilities without a standalone example script (such as Secrets) are marked with — ; see the corresponding concept page.
 
 ---

@@ -39,7 +39,7 @@ Two transitions are worth committing to memory:
 - **Creation is lazy.** Constructing a box returns a handle; the microVM comes up on first use. A box that never runs costs nothing but a database row.
 - **Stop is not remove.** `stop()` frees the VM but keeps the disk, so restarting reuses everything the box had installed. That is what makes a box a reusable workspace rather than a one-shot container.
 
-Read the current state with `box.info().state.status`. **`info()` is synchronous** — do not await it, and it triggers no VM operation. Field names are exact and easy to get wrong: see [`BoxInfo` / `BoxStateInfo`](#boxinfo-boxstateinfo-state-access).
+Read the current state with `box.info().state.status`. **`info()` is async** — `await` it. Field names are exact and easy to get wrong: see [`BoxInfo` / `BoxStateInfo`](#boxinfo-boxstateinfo-state-access).
 
 ## Walking the states in code
 
@@ -76,7 +76,7 @@ async def main():
             result = await execution.wait()
             print(f"  exit_code = {result.exit_code}")  # a non-zero exit code does not raise; check it yourself
 
-            # 3. state query: info() is synchronous; do not await
+            # 3. state query: info() is async — await it
             info = box.info()
             print(f"  state = {info.state.status}, running = {info.state.running}")
 
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     const result = await execution.wait();
     console.log(`  exitCode = ${result.exitCode}`); // a non-zero exit code does not throw; check it yourself
 
-    // 3. state query: info() is synchronous; do not await
+    // 3. state query: info() is async — await it
     const info = box.info();
     console.log(`  state = ${info.state.status}`);
 
@@ -152,7 +152,7 @@ main();
 
 </CodeGroup>
 
-> Key point: `Boxlite` is a **synchronous** context manager (`with`), whereas a `Box`'s methods (`exec`/`stop`/`metrics`) are **async** (require `await`). `box.info()` is synchronous and must not be awaited.
+> Key point: `Boxlite` is a **synchronous** context manager (`with`), whereas a `Box`'s methods (`exec`/`stop`/`metrics`) are **async** (require `await`). `box.info()` is async too — `await` it.
 
 Verified: real run prints `created: <box-id>`, `hello from box`, `exitCode = 0`, `state = running`, `stopped`, `removed`.
 
@@ -635,14 +635,14 @@ Verified: real run prints `running boxes before shutdown: 3`, `shutdown complete
 | `shutdown(timeout=None)` | — | Shut down all Boxes (seconds; `None`=10s, `-1`=indefinite) |
 | `close()` | — | Close the runtime handle (synchronous) |
 
-### `Box` methods (async, require `await`, except `info()`)
+### `Box` methods (async, require `await`)
 
 | Method | Returns | Description |
 |---|---|---|
 | `start()` | — | Bring up the VM, idempotent |
 | `stop()` | — | Shut down the VM, preserve the rootfs (unless `auto_remove=True`) |
 | `exec(command, args=None, ...)` | `Execution` | Run a command; triggers a restart on a stopped Box |
-| `info()` | `BoxInfo` | **Synchronous**, do not `await`; does not trigger the VM |
+| `info()` | `BoxInfo` | **Async** — `await` it |
 | `metrics()` | `BoxMetrics` | Per-Box metrics |
 | `id` / `name` | str | Properties |
 
@@ -651,7 +651,7 @@ Verified: real run prints `running boxes before shutdown: 3`, `shutdown complete
 `box.info()` returns a `BoxInfo`; its `state` field is a `BoxStateInfo`, and the state string is at `state.status`:
 
 ```python
-info = box.info()           # synchronous
+info = await box.info()     # async
 print(info.state.status)    # state string
 print(info.state.running)   # bool
 print(info.id, info.image, info.cpus, info.memory_mib)
@@ -668,9 +668,9 @@ print(info.id, info.image, info.cpus, info.memory_mib)
 
 ## Troubleshooting
 
-### Awaiting `Box.info()` as if it were async
+### Forgetting to await `Box.info()`
 
-`info()` is a **synchronous** method.
+`info()` is an **async** method.
 
 ```python
 # Wrong: await box.info()  ->  TypeError: object BoxInfo can't be used in 'await' expression
@@ -753,7 +753,7 @@ async def main():
         async with SimpleBox(image="alpine:latest", auto_remove=True) as box:
             result = await box.exec("echo", "hello")  # ExecResult
             print(result.stdout, "exit:", result.exit_code)
-            print("state:", box.info().state.status)   # info() is synchronous
+            print("state:", (await box.info()).state.status)   # info() is async
     except RuntimeError as exc:
         print(f"run failed (check virtualization): {exc}")
 

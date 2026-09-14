@@ -77,9 +77,9 @@ Each SDK also exports its own `DEFAULT_MEMORY_MIB` / `DEFAULT_CPUS` constants, b
 
 | SDK constant | `DEFAULT_MEMORY_MIB` | `DEFAULT_CPUS` |
 |---|---|---|
-| Python (`boxlite.constants`) | 2048 | 1 |
+| Python (`boxlite.constants`) | 1024 | 1 |
 | Node (`@boxlite-ai/boxlite` constants) | 512 | 1 |
-| Rust core (`constants.rs`) | 2048 | 1 |
+| Rust core (`constants.rs`) | 1024 | 1 |
 
 The safest approach is to always set resources explicitly:
 
@@ -231,13 +231,13 @@ asyncio.run(main())
 
 ### How do I enable stronger isolation / security?
 
-Security options go through `advanced`. There is **no top-level `security=` keyword** on `BoxOptions`, and `AdvancedBoxOptions` is only importable from `boxlite.boxlite` (it is not re-exported at the top level). Presets are `development()`, `standard()`, and `maximum()` (there is no `minimum()`).
+Security options go through `advanced`. There is **no top-level `security=` keyword** on `BoxOptions`, and `AdvancedBoxOptions` is exported at the top level: `from boxlite import AdvancedBoxOptions`.
 
 ```python
 # Python — maximum isolation preset
 import asyncio
 from boxlite import SimpleBox, SecurityOptions, BoxliteError
-from boxlite.boxlite import AdvancedBoxOptions  # NOT exported at top level
+from boxlite import AdvancedBoxOptions
 
 async def main() -> None:
     try:
@@ -282,17 +282,17 @@ asyncio.run(main())
 
 ### How do I read a box's state and metrics?
 
-`box.info()` is **synchronous** (do not `await` it). State lives in `info().state.status`. Metric field names are `memory_bytes` and `cpu_percent` (not `memory_usage_bytes` / `cpu_time_ms`).
+`box.info()` is **async** — `await` it. State lives in `info().state.status`. Metric field names are `memory_bytes` and `cpu_percent` (not `memory_usage_bytes` / `cpu_time_ms`).
 
 > Note: `metrics()` lives on the **native** `Box` (the object returned by `runtime.create(opts)`),
 > not on the `SimpleBox`/`CodeBox` wrappers — `SimpleBox` exposes `info()` but **not** `metrics()`
 > (`AttributeError: 'SimpleBox' object has no attribute 'metrics'`). Use the native box for metrics.
 > On the native box, `exec(command, args_list)` returns an `Execution`; `await execution.wait()`
 > yields an `ExecResult` carrying only `exit_code` / `error_message` (stdout/stderr stream off the
-> `Execution`). `info()` is still synchronous; `metrics()` is async.
+> `Execution`). both `info()` and `metrics()` are async.
 
 ```python
-# Python — synchronous info(), async metrics() on the native Box
+# Python — both info() and metrics() are async on the native Box
 import asyncio
 from boxlite import Boxlite, BoxOptions, BoxliteError
 
@@ -306,7 +306,7 @@ async def main() -> None:
                     execution = await box.exec("true")  # native exec -> Execution
                     await execution.wait()              # ensure the command ran
 
-                    info = box.info()  # synchronous — do NOT await
+                    info = await box.info()  # async — await it
                     print("status:", info.state.status)
 
                     metrics = await box.metrics()  # async
@@ -445,7 +445,7 @@ The CLI is the only place that uses `:ro`/`:rw` strings (`-v host:box:ro`); that
 # from boxlite import AdvancedBoxOptions   # AttributeError
 
 # Right
-from boxlite.boxlite import AdvancedBoxOptions
+from boxlite import AdvancedBoxOptions
 ```
 
 Also note `SecurityOptions` (with presets `development()/standard()/maximum()`) **is** at the top level; only `AdvancedBoxOptions` lives in `boxlite.boxlite`.
@@ -465,7 +465,7 @@ These names changed (or never existed). Use the real ones:
 
 ### `await box.info()` raises / behaves oddly
 
-`info()` is synchronous. Do not `await` it. Same for the Node `info()` getter (use the async `getInfo()` if you want a Promise).
+`info()` is async in every SDK — `await` it. In Node both `info()` and `getInfo()` return a Promise.
 
 ### A failing command did not raise an exception
 
@@ -517,7 +517,7 @@ Or, in a development environment where you do not need full sandbox isolation, r
 
 ```python
 from boxlite import BoxOptions, SecurityOptions
-from boxlite.boxlite import AdvancedBoxOptions
+from boxlite import AdvancedBoxOptions
 
 opts = BoxOptions(
     image="alpine:latest",

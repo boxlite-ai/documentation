@@ -219,7 +219,7 @@ Removing a sandbox must be called on the **runtime**: `await runtime.remove(box.
 
 ### `await box.info()` errors / coroutine was never awaited
 
-`box.info()` is a **synchronous** method; call `box.info()` directly and do not `await` it. It returns a `BoxInfo`, and the state is at `box.info().state` (a `BoxStateInfo`, whose field is named `.status`).
+`box.info()` is **async**; `await` it. It returns a `BoxInfo`, and the state is at `(await box.info()).state` (a `BoxStateInfo`, whose field is named `.status`).
 
 ### `box.snapshot.create("v1")` reports a missing keyword argument
 
@@ -234,7 +234,7 @@ Removing a sandbox must be called on the **runtime**: `await runtime.remove(box.
 - **The handle is invalidated after stop**: after `stop()`, calling `exec` on the old handle raises
   `RuntimeError: stopped: Handle invalidated after stop(). Use runtime.get() to get a new handle.`. Re-run `box = await runtime.get(box.id)` to obtain a fresh handle.
 
-> Limitation: restore does not guarantee a roll-back of disk contents. When you need a "clean environment", prefer `clone_box` or `export` / `import_box`.
+> Limitation: `restore` re-points the sandbox at the snapshot's disk state, but it is not a guaranteed rollback of everything written since — writes already flushed by a running guest can survive. When you need a guaranteed clean environment, prefer `clone_box` or `export` / `import_box`.
 
 ```python
 # correct restore call sequence

@@ -33,7 +33,7 @@ For the capabilities people most often ask about, here is the current path:
 | Run Git / GitHub workflows | `exec` the `git` / `gh` CLIs with the token injected via `secrets` — [GitHub operations](/agent-tools/github-operations) |
 | Give a human a graphical desktop | `ComputerBox`'s noVNC desktop plus port forwarding — [Desktop access](/human-tools/desktop-access) |
 | Drive a sandbox from an agent loop | An LLM tool-use loop calling `SimpleBox.exec` — [Drive a sandbox from your agent loop](/agent-tools/drive-from-agent-loop) |
-| Use a PTY from Rust / C / Go | `exec(..., tty=True)`; the `InteractiveBox` wrapper is Python and Node — [Interactive shell (PTY)](/agent-tools/pseudo-terminal) |
+| Use a PTY from Rust / C / Go | Set the TTY flag on the exec call — Rust `.tty(true)`, C `cmd.tty = 1`, Go `WithTty(true)`; the `InteractiveBox` wrapper is Python and Node — [Interactive shell (PTY)](/agent-tools/pseudo-terminal) |
 | Connect to a remote BoxLite service | The `Boxlite.rest(...)` client — [Manage remote sandboxes over REST](/guides/agent-service-endpoint) |
 
 ## Next
