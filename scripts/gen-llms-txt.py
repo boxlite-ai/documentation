@@ -16,6 +16,11 @@ Usage:
 
 The --check mode is what CI should run: it makes staleness a build failure
 instead of something a reader discovers.
+
+Links use the `.md` suffix, not `.mdx`. Mintlify serves raw markdown at
+`/route.md` and the rendered page at `/route`, but `/route.mdx` is a 404 —
+which is what every link in the previously hand-maintained llms.txt pointed
+at, so the whole index was dead for its only audience.
 """
 
 import json
@@ -62,7 +67,7 @@ def build() -> str:
             for route in routes:
                 title, description = frontmatter(route)
                 suffix = f": {description}" if description else ""
-                out.append(f"- [{title}](/{route}.mdx){suffix}")
+                out.append(f"- [{title}](/{route}.md){suffix}")
             out.append("")
     return "\n".join(out).rstrip() + "\n"
 
