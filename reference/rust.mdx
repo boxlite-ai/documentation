@@ -381,7 +381,7 @@ The Rust core layer exposes a **two-state switch plus a builder** (unlike the Py
 
 #### `SecurityOptions` fields
 
-The struct fields and their meanings (source `advanced_options.rs:95-173`). Several fields are Linux-only or macOS-only; on a platform that does not support a feature the field is inert.
+The struct fields and their meanings (source: `SecurityOptions` in `src/boxlite/src/runtime/advanced_options.rs`). Several fields are Linux-only or macOS-only; on a platform that does not support a feature the field is inert.
 
 ```rust
 pub struct SecurityOptions {
@@ -402,7 +402,7 @@ pub struct SecurityOptions {
 }
 ```
 
-Field defaults under `enabled()` (`== default()`, source `advanced_options.rs:212-241`):
+Field defaults under `enabled()` (`== default()`, source: `SecurityOptions::enabled` in `advanced_options.rs`):
 
 | Field | Default (enabled) | Notes |
 |---|---|---|
@@ -422,7 +422,7 @@ Field defaults under `enabled()` (`== default()`, source `advanced_options.rs:21
 
 #### `SecurityOptionsBuilder` methods
 
-Obtain a builder with `SecurityOptions::builder()` (or `SecurityOptionsBuilder::enabled()` / `::disabled()` / `::new()`). The setters take `&mut self` (non-consuming), and `build()` produces the final `SecurityOptions` (source `advanced_options.rs:371-560`):
+Obtain a builder with `SecurityOptions::builder()` (or `SecurityOptionsBuilder::enabled()` / `::disabled()` / `::new()`). The setters take `&mut self` (non-consuming), and `build()` produces the final `SecurityOptions` (source `SecurityOptionsBuilder` in `advanced_options.rs`):
 
 | Method | Maps to |
 |---|---|
@@ -455,7 +455,7 @@ Obtain a builder with `SecurityOptions::builder()` (or `SecurityOptionsBuilder::
 
 #### `ResourceLimits`
 
-RLIMIT_* caps applied to the jailed process (source `advanced_options.rs:178-198`). Each field maps to a POSIX resource limit; `None` means "do not set this limit".
+RLIMIT_* caps applied to the jailed process (source: `ResourceLimits` in `advanced_options.rs`). Each field maps to a POSIX resource limit; `None` means "do not set this limit".
 
 ```rust
 pub struct ResourceLimits {
@@ -741,7 +741,7 @@ Source `src/shared/src/errors.rs`. `BoxliteResult<T> = Result<T, BoxliteError>`.
 
 Real variants (**there is no `BoxliteError::Run`** — command-execution errors are `Execution`):
 
-`UnsupportedEngine`、`Engine(String)`、`Config(String)`、`Storage(String)`、`Image(String)`、`Portal(String)`、`Network(String)`、`Rpc(String)`、`RpcTransport(String)`、`Internal(String)`、**`Execution(String)`**、`Unsupported(String)`、`NotFound(String)`、`AlreadyExists(String)`、`InvalidState(String)`、`Database(String)`、`MetadataError(String)`、`InvalidArgument(String)`、`Stopped(String)`、`ResourceExhausted(String)`、`SessionReaped(String)`。
+`UnsupportedEngine`, `Engine(String)`, `Config(String)`, `Storage(String)`, `Image(String)`, `Portal(String)`, `Network(String)`, `Rpc(String)`, `RpcTransport(String)`, `Internal(String)`, **`Execution(String)`**, `Unsupported(String)`, `NotFound(String)`, `AlreadyExists(String)`, `InvalidState(String)`, `Database(String)`, `MetadataError(String)`, `InvalidArgument(String)`, `Stopped(String)`, `ResourceExhausted(String)`, `SessionReaped(String)`。
 
 ```rust
 use boxlite::{BoxliteRuntime, BoxOptions, BoxliteError};

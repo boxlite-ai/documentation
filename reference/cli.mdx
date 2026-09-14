@@ -92,7 +92,7 @@ Global options may appear **before or after** the subcommand and apply to all co
 
 ## Global options
 
-Source: `src/cli/src/cli.rs:139-182`.
+Source: the `GlobalFlags` group in `src/cli/src/cli.rs`.
 
 | Flag | Environment variable | Type | Description |
 |---|---|---|---|
@@ -459,7 +459,7 @@ boxlite auth logout
 
 ### `boxlite completion`
 
-Generate shell completion scripts (`src/cli/src/cli.rs:119-133`; hidden in `--help`).
+Generate shell completion scripts (the `Completion` variant in `src/cli/src/cli.rs`; hidden in `--help`).
 
 ```text
 boxlite completion <bash|zsh|fish>
@@ -701,12 +701,12 @@ Use it with `boxlite --config ./registries.json run ...`. `--registry` flags, if
 
 ## Exit codes
 
-`boxlite` follows POSIX shell exit-code conventions. The mapping lives at `src/cli/src/util/mod.rs:11-15` (`to_shell_exit_code`).
+`boxlite` follows POSIX shell exit-code conventions. The mapping lives in `to_shell_exit_code` (`src/cli/src/util/mod.rs`).
 
 | Code | Source | Meaning |
 |---|---|---|
 | `0` | success | The command (or box command) finished successfully |
-| `1` | runtime | Any anyhow error from a CLI command — `main.rs:71` prints `Error: ...` to stderr and exits `1` |
+| `1` | runtime | Any anyhow error from a CLI command — the top-level handler in `src/cli/src/main.rs` prints `Error: ...` to stderr and exits `1` |
 | `2` | clap | Invalid CLI usage (unknown flag, missing required argument, bad value) |
 | `N` (1-127) | box command | `run`/`exec` propagate the box command's exit status (run.rs:104, exec.rs:81) |
 | `128 + N` | signal | `run`/`exec` exited because the box command was killed by signal *N* (e.g. `137` for `SIGKILL` = 128 + 9, `143` for `SIGTERM` = 128 + 15) |

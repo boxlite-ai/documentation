@@ -6,6 +6,11 @@ description: "Decide who may reach a Cloud box — keep it private, share one po
 
 Two questions decide a box's network posture: who is allowed to reach it, and what it is allowed to reach. The inbound half is the public flag and preview URLs; the outbound half is `NetworkSpec`. Dialing a box port from your own code is a different job, and [Network](/cloud/network) covers it.
 
+
+<Note>
+The routes on this page live under `/api/box/...` — the **platform API**, which is a separate surface from the SDK REST API at `/v1/boxes/...` used everywhere else in these docs. The singular `box` and the missing version segment are intentional, not typos.
+</Note>
+
 ## Prerequisites
 
 - An API key exported as `BOXLITE_API_KEY`, and the base URL as `BOXLITE_REST_URL`. See [API keys](/cloud/api-keys).

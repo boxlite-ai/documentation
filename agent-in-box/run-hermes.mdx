@@ -183,7 +183,7 @@ With `Secret` the real key stays on the host and the box sees only a placeholder
 | The box takes minutes to start | The image is roughly 900 MB and is pulled on first use | Expected once per image; later starts use the cache |
 | `No space left on device` while starting | The default box disk is too small for this image | `disk_size_gb=12` — measured at 26% used |
 | The run stops waiting for confirmation | Hermes asks before dangerous commands | Add `--yolo` when the box is your containment |
-| A user config on a mounted volume changes behaviour unexpectedly | Hermes reads user configuration by default | Add `--ignore-user-config` for a reproducible run |
+| A user config on a mounted volume changes behavior unexpectedly | Hermes reads user configuration by default | Add `--ignore-user-config` for a reproducible run |
 | The gateway is unreachable from the host | The service bound loopback inside the box | Bind all interfaces; see [Network access](/manage-sandbox/network-access#port-forwarding-ports) |
 | `exec` returned non-zero but nothing raised | `exec` never raises on a non-zero exit | Check `result.exit_code` and read `result.stderr` |
 

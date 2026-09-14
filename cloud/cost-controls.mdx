@@ -13,11 +13,6 @@ Two lifecycle controls decide how long each half of the bill runs, and their def
 | `auto_stop` | 900 seconds (15 minutes idle) | **Compute billing stops on its own.** After 15 idle minutes the box stops, and vCPU and memory come off the bill |
 | `auto_delete` | `0`, disabled | **Disk billing never stops on its own.** A stopped box keeps its disk, and keeps being charged for it, indefinitely |
 
-| Control | Default | What it does to your bill |
-|---|---|---|
-| `auto_stop` | 900 seconds (15 minutes idle) | **Compute billing stops on its own.** After 15 idle minutes the box stops, and vCPU and memory come off the bill |
-| `auto_delete` | `0`, disabled | **Disk billing never stops on its own.** A stopped box keeps its disk, and keeps being charged for it, indefinitely |
-
 So by default you stop paying for compute automatically, and you pay for disk forever. Setting `auto_delete` closes that second loop.
 
 It must be larger than `auto_stop` when both are non-zero. This example gives a box 15 idle minutes to be reused, then deletes it an hour after it stops:

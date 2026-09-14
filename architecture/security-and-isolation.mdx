@@ -54,7 +54,7 @@ how to attach them to a box, see
 | `max_processes` | RLIMIT_NPROC |
 | `max_memory` | RLIMIT_AS (bytes); `None` defers to the VM configuration |
 | `max_cpu_time` | RLIMIT_CPU (seconds) |
-| `network_enabled` | In-sandbox network policy (macOS seatbelt + Linux landlock TCP); `False` denies all TCP, which gvproxy's VM network needs left on |
+| `network_enabled` | **Jailer-level** TCP policy for the host-side sandbox (macOS seatbelt + Linux landlock). `False` denies all TCP, which gvproxy's VM networking needs left on. This is **not** the guest-networking switch — that is `NetworkSpec.mode` |
 | `close_fds` | Closes inherited FDs other than stdin/stdout/stderr before startup |
 
 Errors you hit while configuring these — the `AdvancedBoxOptions` import, the top-level `security=`
@@ -65,6 +65,6 @@ keyword, the absent `minimum()` preset — are answered on
 
 - [Secrets and security configuration](/manage-sandbox/secrets-and-security) — `Secret`/Vault entry point and security-option usage
 - [Volume mounts](/manage-sandbox/volumes) — read-only/read-write volumes and the `read_only` bool
-- [Network access](/manage-sandbox/network-access) — `NetworkSpec` and `network_enabled`
+- [Network access](/manage-sandbox/network-access) — `NetworkSpec`, the guest-networking control (distinct from the jailer's `network_enabled` above)
 - [Architecture overview](/architecture/index) — microVM / shim / runtime layering
 - [Debug macOS Seatbelt denials](/development/macos-sandbox-debugging)

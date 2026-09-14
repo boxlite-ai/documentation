@@ -36,4 +36,4 @@ Managed volumes need a **REST runtime**. A local runtime has no volume backend t
 - **Handing results from one box to the next.** One box produces artifacts under the mount path, a later box mounts the same volume and picks them up.
 - **A fleet that addresses storage by name.** Workers mount a name, and none of them needs an id.
 
-A volume also costs less than keeping a stopped box around: a mounted volume adds nothing to a box's hourly price, while a stopped box is billed for its disk until it is deleted. See [What a box costs](/cloud/box-costs).
+A volume also costs less than keeping a stopped box around: volumes are not metered at all, so mounting one adds nothing to a box's hourly price, while a stopped box is billed for its disk until it is deleted. See [What a box costs](/cloud/box-costs).

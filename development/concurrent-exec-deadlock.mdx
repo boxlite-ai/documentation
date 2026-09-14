@@ -1,6 +1,6 @@
 ---
 title: "Concurrent execution deadlock investigation"
-description: "**Resolved and superseded.** A historical record of one deadlock — kept for the debugging method, not as current behaviour."
+description: "**Resolved and superseded.** A historical record of one deadlock — kept for the debugging method, not as current behavior."
 ---
 
 The hang is fixed: the guest now forks a single-threaded zygote before tokio starts any threads, and that zygote handles every `clone3()` (`src/guest/src/container/zygote.rs`). **If you hit a concurrent `exec` hang today, do not assume it is this bug** — re-diagnose from the Troubleshooting section below.

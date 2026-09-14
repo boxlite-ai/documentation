@@ -28,7 +28,7 @@ which components get installed and their minimum versions.
 
 | Dependency | Minimum version | Purpose | Evidence |
 |---|---|---|---|
-| Rust (stable) | 1.88 (`Cargo.toml` declares `rust-version`) | Core runtime, CLI, the native layer of each SDK | `Cargo.toml:40`, `rust-toolchain.toml` |
+| Rust (stable) | 1.88 (`Cargo.toml` declares `rust-version`) | Core runtime, CLI, the native layer of each SDK | `rust-version` in `Cargo.toml`, `rust-toolchain.toml` |
 | `protobuf` (`protoc`) | Distro's current version | Compile the gRPC/protobuf protocol in `src/shared` | `setup-ubuntu.sh:101` (`protobuf-compiler`); `setup-macos.sh:193` (`brew install protobuf`) |
 | Go | 1.24+ | Go SDK (CGO) | `GO_MIN_MAJOR`/`GO_MIN_MINOR` in `scripts/setup/setup-common.sh` (`GO_MIN_MAJOR=1` / `GO_MIN_MINOR=24`) |
 | CMake | Current version | C SDK test cases | `setup-macos.sh:208` (`brew install cmake`); `setup-ubuntu.sh:104` (`cmake`) |

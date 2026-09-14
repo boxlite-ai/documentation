@@ -213,7 +213,7 @@ Constructor signature:
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `host` | `str` | **Required** | --- | Registry host, in the form `host[:port]` (e.g. `ghcr.io`, `registry.local:5000`). **Must not contain `://` or `/`**, otherwise it raises |
+| `host` | `str` | **Required** | — | Registry host, in the form `host[:port]` (e.g. `ghcr.io`, `registry.local:5000`). **Must not contain `://` or `/`**, otherwise it raises |
 | `transport` | `str` | Optional | `"https"` | Only accepts `"https"` or `"http"`; `"http"` is for plaintext HTTP registries |
 | `skip_verify` | `bool` | Optional | `False` | When `True`, skips HTTPS TLS certificate and hostname verification (self-signed certificate scenario) |
 | `search` | `bool` | Optional | `False` | When `True`, this registry participates in lookup fallback for "non-fully-qualified" image names. **Note the default is `False`** |
@@ -225,11 +225,11 @@ Constructor signature:
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `host` | `string` | **Required** | --- | Registry host `host[:port]` |
+| `host` | `string` | **Required** | — | Registry host `host[:port]` |
 | `transport` | `"https" \| "http"` | Optional | `"https"` | Transport protocol |
 | `skipVerify` | `boolean` | Optional | `false` | Skip TLS verification |
 | `search` | `boolean` | Optional | `false` | Participate in non-qualified-name lookup fallback |
-| `auth` | `JsImageRegistryAuth` | Optional | --- | Auth sub-object: `{ username?, password?, bearerToken? }` |
+| `auth` | `JsImageRegistryAuth` | Optional | — | Auth sub-object: `{ username?, password?, bearerToken? }` |
 
 ### Returns / behavior
 
@@ -298,7 +298,7 @@ boxlite.ImageRegistry(host="ghcr.io")            # search defaults to False
 boxlite.ImageRegistry(host="ghcr.io", search=True)
 ```
 
-Also confirm you are not using a fully-qualified name --- a fully-qualified name
+Also confirm you are not using a fully-qualified name — a fully-qualified name
 (with a host) bypasses the lookup list and pulls directly.
 
 ### Self-signed / internal HTTPS certificate verification fails
@@ -324,7 +324,7 @@ BoxLite runs inside a microVM and needs hardware virtualization:
 - Without virtualization, startup fails (the exception is catchable; the process
   does not crash).
 
-This is unrelated to registry configuration --- first confirm the base
+This is unrelated to registry configuration — first confirm the base
 environment can start a box with `image="alpine:latest"` (default Docker Hub),
 then debug the registry configuration.
 
