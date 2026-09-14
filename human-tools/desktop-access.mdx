@@ -160,3 +160,49 @@ The webtop desktop is slow to start on first run (image decompression, X server 
 
 **Need the traditional VNC protocol but cannot find an API**
 Use the built-in noVNC web desktop (see above), or run your own VNC service plus port forwarding.
+
+## A tour: hand a running box to a person
+
+Moved here from the section index, which is now a summary and an index.
+
+
+The code below: (1) starts a sandbox that ships with a desktop (`ComputerBox`, image `lscr.io/linuxserver/webtop:ubuntu-xfce`); (2) waits until the desktop is ready; (3) **prints a local URL you can open directly in a browser**, then keeps running until you press Enter. During that window you can operate the sandbox like a remote desktop in your browser.
+
+```python
+# pip install boxlite
+import asyncio
+import boxlite
+
+async def main():
+    # ComputerBox ships with an XFCE desktop plus a noVNC web client.
+    # gui_http_port / gui_https_port map "host local ports" -> in-sandbox GUI ports.
+    try:
+        async with boxlite.ComputerBox(
+            cpu=2,
+            memory=2048,
+            gui_http_port=3000,   # host http port; open it in a browser
+            gui_https_port=3001,  # host https port (self-signed cert; browser warns)
+        ) as desktop:
+            # Wait until the desktop environment is fully up (default max 60s)
+            await desktop.wait_until_ready(timeout=60)
+
+            print("Desktop ready. Open either URL below in a browser to take over:")
+            print("  HTTP :  http://localhost:3000")
+            print("  HTTPS:  https://localhost:3001  (self-signed cert; click 'Advanced' -> 'Proceed')")
+
+            # Keep the sandbox alive to give the human time to operate.
+            # On async with exit the sandbox is destroyed and all changes are lost (ephemeral).
+            input("When done, come back here and press Enter to close the sandbox...")
+    except RuntimeError as exc:
+        # Image pull failure / no hardware virtualization, etc. all raise standard RuntimeError
+        print(f"Sandbox failed to start: {exc}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+After it runs, open `http://localhost:3000` in a browser to view and operate the sandbox desktop. When you close the script (press Enter), the sandbox and every change inside it are destroyed.
+
+> Node users: `ComputerBox` is also available in the Node SDK (`import { ComputerBox } from "@boxlite-ai/boxlite"`), with camelCase method names (`waitUntilReady` / `screenshot`, etc.). The GUI port exposure logic is identical.
+
+---

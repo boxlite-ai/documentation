@@ -1,170 +1,49 @@
 ---
 title: "Manage sandboxes"
-description: "A Box is a disposable microVM that boots in about a second. The Boxlite runtime creates, lists, and removes boxes; a Box handle only executes inside its own."
+sidebarTitle: "Manage sandboxes"
+description: "Create, configure, and reclaim boxes — the type, the lifecycle, and the four dials that shape what a box can see, use, and reach."
 ---
 
-> Context manager versus method semantics: `Boxlite` uses a **synchronous** `with` to enter and exit (`__enter__`/`__exit__` are synchronous), but its **business methods** (`create` / `get_or_create` / `list_info` / `remove` / `shutdown`, etc.) are all `async` and **must be awaited**. A `Box` uses `async with` to enter and exit, and its methods are likewise `async` — the only exception is the synchronous `info()`.
+Two objects, and everything here is one of them. The **runtime** creates, finds, and reclaims boxes. A **box** is one microVM you run things in.
 
----
+A box you create is yours until you remove it, and every configuration choice below is made at creation time.
 
 ## In this section
 
-| Subtopic | Question it answers |
+<CardGroup cols={2}>
+  <Card title="Box types" icon="cubes" href="/manage-sandbox/sandbox-types">
+    Six constructors, each tuned for one job. **Start here** — the type decides most of the rest.
+  </Card>
+  <Card title="Lifecycle" icon="clock-rotate-left" href="/manage-sandbox/lifecycle">
+    Created, running, stopped, removed — and what survives each transition.
+  </Card>
+  <Card title="Compute resources" icon="microchip" href="/manage-sandbox/compute-resources">
+    CPU, memory, and disk, so a workload is neither starved nor wasteful.
+  </Card>
+  <Card title="Environment" icon="terminal" href="/manage-sandbox/environment">
+    Variables, run user, and working directory inside the box.
+  </Card>
+  <Card title="Volumes" icon="hard-drive" href="/manage-sandbox/volumes">
+    Mount a host directory so both sides read and write the same files.
+  </Card>
+  <Card title="Network access" icon="network-wired" href="/manage-sandbox/network-access">
+    Expose a service to the host, and bound what the box can reach.
+  </Card>
+  <Card title="Secrets and security" icon="shield-halved" href="/manage-sandbox/secrets-and-security">
+    Deliver credentials without the sandbox seeing them; tighten isolation.
+  </Card>
+  <Card title="Snapshots" icon="camera" href="/manage-sandbox/snapshots">
+    Save disk state, clone a box, or pack one into an archive.
+  </Card>
+</CardGroup>
+
+## Which page do I want?
+
+| You are asking | Page |
 |---|---|
-| Overview and mental model (**this page**) | The two objects, the state machine, and who cleans up |
-| [Box types](/manage-sandbox/sandbox-types) | Which Box type to choose (`SimpleBox` / `CodeBox` / `BrowserBox` / `ComputerBox` / `InteractiveBox` / `SkillBox`) |
-| [Lifecycle](/manage-sandbox/lifecycle) | Create / start / stop / remove, plus detach and cross-process reattach |
-| [Environment and startup](/manage-sandbox/environment) | Variables, `entrypoint` / `cmd`, run user, working directory, image |
-| [Compute resources](/manage-sandbox/compute-resources) | `cpus`, `memory_mib`, `disk_size_gb` and their defaults |
-| [Network access](/manage-sandbox/network-access) | Port publishing and network modes |
-| [Volumes](/manage-sandbox/volumes) | Host-to-guest bind mounts |
-| [Secrets and security](/manage-sandbox/secrets-and-security) | Secret injection and isolation controls |
-| [Snapshots](/manage-sandbox/snapshots) | Export and import Box state |
-
----
-
-## Two objects: a runtime and a Box
-
-BoxLite separates "the runtime that manages a group of Boxes" from "operating on a single Box" into two objects. The two have different **context manager** semantics. Note: whether a context manager is synchronous or asynchronous is an independent question from whether its **methods** need `await`.
-
-| Object                                | Role                                       | Context manager               | Methods need `await`?                                                                                                                                                |
-| ------------------------------------- | ------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Boxlite` (runtime)                   | Create / list / remove / aggregate metrics | **Synchronous** `with`        | Business methods are `async`, **must be awaited** (`create` / `get_or_create` / `list_info` / `get` / `get_info` / `remove` / `shutdown` / `metrics` / `import_box`) |
-| `Box` / `SimpleBox` / `CodeBox`, etc. | Operate a single Box (exec, copy, stop)    | **Asynchronous** `async with` | Yes, `await` (except `info()`, see below)                                                                                                                            |
-
-Key point: **the runtime enters with a synchronous `with`, but its methods must be awaited; a Box enters with `async with`, and its methods must also be awaited; only `info()` is always synchronous and must not be awaited.**
-
-> In general, prefer the wrapper layer (`SimpleBox` / `CodeBox`, etc.). On `async with` entry they **lazily create** and automatically start the Box, and on exit they clean up according to `auto_remove`, so you never have to manage the runtime handle by hand. Operate the `Boxlite` runtime directly only when you need to manage several Boxes at once.
-
----
-
-## What a Box goes through
-
-A box is **created** lazily, becomes **running** on first use, goes **stopped** when you call `stop()` — keeping its disk — and is **removed** either by `auto_remove` or by the runtime. Stop is not remove: a stopped box restarts with everything it had installed.
-
-The state diagram, the full transition table, and how to read `box.info().state.status` are on [Lifecycle](/manage-sandbox/lifecycle#the-states).
-
-## Making sure nothing is left running
-
-| Cleanup mechanism | Who triggers it | When it happens | Use case |
-|---|---|---|---|
-| `auto_remove=True` | SDK, automatically | On `async with` exit / when the Box stops | One-off, disposable tasks (wrapper-layer default) |
-| `await runtime.remove(id_or_name, force=False)` | You, explicitly | Any time | Long-lived / cross-process named Boxes |
-| `await runtime.shutdown(timeout=None)` | You, explicitly | Before process exit | Shut down every Box the runtime manages at once |
-
-Key point: **removal is the runtime's responsibility, not the Box's** — call `await runtime.remove(id_or_name)`, not `box.remove()` (which does not exist). The same applies to listing: use `await runtime.list_info()`, not `list()`. These runtime methods are all `async` and must be awaited.
-
----
-
-## Quick Example
-
-Both examples below are directly runnable.
-
-### A. Wrapper layer: lazy create and automatic cleanup (recommended starting point)
-
-`SimpleBox` lazily creates and starts the Box on `async with` entry and, on exit, destroys it automatically according to `auto_remove` (default `True`), without touching the runtime handle directly.
-
-```python
-import asyncio
-from boxlite import SimpleBox
-
-async def main():
-    try:
-        # auto_remove=True is the default: cleanup happens automatically on async with exit
-        async with SimpleBox(image="alpine:latest") as box:
-            print("box id:", box.id)
-
-            # info() is synchronous; do not await
-            info = box.info()
-            print("state:", info.state.status)  # BoxStateInfo.status is a string
-
-            # a non-zero exit code does not raise; check exit_code yourself
-            result = await box.exec("echo", "hello from boxlite")
-            print("exit_code:", result.exit_code)
-            print("stdout:", result.stdout.strip())
-    except RuntimeError as e:
-        # image pull failure / no virtualization raises a standard RuntimeError
-        print("startup or pull failed:", e)
-
-asyncio.run(main())
-```
-
-### B. Explicit runtime management: create a named Box, reuse it across calls, then remove it explicitly
-
-When you need a long-lived Box or want to reuse one across processes, operate the `Boxlite` runtime directly. Note two things: `Boxlite` enters with a **synchronous** `with`, but its **business methods are `async` and must be awaited**; a single `Box` is still an **async** context manager.
-
-
-<CodeGroup>
-
-```python Python
-import asyncio
-from boxlite import Boxlite, BoxOptions
-
-async def main():
-    with Boxlite.default() as runtime:
-        try:
-            # get_or_create is idempotent: reuse an existing Box with the same name, otherwise create one (async, must await)
-            box, created = await runtime.get_or_create(
-                BoxOptions(image="alpine:latest", auto_remove=False),
-                name="my-worker",
-            )
-            print("created new box?", created)
-
-            # a single Box is an async context manager
-            async with box:
-                result = await box.exec("uname", "-a")
-                print(result.stdout.strip())
-
-            # listing: the runtime method is list_info() (not list()), and it is async, must await
-            for bi in await runtime.list_info():
-                print(bi.id, bi.name, bi.state.status)
-
-        finally:
-            # removal is the runtime's responsibility: await runtime.remove(...), not box.remove()
-            try:
-                await runtime.remove("my-worker", force=True)
-            except Exception as e:
-                print("error during removal (ignorable, may already be cleaned up):", e)
-
-asyncio.run(main())
-```
-
-```typescript Node.js
-import { SimpleBox } from "@boxlite-ai/boxlite";
-
-async function main(): Promise<void> {
-  try {
-    // await using: cleanup happens automatically at scope exit per autoRemove (default true)
-    await using box = new SimpleBox({ image: "alpine:latest" });
-
-    const result = await box.exec("echo", "hello from boxlite");
-    console.log("exitCode:", result.exitCode);
-    console.log("stdout:", result.stdout.trim());
-
-    // info() is synchronous; getInfo() is asynchronous
-    console.log("state:", box.info().state.status);
-  } catch (e) {
-    console.error("failed:", e);
-  }
-}
-
-main();
-```
-
-</CodeGroup>
-
-> Node differences: the package is `@boxlite-ai/boxlite`; the runtime class is `JsBoxlite` (there is no bare `Boxlite`); listing uses `listInfo()`; removal uses `runtime.remove(idOrName, force?)`; `SimpleBox` uses `await using` for automatic cleanup; `info()` is synchronous while `getInfo()` is asynchronous.
-
----
-## Where to go next
-
-This page is the mental model. Everything below has a home page that goes deeper:
-
-| If you want to | Go to |
-|---|---|
-| Pick a Box type for your workload | [Box types](/manage-sandbox/sandbox-types) |
-| Full `BoxOptions` reference and every lifecycle method | [Lifecycle → Parameters and returns](/manage-sandbox/lifecycle#parameters-and-returns) |
-| Keep a Box alive across processes, or reattach to one | [Lifecycle → detach and reattach](/manage-sandbox/lifecycle) |
-| Size CPU, memory, and disk | [Compute resources](/manage-sandbox/compute-resources) |
-| Fix a startup failure, an `AttributeError`, or a surprising `exec` result | [Error handling](/guides/error-handling#troubleshooting) |
-| Confirm your platform can run a Box at all | [Installation](/getting-started/installation#platform-and-virtualization-requirements-common-to-all-sdks) |
+| Which box type do I need? | [sandbox types](/manage-sandbox/sandbox-types) |
+| What happens when my program exits? | [lifecycle](/manage-sandbox/lifecycle) |
+| How much CPU and memory should I give it? | [compute resources](/manage-sandbox/compute-resources) |
+| How do I get a file in or out? | [volumes](/manage-sandbox/volumes) |
+| How do I reach a server running inside? | [network access](/manage-sandbox/network-access) |
+| How do I pass an API key without leaking it? | [secrets and security](/manage-sandbox/secrets-and-security) |

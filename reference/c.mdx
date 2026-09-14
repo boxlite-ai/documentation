@@ -858,6 +858,21 @@ leaks -atExit -- ./my_program                  # macOS
 
 ---
 
+### The linker/runtime cannot find the library
+
+Error `dyld: Library not loaded: @rpath/libboxlite.dylib` (macOS) or `error while loading shared libraries: libboxlite.so` (Linux).
+
+The dynamic linker was not told the library path. Set it:
+
+```bash
+# macOS
+export DYLD_LIBRARY_PATH=<YOUR_PATH>/boxlite/target/release:$DYLD_LIBRARY_PATH
+# Linux
+export LD_LIBRARY_PATH=<YOUR_PATH>/boxlite/target/release:$LD_LIBRARY_PATH
+```
+
+Or use CMake (`examples/c/CMakeLists.txt` already sets `BUILD_RPATH`, so no manual export is needed).
+
 ## Related pages
 
 - [Installation](/getting-started/installation) — platform and virtualization prerequisites

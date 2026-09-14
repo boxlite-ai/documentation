@@ -3,7 +3,15 @@ title: "Installation"
 description: "Install the four SDKs and the CLI, and confirm your machine meets the virtualization requirement."
 ---
 
-BoxLite is not an ordinary container runtime — it starts a real lightweight VM (Hypervisor.framework on macOS, KVM on Linux), so beyond the package you need hardware virtualization. The prebuilt pip and npm packages work out of the box; `protoc` matters only when building the Rust core from source.
+BoxLite is not an ordinary container runtime — it starts a real lightweight VM (Hypervisor.framework on macOS, KVM on Linux), so beyond the package you need hardware virtualization.
+
+<Note>
+**You may not need this page.** For most people `pip install boxlite` (or the npm / cargo / go equivalent) is the whole install, and the [Quickstart](/getting-started/quickstart) has it inline. Come here for the platform matrix, offline and pinned installs, building from source, the CLI, and install troubleshooting.
+</Note>
+
+<Warning>
+**No hardware virtualization on this machine?** Nothing on this page will fix that — CI runners, most nested VMs, and containers cannot run a microVM. Use [BoxLite Cloud](/cloud/quickstart) instead: your machine needs only an API key and HTTPS, and it is the same SDK.
+</Warning>
 
 ## Prerequisites
 
@@ -53,85 +61,19 @@ protoc --version
 
 ---
 
-## Quick Example
-
-### Python (shortest path, runnable as-is)
+## Verify the install
 
 ```bash
-pip install boxlite
+# Python
+python3 -c "import boxlite; print(boxlite.__version__)"
+# Node
+node -e "console.log(require('@boxlite-ai/boxlite/package.json').version)"
+# CLI
+boxlite --version
 ```
 
-```python
-# hello_boxlite.py — run directly: python hello_boxlite.py
-import asyncio
-import boxlite
+A runnable first box, in all five languages, is on the [Quickstart](/getting-started/quickstart).
 
-async def main() -> None:
-    try:
-        # SimpleBox is an async context manager; it stops and cleans up automatically on exit
-        async with boxlite.SimpleBox(image="python:slim") as box:
-            result = await box.exec("python", "-c", "print('Hello from BoxLite!')")
-            print("stdout:", result.stdout.strip())
-            print("exit_code:", result.exit_code)  # a non-zero exit code does not raise; check it yourself
-    except RuntimeError as exc:
-        # Image pull failure / missing virtualization raises a standard RuntimeError (not BoxliteError)
-        print(f"Failed to start: {exc}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-Verify the install:
-
-```python
-# verify.py
-import boxlite
-
-print(boxlite.__version__)  # Prints the installed package version (the latest published version)
-```
-
-### Node.js (optional, shortest path)
-
-```bash
-npm install @boxlite-ai/boxlite
-```
-
-```typescript
-// hello.mjs — run directly: node hello.mjs (package is pure ESM)
-import { SimpleBox } from "@boxlite-ai/boxlite";
-
-async function main() {
-  const box = new SimpleBox({ image: "alpine:latest" });
-  try {
-    const result = await box.exec("echo", "Hello from BoxLite!");
-    console.log("stdout:", result.stdout.trim());
-    console.log("exitCode:", result.exitCode); // check it yourself; a non-zero exit code does not raise
-  } catch (err) {
-    console.error("Failed to start:", err instanceof Error ? err.message : err);
-  } finally {
-    await box.stop();
-  }
-}
-
-main();
-```
-
-### CLI (no code required)
-
-```bash
-# One-line install (Linux and macOS Apple Silicon), installs to $HOME/.local/bin/boxlite
-curl -fsSL https://sh.boxlite.ai | sh
-
-# Verify
-boxlite --help
-
-# Run a command
-boxlite run python:slim python -c "print('Hello from BoxLite!')"
-```
-
-`sh.boxlite.ai` is a thin Cloudflare Worker that serves the same `install.sh` published on every GitHub Release. The long form `https://github.com/boxlite-ai/boxlite/releases/latest/download/install.sh` is the verifiable upstream, and it is what the `gh attestation verify` commands below cover. If you want to verify before running, see [Verifying the installer and artifacts](#verifying-the-installer-and-artifacts).
-
----
 
 ## Parameters and Returns
 
@@ -232,6 +174,8 @@ The native binaries bundled with the npm package cover `aarch64-apple-darwin`, `
 The following collects common errors and platform-specific issues.
 
 ### Linux: KVM unavailable / permission denied
+
+If the host genuinely has no virtualization — a CI runner, a nested VM, a container — none of the steps below apply. [BoxLite Cloud](/cloud/quickstart) needs no local virtualization.
 
 **Error:** Box fails to start, reporting it cannot access `/dev/kvm` or `Permission denied`.
 

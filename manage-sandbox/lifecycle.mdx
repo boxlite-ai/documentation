@@ -762,3 +762,108 @@ if __name__ == "__main__":
 ```
 
 > `SimpleBox.exec`'s timeout parameter is `timeout` (float) and its `env` is a `dict`; whereas the underlying `Box.exec`'s timeout parameter is `timeout_secs` and its `env` is a `list[tuple]`. For detach / cross-process / explicit restart, continue to use `Boxlite` + `Box` directly, because those operations require access to the Box id and the runtime.
+
+## A tour of the whole lifecycle
+
+Moved here from the section index, which is now a summary and an index.
+
+
+Both examples below are directly runnable.
+
+### A. Wrapper layer: lazy create and automatic cleanup (recommended starting point)
+
+`SimpleBox` lazily creates and starts the Box on `async with` entry and, on exit, destroys it automatically according to `auto_remove` (default `True`), without touching the runtime handle directly.
+
+```python
+import asyncio
+from boxlite import SimpleBox
+
+async def main():
+    try:
+        # auto_remove=True is the default: cleanup happens automatically on async with exit
+        async with SimpleBox(image="alpine:latest") as box:
+            print("box id:", box.id)
+
+            # info() must be awaited on every box type
+            info = await box.info()
+            print("state:", info.state.status)  # BoxStateInfo.status is a string
+
+            # a non-zero exit code does not raise; check exit_code yourself
+            result = await box.exec("echo", "hello from boxlite")
+            print("exit_code:", result.exit_code)
+            print("stdout:", result.stdout.strip())
+    except RuntimeError as e:
+        # image pull failure / no virtualization raises a standard RuntimeError
+        print("startup or pull failed:", e)
+
+asyncio.run(main())
+```
+
+### B. Explicit runtime management: create a named Box, reuse it across calls, then remove it explicitly
+
+When you need a long-lived Box or want to reuse one across processes, operate the `Boxlite` runtime directly. Note two things: `Boxlite` enters with a **synchronous** `with`, but its **business methods are `async` and must be awaited**; a single `Box` is still an **async** context manager.
+
+
+<CodeGroup>
+
+```python Python
+import asyncio
+from boxlite import Boxlite, BoxOptions
+
+async def main():
+    with Boxlite.default() as runtime:
+        try:
+            # get_or_create is idempotent: reuse an existing Box with the same name, otherwise create one (async, must await)
+            box, created = await runtime.get_or_create(
+                BoxOptions(image="alpine:latest", auto_remove=False),
+                name="my-worker",
+            )
+            print("created new box?", created)
+
+            # a single Box is an async context manager
+            async with box:
+                result = await box.exec("uname", "-a")
+                print(result.stdout.strip())
+
+            # listing: the runtime method is list_info() (not list()), and it is async, must await
+            for bi in await runtime.list_info():
+                print(bi.id, bi.name, bi.state.status)
+
+        finally:
+            # removal is the runtime's responsibility: await runtime.remove(...), not box.remove()
+            try:
+                await runtime.remove("my-worker", force=True)
+            except Exception as e:
+                print("error during removal (ignorable, may already be cleaned up):", e)
+
+asyncio.run(main())
+```
+
+```typescript Node.js
+import { SimpleBox } from "@boxlite-ai/boxlite";
+
+async function main(): Promise<void> {
+  try {
+    // await using: cleanup happens automatically at scope exit per autoRemove (default true)
+    await using box = new SimpleBox({ image: "alpine:latest" });
+
+    const result = await box.exec("echo", "hello from boxlite");
+    console.log("exitCode:", result.exitCode);
+    console.log("stdout:", result.stdout.trim());
+
+    // in Node, info() returns a Promise on every type
+    const info = await box.info();
+    console.log("state:", info.state.status);
+  } catch (e) {
+    console.error("failed:", e);
+  }
+}
+
+main();
+```
+
+</CodeGroup>
+
+> Node differences: the package is `@boxlite-ai/boxlite`; the runtime class is `JsBoxlite` (there is no bare `Boxlite`); listing uses `listInfo()`; removal uses `runtime.remove(idOrName, force?)`; `SimpleBox` uses `await using` for automatic cleanup; `info()` and `getInfo()` both return a `Promise`.
+
+---
