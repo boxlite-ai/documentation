@@ -135,7 +135,9 @@ async def main() -> None:
             disk_size_gb=12,
             ports=[(GATEWAY_PORT, GATEWAY_PORT)],
         ) as box:
-            # Launch in the background — this exec returns immediately
+            # Launch in the background — this exec returns immediately.
+            # The gateway runs beside init, so the box survives a gateway crash and
+            # the port simply stops answering. Check the log, not the box status.
             await box.exec("sh", "-c", "nohup hermes gateway run > /tmp/gateway.log 2>&1 &")
 
             if not await wait_for_port(box, GATEWAY_PORT):

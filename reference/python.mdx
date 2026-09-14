@@ -190,7 +190,7 @@ if __name__ == "__main__":
 | `copy_out` | `(container_src, host_dest, copy_options=None)` | async |
 | `clone_box` | `(*, options=None, name=None)` | async, returns a new `Box` |
 | `export` | `(*, options=None, dest)` | async |
-| `attach` | `(execution_id)` | async |
+| `attach` | `(execution_id=None)` | async. **With no argument, attaches to the init session** — the `entrypoint + cmd` process — which is the only way to read its exit code. With an `execution_id`, reattaches to that exec session. Not available on `SimpleBox` or the sync API |
 | `info` | `() -> BoxInfo` | **synchronous**, do not await |
 | `metrics` | `() -> BoxMetrics` | async |
 
