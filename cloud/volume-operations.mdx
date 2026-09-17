@@ -50,7 +50,7 @@ if not api_key:
 async def main() -> None:
     rt = Boxlite.rest(
         BoxliteRestOptions(
-            url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
             credential=ApiKeyCredential(api_key),
         )
     )
@@ -110,7 +110,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function main(): Promise<void> {
   const rt = JsBoxlite.rest(
     new BoxliteRestOptions({
-      url: process.env.BOXLITE_REST_URL ?? "https://app.boxlite.ai/api",
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
       credential: new ApiKeyCredential(apiKey),
     }),
   );
@@ -163,7 +163,7 @@ main();
 # cloud_volume_crud.sh — create, list, inspect, delete
 set -euo pipefail
 
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
 
 # CREATE — name is optional.

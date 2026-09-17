@@ -48,7 +48,7 @@ Server(("0.0.0.0", {GUEST_PORT}), Handler).serve_forever()
 async def main() -> None:
     # export BOXLITE_API_KEY=<YOUR_API_KEY> before running
     rt = Boxlite.rest(BoxliteRestOptions(
-        url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+        url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
         credential=ApiKeyCredential(os.environ["BOXLITE_API_KEY"]),
     ))
 

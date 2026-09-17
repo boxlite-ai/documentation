@@ -60,7 +60,7 @@ Then export your credentials. Read the key interactively so it never lands in yo
 ```bash
 read -rs BOXLITE_API_KEY   # prompts without echoing; paste your blk_live_... key
 export BOXLITE_API_KEY
-export BOXLITE_REST_URL="https://app.boxlite.ai/api"
+export BOXLITE_REST_URL="https://api.boxlite.ai"
 ```
 
 </Step>
@@ -92,7 +92,7 @@ async def main() -> None:
     # Boxlite.rest(...) is a synchronous constructor; every runtime method below is awaited
     rt = Boxlite.rest(
         BoxliteRestOptions(
-            url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
             credential=ApiKeyCredential(api_key),
         )
     )
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
   // JsBoxlite.rest(...) is a synchronous constructor; every runtime method below is awaited
   const rt = JsBoxlite.rest(
     new BoxliteRestOptions({
-      url: process.env.BOXLITE_REST_URL ?? "https://app.boxlite.ai/api",
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
       credential: new ApiKeyCredential(apiKey),
     }),
   );
@@ -217,7 +217,7 @@ boxlite run --rm --name "sdk-quickstart-cli-$(date +%s)" \
 # cloud_quickstart.sh — create a box on BoxLite Cloud, run a command, tear it down
 set -euo pipefail
 
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 : "${BOXLITE_API_KEY:?Set BOXLITE_API_KEY to your blk_live_... key before running this}"
 
 auth=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
@@ -246,7 +246,7 @@ exec_id="$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes/${box_id}/exec" \
 curl -fsS "${BOXLITE_REST_URL}/v1/boxes/${box_id}/executions/${exec_id}" "${auth[@]}"
 ```
 
-Run it with `bash cloud_quickstart.sh`. Every path is relative to `BOXLITE_REST_URL`, so the create call above resolves to `https://app.boxlite.ai/api/v1/boxes`.
+Run it with `bash cloud_quickstart.sh`. Every path is relative to `BOXLITE_REST_URL`, so the create call above resolves to `https://api.boxlite.ai/v1/boxes`.
 </Tab>
 </Tabs>
 
@@ -258,7 +258,7 @@ Run it with `bash cloud_quickstart.sh`. Every path is relative to `BOXLITE_REST_
 
 The five calls in that script are the whole Cloud lifecycle. Every language binding and the REST API expose the same five, in the same order:
 
-1. **Authenticate.** `Boxlite.rest(...)` wraps your key in an `ApiKeyCredential` and points every later call at `https://app.boxlite.ai/api`. Nothing is sent at construction time — the object is just a configured client.
+1. **Authenticate.** `Boxlite.rest(...)` wraps your key in an `ApiKeyCredential` and points every later call at `https://api.boxlite.ai`. Nothing is sent at construction time — the object is just a configured client.
 2. **Create.** `rt.create(BoxOptions(image=...), name=...)` allocates a box from a shared Linux base image and returns a handle. The box exists but is not running.
 3. **Start.** `box.start()` boots the microVM. Only now is there a kernel and a filesystem to run against.
 4. **Exec.** `box.exec("echo", args=[...])` launches one process inside the VM and hands you an execution handle. `execution.wait()` blocks until that process exits and returns its exit code.
@@ -286,7 +286,7 @@ The `Exit code` line comes from `execution.wait()` and is the authoritative succ
 | A box from an earlier run is still listed as running | The script exited before teardown — an exception outside `try`, a `Ctrl-C`, or a crash. | Remove it explicitly with `await rt.remove("<BOX_ID_OR_NAME>", force=True)` (CLI: `boxlite rm`), then move teardown into a `finally` block as shown above. |
 | A long job stops part-way through with no error from your code | The box was stopped for being idle, and work running *inside* the box does not count as activity. | Adjust **STOP WHEN IDLE** when you create the box in the console — see [Stop when idle](/cloud/box-lifecycle#stop-when-idle). |
 | `execution.stdout()` finishes without yielding lines | Streamed output is a separate channel from the exit code. Only `execution.wait()` is guaranteed to report the process result. | Treat `result.exit_code` as the success signal and collect output as a bonus. When you need output you can depend on, redirect it to a file in the box and read the file back. |
-| `404 Not Found` on every request | The base URL is wrong — most often the `/api` suffix is missing. | Set `BOXLITE_REST_URL` to exactly `https://app.boxlite.ai/api`. |
+| An HTML page comes back instead of JSON, and the status is `200` | The base URL points at the console host `https://app.boxlite.ai` instead of the API host. The console answers unrecognised paths with the dashboard page, so a wrong base URL returns markup rather than an error. | Set `BOXLITE_REST_URL` to exactly `https://api.boxlite.ai`. |
 
 ## Next steps
 

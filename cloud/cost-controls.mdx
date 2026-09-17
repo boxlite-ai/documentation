@@ -36,7 +36,7 @@ async def main() -> None:
         raise SystemExit("Set BOXLITE_API_KEY to your blk_live_... key first.")
 
     rt = Boxlite.rest(BoxliteRestOptions(
-        url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+        url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
         credential=ApiKeyCredential(api_key),
     ))
 
@@ -76,7 +76,7 @@ if (!apiKey) {
 async function main(): Promise<void> {
   const rt = JsBoxlite.rest(
     new BoxliteRestOptions({
-      url: process.env.BOXLITE_REST_URL ?? "https://app.boxlite.ai/api",
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
       credential: new ApiKeyCredential(apiKey),
     }),
   );
@@ -129,7 +129,7 @@ func main() {
 
 	restURL := os.Getenv("BOXLITE_REST_URL")
 	if restURL == "" {
-		restURL = "https://app.boxlite.ai/api"
+		restURL = "https://api.boxlite.ai"
 	}
 
 	rt, err := boxlite.NewRest(boxlite.BoxliteRestOptions{

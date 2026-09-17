@@ -48,12 +48,12 @@ BoxLite Cloud reads two environment variables. Both the SDKs and the CLI use the
 | Variable | Required | Value |
 |---|---|---|
 | `BOXLITE_API_KEY` | Yes | Your `blk_live_...` key. |
-| `BOXLITE_REST_URL` | Yes | `https://app.boxlite.ai/api` |
+| `BOXLITE_REST_URL` | Yes | `https://api.boxlite.ai` |
 
 ```bash
 read -rs BOXLITE_API_KEY   # prompts without echoing; nothing lands in shell history
 export BOXLITE_API_KEY
-export BOXLITE_REST_URL="https://app.boxlite.ai/api"
+export BOXLITE_REST_URL="https://api.boxlite.ai"
 ```
 
 Read the key from the environment at runtime and pass it as an `ApiKeyCredential`. The snippets below construct a client and list your boxes, which is the cheapest way to prove a credential works.
@@ -76,7 +76,7 @@ if not api_key:
 async def main() -> None:
     rt = Boxlite.rest(
         BoxliteRestOptions(
-            url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
             credential=ApiKeyCredential(api_key),
         )
     )
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   // The runtime class is JsBoxlite; there is no bare Boxlite export
   const rt = JsBoxlite.rest(
     new BoxliteRestOptions({
-      url: process.env.BOXLITE_REST_URL ?? "https://app.boxlite.ai/api",
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
       credential: new ApiKeyCredential(apiKey),
     }),
   );
@@ -177,7 +177,7 @@ Exports live and die with a shell. `boxlite auth login` writes the credential to
 # never appears in argv or in your shell history
 read -rs BOXLITE_API_KEY
 printf '%s' "$BOXLITE_API_KEY" | boxlite auth login \
-  --url https://app.boxlite.ai/api --api-key-stdin
+  --url https://api.boxlite.ai --api-key-stdin
 
 boxlite auth status    # what is stored locally, no network call
 boxlite auth whoami    # confirm the identity the service sees, via GET /v1/me
@@ -189,7 +189,7 @@ Profiles let one machine hold several identities. Each profile stores its own UR
 ```bash
 # Store a second identity, then use it for one command
 printf '%s' "$STAGING_KEY" | boxlite auth login --profile staging \
-  --url https://app.boxlite.ai/api --api-key-stdin
+  --url https://api.boxlite.ai --api-key-stdin
 boxlite --profile staging ps
 ```
 
@@ -209,7 +209,7 @@ One interaction is worth knowing before it surprises you: `BOXLITE_API_KEY` in t
 |---|---|---|
 | `401 Unauthorized` on every call | The key is missing from the request, mistyped, or was deleted in the console. | Confirm the value starts with `blk_live_` and that its masked form matches a live row in **API Keys**. Cloud has no permissive mode, so there is no configuration that makes an unauthenticated request succeed. |
 | `SystemExit: Set BOXLITE_API_KEY ...`, or the CLI runs against your local runtime | The process did not inherit the export — a new shell, a cron job, or a service manager with its own environment. | Export both variables in the process that actually runs, or store the credential with `boxlite auth login` so it does not depend on the shell. |
-| `404 Not Found` instead of a box payload | The base URL is wrong — usually the `/api` suffix is missing, so requests land on a route that does not exist. | Set `BOXLITE_REST_URL` to exactly `https://app.boxlite.ai/api`. |
+| An HTML page comes back instead of a box payload, with a `200` status | The base URL points at the console host `https://app.boxlite.ai`. The console serves the dashboard page on paths it does not recognise, so a wrong base URL does not fail loudly — it returns markup your client cannot parse. | Set `BOXLITE_REST_URL` to exactly `https://api.boxlite.ai`. That is the API host; `app.boxlite.ai` is the console you sign in to. |
 | Calls that worked before start returning `401` | The key passed the date in its **EXPIRES** column. | Create a replacement key, update the environment, then delete the expired row. |
 | `RuntimeError('box not found: {"detail":"Not Found"}')` while the key is valid | A `path_prefix` is being sent. Cloud serves `/v1/boxes` directly; the route prefix belongs to the open-source reference server, which mounts routes under `/v1/{prefix}/boxes`. | Drop `path_prefix` from `BoxliteRestOptions`, unset `BOXLITE_REST_PATH_PREFIX`, and drop `--path-prefix` from CLI invocations. See [BoxLite Cloud vs open source](/cloud/vs-opensource). |
 | `boxlite auth whoami` fails while `boxlite auth status` looks correct | `status` reads local state only; `whoami` calls `GET /v1/me`. A stored credential can be well-formed and still be rejected. | Log in again with the current key, and check whether a stale `BOXLITE_API_KEY` export is overriding the profile's bearer. |

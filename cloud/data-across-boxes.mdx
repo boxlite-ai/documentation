@@ -53,7 +53,7 @@ async def run_in_fresh_box(rt, name, script):
 
 async def main():
     rt = Boxlite.rest(BoxliteRestOptions(
-        url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+        url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
         credential=ApiKeyCredential(os.environ["BOXLITE_API_KEY"]),
     ))
     stamp = int(time.time())
@@ -114,7 +114,7 @@ async function runInFreshBox(rt, name: string, script: string): Promise<[number,
 async function main(): Promise<void> {
   const rt = JsBoxlite.rest(
     new BoxliteRestOptions({
-      url: process.env.BOXLITE_REST_URL ?? "https://app.boxlite.ai/api",
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
       credential: new ApiKeyCredential(process.env.BOXLITE_API_KEY!),
     }),
   );
@@ -148,7 +148,7 @@ main();
 
 ```bash REST
 # Two boxes, one volume: the first writes, the second reads after the first is gone.
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 VOLUME="${BOXLITE_VOLUME:-<YOUR_VOLUME_NAME>}"
 IMAGE="ghcr.io/boxlite-ai/boxlite-agent-base:v0.1.0"
 AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}" -H 'Content-Type: application/json')

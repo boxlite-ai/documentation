@@ -46,7 +46,7 @@ The call needs write access to boxes in your organization, and it is recorded in
 
 ```bash
 # Make a box public. Read the key from the environment -- never inline it.
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 
 curl -fsS -X POST \
   "${BOXLITE_REST_URL}/box/review-app-142/public/true" \
@@ -56,7 +56,7 @@ curl -fsS -X POST \
 Be clear-eyed about what you just did. **A public box drops the credential requirement in front of it: anyone who has a URL to it can reach the service, from anywhere, with no API key and no token, and that holds until you set the flag back to `false`.** A URL is a string — it travels in chat messages, tickets, browser history, referrer headers, and screenshots. Anything the service in that box can read or write is now guarded by the secrecy of a link, so treat the box's files, its environment variables, and its network credentials as exposed for as long as the flag is on. Set it back to private the moment you no longer need it:
 
 ```bash
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 
 curl -fsS -X POST \
   "${BOXLITE_REST_URL}/box/review-app-142/public/false" \
@@ -72,7 +72,7 @@ GET /api/box/{boxIdOrName}/ports/{port}/preview-url
 ```
 
 ```bash
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 
 curl -fsS \
   "${BOXLITE_REST_URL}/box/review-app-142/ports/8080/preview-url" \
@@ -120,7 +120,7 @@ This is the call to prefer when you want to hand someone a working link and keep
 `expiresInSeconds` is an optional query parameter, and **the default is 60 seconds**. Sixty seconds is the right size for a link your own code generates and redirects to immediately; pass a larger value when a person has to open it, read it, and click around.
 
 ```bash
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 
 # 900 seconds gives a reviewer a quarter of an hour with the link
 curl -fsS \
@@ -148,7 +148,7 @@ POST /api/box/{boxIdOrName}/ports/{port}/signed-preview-url/{token}/expire
 The `token` in the path is the `token` field from the signed-URL response — that is the reason to keep it rather than discarding everything but the `url`. A `200` returns no body.
 
 ```bash
-BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://app.boxlite.ai/api}"
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
 SIGNED_TOKEN="<TOKEN_FROM_THE_SIGNED_URL_RESPONSE>"
 
 curl -fsS -X POST \
@@ -210,7 +210,7 @@ async def resolve(box, host: str) -> str:
 async def main() -> None:
     # export BOXLITE_API_KEY=<YOUR_API_KEY> before running
     rt = Boxlite.rest(BoxliteRestOptions(
-        url=os.environ.get("BOXLITE_REST_URL", "https://app.boxlite.ai/api"),
+        url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
         credential=ApiKeyCredential(os.environ["BOXLITE_API_KEY"]),
     ))
 
