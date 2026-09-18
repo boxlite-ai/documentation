@@ -1,45 +1,110 @@
 ---
-title: "What is BoxLite Cloud"
+title: "BoxLite Cloud"
 sidebarTitle: "What is Cloud"
-description: "A hosted agent runtime built on BoxLite — the same SDK and the same core API, reached with a URL and an API key, with managed storage and a managed box lifecycle."
+description: "The managed cloud for AI agents — compute, a filesystem that outlives the box, a public URL, and hardware isolation around all of it, from a URL and an API key."
 ---
 
-**BoxLite Cloud is a hosted agent runtime.** It runs microVM boxes on BoxLite's resource pool, so your machines need no hardware virtualization — your code needs a URL and an API key.
+**The managed cloud for AI agents.** Your agent gets compute, a filesystem that survives a restart, a public URL for whatever it builds, and hardware-level isolation around all of it — from a URL and an API key.
 
-Cloud is not a separate client library. You install the same package as open-source BoxLite and swap the runtime handle to `Boxlite.rest(...)`. [Quickstart](/cloud/quickstart) has the whole first script.
+You run no hosts, cache no images, and plan no capacity. A box starts in about a second, stops itself when it goes idle, and wakes when something reaches for it again.
 
-## Two shapes, one runtime
+Cloud is not a separate client library. It is the same `boxlite` package you install locally, and the runtime handle is the only line that changes:
 
-| Shape | What it looks like | What Cloud contributes |
-|---|---|---|
-| **Disposable container** | Create a box, run untrusted or model-generated code in it, remove it | Hardware-level isolation without a virtualization host of your own |
-| **A home for an agent** | One box that keeps its filesystem, its packages, and its working state across sessions | Managed storage that outlives the box, plus a managed stop-and-wake lifecycle |
+```python
+import os
 
-The second shape is what a stateful microVM makes possible: an agent installs its tools once, writes files, stops, and picks the work back up later instead of rebuilding its world on every run.
+from boxlite import ApiKeyCredential, Boxlite, BoxliteRestOptions
 
-<Warning>
-**Idle means no SDK, terminal, or preview traffic.** Work running *inside* the box does not count, so a long unattended job can be stopped mid-run. See [Lifecycle](/cloud/box-lifecycle#stop-when-idle).
-</Warning>
+# The one line that differs from running BoxLite on your own machine.
+rt = Boxlite.rest(
+    BoxliteRestOptions(
+        url=os.environ["BOXLITE_REST_URL"],  # https://api.boxlite.ai
+        credential=ApiKeyCredential(os.environ["BOXLITE_API_KEY"]),
+    )
+)
+```
+
+Everything after that line — `create`, `exec`, volumes, tunnels — is the API you already know. The [Quickstart](/cloud/quickstart) has the whole first script, end to end.
 
 ## Start here
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Quickstart" icon="rocket" href="/cloud/quickstart">
-    Create a key, install the SDK, and run your first command on Cloud.
+    Create a key, install the SDK, run your first command on Cloud.
+  </Card>
+  <Card title="Hand it to a coding agent" icon="robot" href="https://boxlite.ai/agent.md">
+    `agent.md` is a single file written for coding agents. Every code block in it is executed against the live API before release.
   </Card>
   <Card title="Cloud vs open source" icon="code-compare" href="/cloud/vs-opensource">
     Every difference between the hosted runtime and self-hosted BoxLite, in one table — plus how to port existing code.
   </Card>
-  <Card title="API keys" icon="key" href="/cloud/api-keys">
-    Create, scope, expire, and rotate the `blk_live_...` keys your code authenticates with.
+</CardGroup>
+
+## Two shapes, one API
+
+The same `rt.create()` call gives you either shape. What differs is how long the box lives.
+
+<CardGroup cols={2}>
+  <Card title="A disposable box" icon="trash">
+    Run untrusted or model-generated code, take the result, throw the box away. Hardware-level isolation without a virtualization host of your own.
+  </Card>
+  <Card title="A home for an agent" icon="house">
+    One box that keeps its filesystem, its packages, and its working state across sessions. The agent installs its tools once instead of rebuilding its world on every run.
   </Card>
 </CardGroup>
 
-## The rest of this tab
+The second shape is what a stateful microVM makes possible, and it is the part a plain sandbox API cannot do: an agent writes files, stops, and picks the work back up a week later.
 
-| Section | What it covers |
-|---|---|
-| [Boxes](/cloud/boxes) | Images, sizes, the idle-stop and wake-on-access lifecycle, and the full cycle from code |
-| [Volumes](/cloud/volumes) | Managed storage that outlives a box, and how to mount it by name |
-| [Network](/cloud/network) | Tunnels into a box, preview URLs, port forwarding, and the egress allowlist |
-| [Pricing](/cloud/pricing) | The three metered rates, what a box costs, plans, and the wallet |
+<Note>
+**Idle means no SDK, terminal, or preview traffic.** Work running *inside* the box does not count, so a long unattended job can be stopped mid-run. Set the idle window per box — see [Stop when idle](/cloud/box-lifecycle#stop-when-idle).
+</Note>
+
+## What you get
+
+<CardGroup cols={2}>
+  <Card title="Boxes" icon="cube" href="/cloud/boxes">
+    Shared Linux base images, three preset sizes, and a managed lifecycle. Up to **4 vCPU, 32 GiB memory, and 120 GiB storage** per box.
+  </Card>
+  <Card title="Volumes" icon="database" href="/cloud/volumes">
+    Managed storage that outlives the box that wrote it. Mount by a name you choose, and volumes are not metered at all.
+  </Card>
+  <Card title="Network" icon="globe" href="/cloud/network">
+    A tunnel to a port inside the box, carrying a public URL — so what your agent builds is reachable without you deploying it.
+  </Card>
+  <Card title="Pricing" icon="credit-card" href="/cloud/pricing">
+    Three metered rates and nothing else. Run wallet-only with no subscription, or take a plan whose quota covers usage first.
+  </Card>
+</CardGroup>
+
+Concurrency is set by your plan — 20 boxes on Starter, 100 on Pro, 1000 on Max. See [Wallet or a plan?](/cloud/plans) for which one your usage argues for.
+
+## Build something
+
+Six things people ship on Cloud, each a complete runnable guide:
+
+<CardGroup cols={3}>
+  <Card title="Run Claude Code in a box" icon="terminal" href="/agent-in-box/run-claude-code">
+    An autonomous coding agent with root inside its own kernel and nothing outside the box.
+  </Card>
+  <Card title="Code interpreter for an LLM" icon="code" href="/use-cases/code-interpreter">
+    A model writes Python, it executes in a disposable box, the box is thrown away.
+  </Card>
+  <Card title="Review untrusted pull requests" icon="code-pull-request" href="/use-cases/sandboxed-ci">
+    Clone the PR into a box, run the suite, read the diff — with no access to your machine.
+  </Card>
+  <Card title="Data analysis agent" icon="chart-line" href="/use-cases/data-analysis-agent">
+    CSV in, model-written pandas analysis and a chart out.
+  </Card>
+  <Card title="Scrape the web safely" icon="spider" href="/use-cases/web-scraping-agent">
+    A browser box feeding clean data to a model, with parsing in a separate box.
+  </Card>
+  <Card title="A persistent shell per user" icon="user" href="/use-cases/interactive-dev-environment">
+    State survives stop and restart, so every user or branch keeps its own environment.
+  </Card>
+</CardGroup>
+
+## What Cloud does not do
+
+Four capabilities of the open-source runtime are disabled on the hosted service: snapshots, clone, export, and import. `GET /api/v1/config` reports all four as `false`. Keep state you need to survive a box on a volume instead, which is the durable path on Cloud anyway.
+
+Host bind mounts are the difference that breaks quietly: over REST the mount is accepted and ignored, so your code runs and your data is simply not there. [Cloud vs open source](/cloud/vs-opensource) enumerates every difference.
