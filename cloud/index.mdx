@@ -102,9 +102,3 @@ Six things people ship on Cloud, each a complete runnable guide:
     State survives stop and restart, so every user or branch keeps its own environment.
   </Card>
 </CardGroup>
-
-## What Cloud does not do
-
-Four capabilities of the open-source runtime are disabled on the hosted service: snapshots, clone, export, and import. `GET /api/v1/config` reports all four as `false`. Keep state you need to survive a box on a volume instead, which is the durable path on Cloud anyway.
-
-Host bind mounts are the difference that breaks quietly: over REST the mount is accepted and ignored, so your code runs and your data is simply not there. [Cloud vs open source](/cloud/vs-opensource) enumerates every difference.
