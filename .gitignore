@@ -5,3 +5,6 @@
 # ignores .claude when it builds; git must too, or a worktree copy of the
 # whole site gets committed.
 .claude/
+
+# Scratch context written by the docs-sync workflow
+.docs-sync/
