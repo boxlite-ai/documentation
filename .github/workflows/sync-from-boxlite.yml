@@ -186,8 +186,10 @@ jobs:
 
           case "$RESULT" in
             changed*)
+              # Same reason as below: read it over the API, not through the
+              # remote whose credential the action has already revoked.
               BRANCH="docs-sync/boxlite-pr-${PR_NUMBER}"
-              if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+              if ! gh api "repos/${GITHUB_REPOSITORY}/branches/${BRANCH}" >/dev/null 2>&1; then
                 echo "::error::Result says 'changed' but ${BRANCH} was never pushed."
                 exit 1
               fi
@@ -196,7 +198,15 @@ jobs:
             no-change*)
               # Mark the source PR processed so the next run moves on, without
               # opening a PR nobody asked for.
-              git push origin "HEAD:refs/heads/docs-sync/boxlite-pr-${PR_NUMBER}"
+              #
+              # Created through the API rather than `git push`: the action
+              # swaps in its own app token for git operations and revokes it
+              # on the way out, so by this step the configured remote has no
+              # usable credential and a push returns 403.
+              SHA="$(git rev-parse HEAD)"
+              gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f "ref=refs/heads/docs-sync/boxlite-pr-${PR_NUMBER}" \
+                -f "sha=${SHA}" >/dev/null
               echo "::notice::boxlite#${PR_NUMBER} needs no docs change: ${RESULT}"
               ;;
             *)
