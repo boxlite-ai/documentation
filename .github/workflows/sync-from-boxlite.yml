@@ -43,6 +43,18 @@ jobs:
             exit 1
           fi
 
+          # GH_PAT must be able to write here, or Claude cannot push a branch
+          # and open a PR. GitHub answers 404 rather than 403 when a token
+          # lacks write on ref creation, which reads as "the endpoint is
+          # wrong" and sent a previous debugging session down the wrong path.
+          # Check it here, before spending an Anthropic API call on a run that
+          # cannot deliver.
+          if [ "$(GH_TOKEN="$GH_PAT" gh api "repos/${GITHUB_REPOSITORY}" --jq .permissions.push)" != "true" ]; then
+            echo "::error::GH_PAT cannot write to ${GITHUB_REPOSITORY}; it can only read."
+            echo "::error::Grant it Contents: write and Pull requests: write, or the sync can never open a PR."
+            exit 1
+          fi
+
       - name: Find unprocessed merged PRs
         id: find-pr
         env:
@@ -170,7 +182,12 @@ jobs:
       - name: Record the outcome, and fail if there is none
         if: steps.find-pr.outputs.found == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          # The job's own token, not GH_PAT: everything here touches this
+          # repository only, and the job already declares contents: write.
+          # GH_PAT stays on the action itself, so the pull requests Claude
+          # opens are authored by a real account and therefore trigger CI —
+          # a GITHUB_TOKEN-authored PR would not.
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.find-pr.outputs.pr_number }}
         run: |
           set -euo pipefail
