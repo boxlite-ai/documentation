@@ -259,8 +259,8 @@ Run it with `bash cloud_quickstart.sh`. Every path is relative to `BOXLITE_REST_
 The five calls in that script are the whole Cloud lifecycle. Every language binding and the REST API expose the same five, in the same order:
 
 1. **Authenticate.** `Boxlite.rest(...)` wraps your key in an `ApiKeyCredential` and points every later call at `https://api.boxlite.ai`. Nothing is sent at construction time — the object is just a configured client.
-2. **Create.** `rt.create(BoxOptions(image=...), name=...)` allocates a box from a shared Linux base image and returns a handle. The box exists but is not running.
-3. **Start.** `box.start()` boots the microVM. Only now is there a kernel and a filesystem to run against.
+2. **Create.** `rt.create(BoxOptions(image=...), name=...)` allocates a box from a shared Linux base image and returns a handle. On Cloud the box is already running by the time this returns — `POST /v1/boxes` answers with `status: running`, and reading the box back before any other call reports the same.
+3. **Start.** `box.start()` is what boots the microVM on a self-hosted runtime. On Cloud the box is up already, so the call confirms that state rather than changing it: it is safe to repeat, and returns the box still `running`. Keeping it in the script is what lets the same five calls run against either runtime.
 4. **Exec.** `box.exec("echo", args=[...])` launches one process inside the VM and hands you an execution handle. `execution.wait()` blocks until that process exits and returns its exit code.
 5. **Remove.** `rt.remove(box.id, force=True)` destroys the box and its disk. Removal is a **runtime** method, not a box method — the box handle you hold is a pointer, and the runtime owns the fleet.
 
