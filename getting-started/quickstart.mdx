@@ -342,30 +342,9 @@ The per-language signatures, types, and return shapes live in the SDK reference:
 
 ## Troubleshooting
 
-### `Cannot find native binding` on Apple Silicon
+### `Schema version mismatch` aborts the process
 
-The wrapper package and its platform-specific native packages are versioned independently, and `@boxlite-ai/boxlite-darwin-arm64` is published up to **0.9.7** while the wrapper is at **0.10.0**. Installing the wrapper at latest on an arm64 Mac therefore leaves it with no binding to load:
-
-```text
-Error: Cannot find native binding. npm has a bug related to optional dependencies ...
-Cannot find module '@boxlite-ai/boxlite-darwin-arm64'
-```
-
-The install itself reports success — the failure only appears on first import. Pin both to a version that has a matching binding:
-
-```bash
-npm install @boxlite-ai/boxlite@0.9.7
-```
-
-Check what is available for your platform before choosing a version:
-
-```bash
-npm view @boxlite-ai/boxlite version
-npm view @boxlite-ai/boxlite-darwin-arm64 version
-```
-
-<Warning>
-**Pinning alone is not enough if you also installed the Python SDK.** All BoxLite SDKs share one database at `~/.boxlite/db/boxlite.db`, and a newer SDK upgrades its schema in place. Installing `boxlite` 0.10.0 for Python takes that database to schema v10; the pinned Node 0.9.7 expects v8 and aborts on startup:
+All BoxLite SDKs share one database at `~/.boxlite/db/boxlite.db`, and a newer SDK upgrades its schema in place. An older SDK then finds a schema it does not know and stops — a Python SDK that took the database to schema v10 leaves a Node SDK expecting v8 unable to start:
 
 ```text
 Schema version mismatch: database has v10, process expects v8. Upgrade boxlite to a newer version.
@@ -374,12 +353,11 @@ fatal runtime error: failed to initiate panic, error 5, aborting
 
 **This is a process abort, not an exception — a `try`/`catch` around your code does not catch it.**
 
-Give the pinned Node process its own data directory:
+Install the same version of every SDK you use. When you need two versions side by side, give the older process its own data directory:
 
 ```bash
 BOXLITE_HOME="$PWD/.boxlite-node" node hello.mjs
 ```
-</Warning>
 
 ### Everything else
 
@@ -388,7 +366,7 @@ BOXLITE_HOME="$PWD/.boxlite-node" node hello.mjs
 |---|---|---|
 | The box fails to start with a virtualization error | The machine has no KVM, no Apple Silicon hypervisor, or is a nested VM or container | Use the [Cloud track](/cloud/quickstart), which needs no local virtualization. Full matrix on [Installation](/getting-started/installation) |
 | A non-zero exit code does not raise an exception | `exec` returns the exit code rather than raising | Check `result.exit_code` yourself, as every example above does |
-| Node aborts with `Schema version mismatch` and `try`/`catch` does not catch it | All SDKs share `~/.boxlite/db/boxlite.db`; a newer SDK upgraded its schema in place, and the older one aborts rather than raising | Give the older process its own `BOXLITE_HOME`, or match SDK versions. See [above](#cannot-find-native-binding-on-apple-silicon) |
+| Node aborts with `Schema version mismatch` and `try`/`catch` does not catch it | All SDKs share `~/.boxlite/db/boxlite.db`; a newer SDK upgraded its schema in place, and the older one aborts rather than raising | Give the older process its own `BOXLITE_HOME`, or match SDK versions. See [above](#schema-version-mismatch-aborts-the-process) |
 | The box is gone before you use it | The `async with` / `await using` block that owned it exited | Keep the work inside the block, or use the runtime API to create a box you own explicitly |
 | A crashed program left a box running | Rust, Go, and C do not tear down on scope exit | Tear down in the error path — `defer`, `Drop`, or an explicit cleanup |
 | `cargo build` fails on a missing `protoc` | The Rust build needs Protocol Buffers | Install `protobuf` for your platform, then rebuild |

@@ -5,7 +5,7 @@
 This is the official documentation site for **BoxLite** — a local-first micro-VM sandbox for AI agents. Stateful, lightweight, hardware-level isolation, no daemon required. The site is built with [Mintlify](https://mintlify.com) and deployed automatically on push to `main`.
 
 - **BoxLite repo**: https://github.com/boxlite-ai/boxlite
-- **Current versions**: BoxLite Python v0.10.0, Node.js v0.10.0, Rust crate v0.10.0, Go v0.10.0, CLI v0.10.0. The Node `darwin-arm64` native package is published only up to v0.9.7, so `npm install @boxlite-ai/boxlite@latest` installs a version that fails to load on Apple Silicon — see boxlite-ai/boxlite#1443.
+- **Current versions**: BoxLite Python, Node.js, Rust crate, Go, and CLI are all **v0.10.4**. The Node native packages (`@boxlite-ai/boxlite-darwin-arm64` and the Linux pair) are published at the same version as the wrapper, so `npm install @boxlite-ai/boxlite@latest` resolves a matching binding on every supported platform. Check this line against PyPI and the npm registry before writing a version-dependent claim — it has gone stale before.
 - **Platforms**: macOS (Apple Silicon), Linux (KVM), Windows (WSL2)
 
 ## Tech Stack
