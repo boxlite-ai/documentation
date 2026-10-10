@@ -1,10 +1,23 @@
 ---
 title: "Run boxes from your own images"
 sidebarTitle: "Your own images"
-description: "Start Cloud boxes from public and private registry images, pin a tag to the version you tested, roll it back, and keep your organization's image catalog under its limit."
+description: "How the image catalog pins what each tag boots, private registry logins, rolling a tag back, and the image limit, with every example in Python, Node.js, Go, and REST."
 ---
 
-A box on BoxLite Cloud can start from an image in a public registry, or in a private one you log in to. The first box from an image records it in your organization's **image catalog**, and from then on the catalog decides which version a tag boots:
+Start Cloud boxes from your own images, public or private, and decide which build each tag boots. Pin a tag to the version you tested, roll it back with one call, and keep your organization's image catalog under its limit.
+
+## Prerequisites
+
+- An API key from the console, exported as `BOXLITE_API_KEY`, and the REST URL exported as `BOXLITE_REST_URL`. See [API keys](/cloud/api-keys) and [Quickstart](/cloud/quickstart).
+- An SDK:
+  - Python: `pip install boxlite`.
+  - Node.js: `npm install @boxlite-ai/boxlite`; run the TypeScript examples with `npx tsx`.
+  - Go: `go get github.com/boxlite-ai/boxlite/sdks/go`, then `go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup` once to fetch the native library.
+  - REST: `curl` and `jq`.
+
+## Start from one box
+
+This starts a box from Alpine on Docker Hub, then reads back the version your catalog recorded:
 
 <CodeGroup>
 
@@ -286,16 +299,7 @@ box 5S46rvQC9CnR runs Alpine 3.20.10
 docker.io/library/alpine  sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d  tags=['3.20']
 ```
 
-This page starts from that one box and builds up: what the catalog records, private images, pinning and rolling back a tag, and keeping the catalog tidy. To start from one of the images the console offers instead, see [Choose an image](/cloud/box-images).
-
-## Prerequisites
-
-- An API key from the console, exported as `BOXLITE_API_KEY`, and the REST URL exported as `BOXLITE_REST_URL`. See [API keys](/cloud/api-keys) and [Quickstart](/cloud/quickstart).
-- An SDK:
-  - Python: `pip install boxlite`.
-  - Node.js: `npm install @boxlite-ai/boxlite`; run the TypeScript examples with `npx tsx`.
-  - Go: `go get github.com/boxlite-ai/boxlite/sdks/go`, then `go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup` once to fetch the native library.
-  - REST: `curl` and `jq`.
+The rest of the page builds on that box: what the catalog records, private images, pinning and rolling back a tag, and keeping the catalog under its limit. To start from one of the images the console offers instead, see [Choose an image](/cloud/box-images).
 
 ## What is the image catalog?
 
@@ -325,17 +329,25 @@ Pass a full image reference, such as `docker.io/library/alpine:3.20`, as the box
 
 A reference the catalog cannot answer yet is a **cold pull**. Your organization may start only a limited number of cold pulls in a short window; past it, `create()` fails with a resource-exhausted error whose message says how many seconds are left. Boxes from images the catalog already holds do not count.
 
-When a pull fails, `create()` raises an invalid-argument error that says why:
+When the image cannot be pulled, `create()` raises an invalid-argument error that says why, for example:
 
-| Message contains | Cause |
-|---|---|
-| `has no such image` | The repository or tag does not exist |
-| `refused the pull` | The image is private, or does not exist, and no registry login covers it |
-| `is not allowed` | The registry is not one Cloud admits |
+```text
+invalid argument: Box state transition failed: Failed to pull image 'docker.io/library/alpine:no-such-tag-for-docs': docker.io has no such image (MANIFEST_UNKNOWN). Check the repository and the tag.
+```
+
+| Message contains | Cause | Fix |
+|---|---|---|
+| `has no such image (MANIFEST_UNKNOWN)` | The repository or tag does not exist | Correct the reference |
+| `refused the pull (UNAUTHORIZED). The image is private or does not exist, and no registry login of the organization covers it.` | The image is private | Add a registry login — see [Use a private image](#use-a-private-image) |
+| `Image registry 'registry.k8s.io' is not allowed. Allowed registries: …` | The registry is outside the set Cloud admits | Use an admitted registry, or one that takes a login |
+
+<Warning>
+**A create that fails on its image still leaves the box behind**, and you never received its id. Remove it by the name you passed to `create()`, for example `await rt.remove("<YOUR_BOX_NAME>", force=True)`.
+</Warning>
 
 ## Read the catalog
 
-`images.list()` returns one row per tag at its version, then one row per untagged version as `name@digest` with the tag `<none>`. The row's `id` is the version's digest. `images.get(name)` returns the image with every version and its tag history. It takes the name without a tag or digest — `docker.io/library/alpine`, not `alpine:3.20`.
+`images.list()` returns one row per tag at its version, then one row per untagged version as `name@digest` with the tag `<none>`. The row's `id` is the version's digest. `images.get(name)` returns the image with every version and its tag history. It takes the name without a tag or digest: `get("docker.io/library/alpine:3.20")` is refused with `'docker.io/library/alpine:3.20' names a tag or digest; pass the image name alone, such as 'docker.io/library/alpine'`.
 
 | `get()` field | Python / Go | Node.js | Meaning |
 |---|---|---|---|
@@ -624,6 +636,13 @@ curl -fsS "${BOXLITE_REST_URL}/v1/boxes/${BOX_ID}" "${AUTH[@]}" | jq -r '"box \(
 
 </CodeGroup>
 
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `registry_host` (`registryHost`, `RegistryHost`) | string | Required | The registry the login is for; it must be one that takes logins, listed below |
+| `username` (`Username`) | string | Required | The registry account |
+| `password` (`Password`) | string | Required | A token or password with read access. It is sent once and never returned |
+| `repository_prefix` (`repositoryPrefix`, `RepositoryPrefix`) | string | None — the login covers the whole registry | Restricts the login to repositories under this prefix |
+
 A login covers every repository under its `repository_prefix` on its registry. The example scopes it to one repository with `acme/app/`. Set the prefix to whole path segments ending in `/`: `acme/` covers `ghcr.io/acme/app` but not `ghcr.io/acme-other/app`. Leave it out to cover the whole registry. When two logins cover an image, the one with the longer prefix wins.
 
 | Rule | Detail |
@@ -638,6 +657,14 @@ A login also admits public images under its prefix, on a registry that takes log
 ## Pin a tag and roll it back
 
 `images.move_tag(name, tag, digest)` points a tag at one of the image's recorded versions, and creates the tag if it does not exist. The next box created with that tag boots that version. Boxes already created keep the version they booted, and nothing is pulled. Each move is added to the image's history.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | Required | The image name without a tag or digest, such as `docker.io/library/alpine` |
+| `tag` | string | Required | The tag to point; it is created if the image does not have it. It must be a valid OCI tag |
+| `digest` | string | Required | `sha256:` and 64 lowercase hex digits, naming a version the catalog holds for this image |
+
+It returns the image as it is after the move, with the move first in `history`. Moving a tag to the version it already points at records nothing.
 
 This example records two versions, moves `stable` to the newer one, then rolls it back:
 
@@ -1041,7 +1068,7 @@ docker.io/library/alpine:stable boots Alpine 3.19.9
 2026-10-10T11:48:04.842+00:00  stable: (new) -> sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d
 ```
 
-The digest must belong to a version of that image that the catalog holds. Any other digest is refused with `Digest '<digest>' is not a version of image '<name>'`.
+Any other digest is refused, for example with `Digest 'sha256:0000…0000' is not a version of image 'docker.io/library/alpine'`.
 
 ### Pick up where a tag points upstream
 
@@ -1052,7 +1079,7 @@ A pull never moves a recorded tag. To move a tag to a newer upstream build, eith
 
 ### When a version disappears upstream
 
-A registry can delete a build that one of your tags still points at. Runners that already hold the build keep starting it. On a runner that does not, `create()` fails with a message such as:
+A registry can delete a build that one of your tags still points at. Runners that already hold the build keep starting it. On a runner that does not, `create()` raises an invalid-argument error whose message, after the `Box state transition failed:` prefix, reads like this:
 
 ```text
 Failed to pull image 'docker.io/acme/app@sha256:…': docker.io no longer has it (MANIFEST_UNKNOWN). Boxes on runners that already hold it still start. Move the tag 'stable' to a version its registry still has, or remove the image from the catalog and use the reference again.
@@ -1429,7 +1456,7 @@ Creating a box records its image without any image permission. A key created bef
 | Image or login still in use by a box | `InvalidStateError` | `invalid_state` | `ErrInvalidState` |
 | Too many cold pulls in the window | `ResourceExhaustedError` | `resource_exhausted` | `ErrResourceExhausted` |
 | The key lacks the permission | `ConfigError` | `config_error` | `ErrConfig` |
-| `pull()`, which a Cloud box does at creation instead | `UnsupportedError` | `unsupported` | `ErrUnsupported` |
+| `pull()`: "a REST runtime pulls an image when a box is created from it" | `UnsupportedError` | `unsupported` | `ErrUnsupported` |
 
 Over REST, the first six rows are `400`, `404`, `409` with the code `already_exists`, `409`, `429`, and `403`. There is no pull route.
 
