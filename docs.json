@@ -186,10 +186,17 @@
             "icon": "cube",
             "root": "cloud/boxes",
             "pages": [
-              "cloud/box-images",
               "cloud/box-sizes",
               "cloud/box-lifecycle",
               "cloud/box-from-code"
+            ]
+          },
+          {
+            "group": "Images",
+            "icon": "layer-group",
+            "pages": [
+              "cloud/box-images",
+              "cloud/images"
             ]
           },
           {

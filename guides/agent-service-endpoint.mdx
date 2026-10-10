@@ -245,7 +245,7 @@ The outer object is `BoxInfo.state` (a `BoxStateInfo`), and the inner field is `
 | `box.remove()` does not exist / `AttributeError` | Treating removal as a box method. | Call it on the runtime: `await runtime.remove(box_id, force=True)`. List with `runtime.list_info()` (not `list()`). |
 | `RuntimeWarning: coroutine ... was never awaited` | A REST client runtime method was not awaited. | Under the REST path, `create/get/get_info/list_info/metrics/remove` all require `await`. |
 | A remote `exec` exits non-zero but does not raise | By design, `exec` does not raise on a non-zero exit. | Check `result.exit_code` yourself; inspect `result.error_message` when the process died abnormally. |
-| `boxlite pull` / `boxlite images` report "not supported" in REST mode | The REST runtime does not currently support image operations. | Prepare images on the server side; the client only handles box lifecycle and execution. |
+| `boxlite pull` reports "not supported" in REST mode | A REST runtime pulls an image when a box is created from it. | Create the box with the image reference instead. |
 | The server fails to start a box on macOS / a machine without virtualization | The virtualization requirement falls on the **server host**. | Deploy `boxlite serve` on a Linux+KVM host (or macOS with Apple Hypervisor.framework, no `/dev/kvm` required); the client can be on any platform. |
 
 ### Real Error Example (Passing a String for a Volume)
