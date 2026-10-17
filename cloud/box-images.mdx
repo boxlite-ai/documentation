@@ -1,6 +1,6 @@
 ---
 title: "Choose an image for a Cloud box"
-sidebarTitle: "Images"
+sidebarTitle: "Choose an image"
 description: "The three images the console offers, what an image reference looks like from code, and which one to start from."
 ---
 
@@ -72,13 +72,16 @@ An API key carries the `Boxes` permission, and the console describes what that i
 
 > Boxes API access — This key can create and manage Boxes. Shared Linux base images are available automatically.
 
-So you do not stage or pull a base image before your first `create`. Image operations such as pulling are not supported over the REST runtime — see [Cloud vs open source](/cloud/vs-opensource).
+So you do not stage or pull a base image before your first `create`. A Cloud box pulls its image when you create it, so the REST runtime has no separate pull step. To start from your own image instead, see [Your own images](/cloud/images).
 
 
 
 ## Next steps
 
 <CardGroup cols={2}>
+  <Card title="Your own images" icon="layer-group" href="/cloud/images">
+    Public and private registries, pinned tags, and your image catalog.
+  </Card>
   <Card title="Boxes" icon="arrow-left" href="/cloud/boxes">
     Everything else about configuring a box on Cloud.
   </Card>

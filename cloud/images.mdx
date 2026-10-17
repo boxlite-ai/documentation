@@ -1,0 +1,1472 @@
+---
+title: "Run boxes from your own images"
+sidebarTitle: "Your own images"
+description: "How the image catalog pins what each tag boots, private registry logins, rolling a tag back, and the image limit, with every example in Python, Node.js, Go, and REST."
+---
+
+Start Cloud boxes from your own images, public or private, and decide which build each tag boots. Pin a tag to the version you tested, roll it back with one call, and keep your organization's image catalog under its limit.
+
+## Prerequisites
+
+- An API key from the console, exported as `BOXLITE_API_KEY`, and the REST URL exported as `BOXLITE_REST_URL`. See [API keys](/cloud/api-keys) and [Quickstart](/cloud/quickstart).
+- An SDK:
+  - Python: `pip install boxlite`.
+  - Node.js: `npm install @boxlite-ai/boxlite`; run the TypeScript examples with `npx tsx`.
+  - Go: `go get github.com/boxlite-ai/boxlite/sdks/go`, then `go run github.com/boxlite-ai/boxlite/sdks/go/cmd/setup` once to fetch the native library.
+  - REST: `curl` and `jq`.
+
+## Start from one box
+
+This starts a box from Alpine on Docker Hub, then reads back the version your catalog recorded:
+
+<CodeGroup>
+
+```python Python
+# first_image.py — start a box from a public image, then read the image back from the catalog
+# Run: python first_image.py
+import asyncio
+import os
+import time
+
+from boxlite import ApiKeyCredential, Boxlite, BoxliteRestOptions, BoxOptions, NotFoundError
+
+IMAGE = "docker.io/library/alpine:3.20"
+NAME = "docker.io/library/alpine"
+
+api_key = os.environ.get("BOXLITE_API_KEY")
+if not api_key:
+    raise SystemExit("Set BOXLITE_API_KEY to your blk_live_... key before running this.")
+
+
+async def recorded(rt, name: str, tag: str):
+    """The image and the version `tag` names, once the catalog has recorded it.
+
+    The runner reports a started box's image on its next sync, about ten seconds
+    later, so poll for up to 30 seconds while the box is still running.
+    """
+    for _ in range(30):
+        try:
+            detail = await rt.images.get(name)
+            version = next((v for v in detail.versions if tag in v.tags), None)
+            if version is not None:
+                return detail, version
+        except NotFoundError:
+            pass
+        await asyncio.sleep(1)
+    raise TimeoutError(f"{name}:{tag} was not recorded within 30 seconds")
+
+
+async def main() -> None:
+    rt = Boxlite.rest(
+        BoxliteRestOptions(
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
+            credential=ApiKeyCredential(api_key),
+        )
+    )
+    box_id = None
+    try:
+        # The first box from an image pulls it and records it in your catalog.
+        box = await rt.create(BoxOptions(image=IMAGE), name=f"first-image-{int(time.time())}")
+        box_id = box.id
+        await box.start()
+
+        execution = await box.exec("cat", args=["/etc/alpine-release"])
+        release = "".join([line async for line in execution.stdout()]).strip()
+        await execution.wait()
+        print(f"box {box.id} runs Alpine {release}")
+
+        # The catalog files the image under its full name, with the version it booted.
+        detail, version = await recorded(rt, NAME, "3.20")
+        print(f"{detail.name}  {version.digest}  tags={version.tags}")
+    except Exception as exc:
+        print(f"failed: {type(exc).__name__}: {exc}")
+    finally:
+        if box_id:
+            await rt.remove(box_id, force=True)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript Node.js
+// first_image.ts — start a box from a public image, then read the image back from the catalog
+// Run: npx tsx first_image.ts
+import { ApiKeyCredential, BoxliteRestOptions, JsBoxlite, errorCode } from "@boxlite-ai/boxlite";
+
+const IMAGE = "docker.io/library/alpine:3.20";
+const NAME = "docker.io/library/alpine";
+
+type Runtime = ReturnType<typeof JsBoxlite.rest>;
+
+// The image and the version `tag` names, once the catalog has recorded it.
+// The runner reports a started box's image on its next sync, about ten seconds
+// later, so poll for up to 30 seconds while the box is still running.
+async function recorded(rt: Runtime, name: string, tag: string) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const detail = await rt.images.get(name);
+      const version = detail.versions.find((v) => v.tags.includes(tag));
+      if (version) return { detail, version };
+    } catch (err) {
+      if (errorCode(err) !== "not_found") throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`${name}:${tag} was not recorded within 30 seconds`);
+}
+
+async function main(): Promise<void> {
+  const apiKey = process.env.BOXLITE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Set BOXLITE_API_KEY to your blk_live_... key before running this.");
+  }
+  const rt = JsBoxlite.rest(
+    new BoxliteRestOptions({
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
+      credential: new ApiKeyCredential(apiKey),
+    }),
+  );
+
+  let boxId: string | null = null;
+  try {
+    // The first box from an image pulls it and records it in your catalog.
+    const box = await rt.create({ image: IMAGE }, `first-image-${Math.floor(Date.now() / 1000)}`);
+    boxId = box.id;
+    await box.start();
+
+    const execution = await box.exec("cat", ["/etc/alpine-release"]);
+    const stdout = await execution.stdout();
+    let release = "";
+    for (let line = await stdout.next(); line !== null; line = await stdout.next()) {
+      release += line;
+    }
+    await execution.wait();
+    console.log(`box ${box.id} runs Alpine ${release.trim()}`);
+
+    // The catalog files the image under its full name, with the version it booted.
+    const { detail, version } = await recorded(rt, NAME, "3.20");
+    console.log(`${detail.name}  ${version.digest}  tags=${version.tags}`);
+  } catch (err) {
+    console.error("failed:", err);
+  } finally {
+    if (boxId !== null) {
+      await rt.remove(boxId, true);
+    }
+    rt.close();
+  }
+}
+
+main();
+```
+
+```go Go
+// first_image — start a box from a public image, then read the image back from the catalog
+// Run: go run .
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"slices"
+	"strings"
+	"time"
+
+	boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+const (
+	image = "docker.io/library/alpine:3.20"
+	name  = "docker.io/library/alpine"
+)
+
+// recorded returns the image and the version tag names, once the catalog has
+// recorded it. The runner reports a started box's image on its next sync, about
+// ten seconds later, so poll for up to 30 seconds while the box is still running.
+func recorded(ctx context.Context, images *boxlite.Images, name, tag string) (*boxlite.ImageDetail, *boxlite.ImageVersion, error) {
+	for range 30 {
+		detail, err := images.Get(ctx, name)
+		if err != nil && !boxlite.IsNotFound(err) {
+			return nil, nil, err
+		}
+		if detail != nil {
+			for i := range detail.Versions {
+				if slices.Contains(detail.Versions[i].Tags, tag) {
+					return detail, &detail.Versions[i], nil
+				}
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	return nil, nil, fmt.Errorf("%s:%s was not recorded within 30 seconds", name, tag)
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cred, ok := boxlite.ApiKeyCredentialFromEnv()
+	if !ok {
+		return fmt.Errorf("set BOXLITE_API_KEY to your blk_live_... key before running this")
+	}
+	url := os.Getenv("BOXLITE_REST_URL")
+	if url == "" {
+		url = "https://api.boxlite.ai"
+	}
+	rt, err := boxlite.NewRest(boxlite.BoxliteRestOptions{URL: url, Credential: cred})
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	ctx := context.Background()
+	images, err := rt.Images()
+	if err != nil {
+		return err
+	}
+	defer images.Close()
+
+	// The first box from an image pulls it and records it in your catalog.
+	box, err := rt.Create(ctx, image, boxlite.WithName(fmt.Sprintf("first-image-%d", time.Now().Unix())))
+	if err != nil {
+		return err
+	}
+	defer rt.ForceRemove(ctx, box.ID())
+	defer box.Close()
+	if err := box.Start(ctx); err != nil {
+		return err
+	}
+	result, err := box.Exec(ctx, "cat", "/etc/alpine-release")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("box %s runs Alpine %s\n", box.ID(), strings.TrimSpace(result.Stdout))
+
+	// The catalog files the image under its full name, with the version it booted.
+	detail, version, err := recorded(ctx, images, name, "3.20")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s  %s  tags=%v\n", detail.Name, version.Digest, version.Tags)
+	return nil
+}
+```
+
+```bash REST
+#!/usr/bin/env bash
+# first_image.sh — start a box from a public image, then read the image back from the catalog
+set -euo pipefail
+: "${BOXLITE_API_KEY:?Set BOXLITE_API_KEY to your blk_live_... key before running this.}"
+
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
+AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
+NAME_PATH="docker.io%2Flibrary%2Falpine"   # the image name, URL-encoded as one path segment
+
+# Print the digest of the version tag $1 names, once the catalog has recorded it.
+# The runner reports a started box's image on its next sync, about ten seconds
+# later, so poll for up to 30 seconds while the box is still running.
+recorded() {
+  local digest
+  for _ in $(seq 30); do
+    digest=$(curl -fsS "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}" "${AUTH[@]}" 2>/dev/null \
+      | jq -r --arg tag "$1" '.versions[] | select(.tags | index($tag)) | .digest' || true)
+    if [ -n "${digest}" ]; then echo "${digest}"; return 0; fi
+    sleep 1
+  done
+  echo "the version tagged $1 was not recorded within 30 seconds" >&2
+  return 1
+}
+
+# The first box from an image pulls it and records it in your catalog.
+BOX_ID=$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes" "${AUTH[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"image\":\"docker.io/library/alpine:3.20\",\"name\":\"first-image-$(date +%s)\"}" | jq -r .box_id)
+trap 'curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${BOX_ID}?force=true" "${AUTH[@]}"' EXIT
+echo "box ${BOX_ID}"
+
+# The catalog files the image under its full name, with the version it booted.
+echo "docker.io/library/alpine  $(recorded 3.20)"
+```
+
+</CodeGroup>
+
+```text Python output
+box 5S46rvQC9CnR runs Alpine 3.20.10
+docker.io/library/alpine  sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d  tags=['3.20']
+```
+
+The rest of the page builds on that box: what the catalog records, private images, pinning and rolling back a tag, and keeping the catalog under its limit. To start from one of the images the console offers instead, see [Choose an image](/cloud/box-images).
+
+## What is the image catalog?
+
+The catalog is your organization's record of the images its boxes have booted. Each entry is an **image name** — the registry host and repository, such as `docker.io/library/alpine` — and holds:
+
+- **Versions.** Each version is one build, named by its manifest digest. The catalog keeps the reference it was first pulled as, its declared size, when it was recorded, and when a box last started from it.
+- **Tags.** A tag points at one version. The first box created with a tag records where the tag pointed at that moment.
+- **History.** Every time a tag is recorded or moved, the catalog appends an event naming both versions by digest.
+
+```text
+docker.io/library/alpine
+├── sha256:45e0…  tags: 3.20, stable
+└── sha256:5cd7…  tags: 3.19
+```
+
+Once a tag is recorded, a box created with it boots the recorded version — the catalog hands the runner `docker.io/library/alpine@sha256:45e0…`, not the tag. The registry is not asked again, so a tag that moves upstream does not move in your catalog. You decide when a tag moves: see [Pin a tag and roll it back](#pin-a-tag-and-roll-it-back).
+
+The catalog records an image when the runner reports that the box started, about ten seconds after `create()` returns. Keep the box running until then: a box removed before the report leaves nothing recorded. That is why the examples that read the catalog poll `get()` for up to 30 seconds.
+
+## Start a box from a public image
+
+Pass a full image reference, such as `docker.io/library/alpine:3.20`, as the box's image. BoxLite Cloud admits public images from a set of registries that includes `docker.io`, `quay.io`, `gcr.io`, and `public.ecr.aws`. An image on a registry outside the set is refused with `Image registry '<host>' is not allowed. Allowed registries: …`, and the message lists the whole set.
+
+<Warning>
+**`base`, `python`, and `node` are not Docker Hub names on Cloud.** They select the console's images, so `image="python"` boots BoxLite's Python image, not `docker.io/library/python`. Write the full name, such as `docker.io/library/python:3.12-slim`, to use Docker Hub's. A short name like `alpine` is read as `docker.io/library/alpine:latest`.
+</Warning>
+
+A reference the catalog cannot answer yet is a **cold pull**. Your organization may start only a limited number of cold pulls in a short window; past it, `create()` fails with a resource-exhausted error whose message says how many seconds are left. Boxes from images the catalog already holds do not count.
+
+When the image cannot be pulled, `create()` raises an invalid-argument error that says why, for example:
+
+```text
+invalid argument: Box state transition failed: Failed to pull image 'docker.io/library/alpine:no-such-tag-for-docs': docker.io has no such image (MANIFEST_UNKNOWN). Check the repository and the tag.
+```
+
+| Message contains | Cause | Fix |
+|---|---|---|
+| `has no such image (MANIFEST_UNKNOWN)` | The repository or tag does not exist | Correct the reference |
+| `refused the pull (UNAUTHORIZED). The image is private or does not exist, and no registry login of the organization covers it.` | The image is private | Add a registry login — see [Use a private image](#use-a-private-image) |
+| `Image registry 'registry.k8s.io' is not allowed. Allowed registries: …` | The registry is outside the set Cloud admits | Use an admitted registry, or one that takes a login |
+
+<Warning>
+**A create that fails on its image still leaves the box behind**, and you never received its id. Remove it by the name you passed to `create()`, for example `await rt.remove("<YOUR_BOX_NAME>", force=True)`.
+</Warning>
+
+## Read the catalog
+
+`images.list()` returns one row per tag at its version, then one row per untagged version as `name@digest` with the tag `<none>`. The row's `id` is the version's digest. `images.get(name)` returns the image with every version and its tag history. It takes the name without a tag or digest: `get("docker.io/library/alpine:3.20")` is refused with `'docker.io/library/alpine:3.20' names a tag or digest; pass the image name alone, such as 'docker.io/library/alpine'`.
+
+| `get()` field | Python / Go | Node.js | Meaning |
+|---|---|---|---|
+| Name | `name` / `Name` | `name` | Registry host and repository |
+| Tags | `tags` / `Tags` | `tags` | Every tag the image holds |
+| Versions | `versions` / `Versions` | `versions` | Newest first |
+| History | `history` / `History` | `history` | The latest 100 tag events, newest first |
+
+| Version field | Python / Go | Node.js | Meaning |
+|---|---|---|---|
+| Digest | `digest` / `Digest` | `digest` | Manifest digest, such as `sha256:45e0…` |
+| Tags | `tags` / `Tags` | `tags` | Tags that point at this version now |
+| Source | `source_ref` / `SourceRef` | `sourceRef` | The reference the version was first pulled as |
+| Size | `size_bytes` / `SizeBytes` | `sizeBytes` | Sum of the layer sizes the manifest declares; empty when unknown |
+| Recorded | `recorded_at` / `RecordedAt` | `recordedAt` | When the catalog recorded it |
+| Last used | `last_used_at` / `LastUsedAt` | `lastUsedAt` | When a box last started from it; empty when unknown |
+| Missing upstream | `upstream_missing_at` / `UpstreamMissingAt` | `upstreamMissingAt` | When a pull found it gone from its registry; empty otherwise |
+
+| History field | Python / Go | Node.js | Meaning |
+|---|---|---|---|
+| Tag | `tag` / `Tag` | `tag` | The tag that moved |
+| From | `from_digest` / `FromDigest` | `fromDigest` | The version it pointed at before; empty when the tag was new |
+| To | `to_digest` / `ToDigest` | `toDigest` | The version it points at since |
+| Actor | `actor` / `Actor` | `actor` | Who moved it; empty when a pull recorded it |
+| Moved | `moved_at` / `MovedAt` | `movedAt` | When |
+
+Python returns times as RFC 3339 strings, Node.js as RFC 3339 strings, and Go as `time.Time`.
+
+## Use a private image
+
+To pull a private image, add a **registry login** for its registry. The password goes up once into a secret store, and no call ever returns it:
+
+<CodeGroup>
+
+```python Python
+# private_image.py — add a registry login, start a box from a private image, then clean up
+# Run: python private_image.py
+import asyncio
+import os
+import time
+
+from boxlite import ApiKeyCredential, Boxlite, BoxliteRestOptions, BoxOptions
+
+PRIVATE_IMAGE = os.environ.get("PRIVATE_IMAGE", "ghcr.io/acme/app:1.0")
+REGISTRY_HOST = PRIVATE_IMAGE.split("/", 1)[0]
+# Whole path segments ending in "/": this login covers ghcr.io/acme/app and nothing else.
+REPOSITORY_PREFIX = os.environ.get("REPOSITORY_PREFIX", "acme/app/")
+
+api_key = os.environ.get("BOXLITE_API_KEY")
+if not api_key:
+    raise SystemExit("Set BOXLITE_API_KEY to your blk_live_... key before running this.")
+
+
+async def main() -> None:
+    rt = Boxlite.rest(
+        BoxliteRestOptions(
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
+            credential=ApiKeyCredential(api_key),
+        )
+    )
+    login = None
+    box_id = None
+    try:
+        # The password goes up once and is never returned.
+        login = await rt.registries.create(
+            registry_host=REGISTRY_HOST,
+            username=os.environ["REGISTRY_USERNAME"],
+            password=os.environ["REGISTRY_PASSWORD"],
+            repository_prefix=REPOSITORY_PREFIX,
+        )
+        print(f"login {login.id} covers {login.registry_host}/{login.repository_prefix}*")
+
+        # Boxes from any image the login covers now pull with it.
+        box = await rt.create(BoxOptions(image=PRIVATE_IMAGE), name=f"private-{int(time.time())}")
+        box_id = box.id
+        await box.start()
+        execution = await box.exec("cat", args=["/etc/os-release"])
+        output = "".join([chunk async for chunk in execution.stdout()])
+        first_line = output.splitlines()[0]
+        await execution.wait()
+        print(f"box {box.id} from {PRIVATE_IMAGE}: {first_line}")
+    except Exception as exc:
+        print(f"failed: {type(exc).__name__}: {exc}")
+    finally:
+        if box_id:
+            await rt.remove(box_id, force=True)
+        # A login is refused removal while a box still pulls through it, so remove boxes first.
+        if login is not None:
+            await rt.registries.remove(login.id)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript Node.js
+// private_image.ts — add a registry login, start a box from a private image, then clean up
+// Run: npx tsx private_image.ts
+import { ApiKeyCredential, BoxliteRestOptions, JsBoxlite } from "@boxlite-ai/boxlite";
+
+const PRIVATE_IMAGE = process.env.PRIVATE_IMAGE ?? "ghcr.io/acme/app:1.0";
+const REGISTRY_HOST = PRIVATE_IMAGE.split("/")[0];
+// Whole path segments ending in "/": this login covers ghcr.io/acme/app and nothing else.
+const REPOSITORY_PREFIX = process.env.REPOSITORY_PREFIX ?? "acme/app/";
+
+async function main(): Promise<void> {
+  const apiKey = process.env.BOXLITE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Set BOXLITE_API_KEY to your blk_live_... key before running this.");
+  }
+  const rt = JsBoxlite.rest(
+    new BoxliteRestOptions({
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
+      credential: new ApiKeyCredential(apiKey),
+    }),
+  );
+
+  let loginId: string | null = null;
+  let boxId: string | null = null;
+  try {
+    // The password goes up once and is never returned.
+    const login = await rt.registries.create({
+      registryHost: REGISTRY_HOST,
+      repositoryPrefix: REPOSITORY_PREFIX,
+      username: process.env.REGISTRY_USERNAME!,
+      password: process.env.REGISTRY_PASSWORD!,
+    });
+    loginId = login.id;
+    console.log(`login ${login.id} covers ${login.registryHost}/${login.repositoryPrefix}*`);
+
+    // Boxes from any image the login covers now pull with it.
+    const box = await rt.create(
+      { image: PRIVATE_IMAGE },
+      `private-${Math.floor(Date.now() / 1000)}`,
+    );
+    boxId = box.id;
+    await box.start();
+    const execution = await box.exec("cat", ["/etc/os-release"]);
+    const stdout = await execution.stdout();
+    let output = "";
+    for (let chunk = await stdout.next(); chunk !== null; chunk = await stdout.next()) {
+      output += chunk;
+    }
+    await execution.wait();
+    console.log(`box ${box.id} from ${PRIVATE_IMAGE}: ${output.split("\n")[0]}`);
+  } catch (err) {
+    console.error("failed:", err);
+  } finally {
+    if (boxId !== null) {
+      await rt.remove(boxId, true);
+    }
+    // A login is refused removal while a box still pulls through it, so remove boxes first.
+    if (loginId !== null) {
+      await rt.registries.remove(loginId);
+    }
+    rt.close();
+  }
+}
+
+main();
+```
+
+```go Go
+// private_image — add a registry login, start a box from a private image, then clean up
+// Run: go run .
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cred, ok := boxlite.ApiKeyCredentialFromEnv()
+	if !ok {
+		return fmt.Errorf("set BOXLITE_API_KEY to your blk_live_... key before running this")
+	}
+	url := os.Getenv("BOXLITE_REST_URL")
+	if url == "" {
+		url = "https://api.boxlite.ai"
+	}
+	image := os.Getenv("PRIVATE_IMAGE")
+	if image == "" {
+		image = "ghcr.io/acme/app:1.0"
+	}
+	// Whole path segments ending in "/": this login covers ghcr.io/acme/app and nothing else.
+	prefix := os.Getenv("REPOSITORY_PREFIX")
+	if prefix == "" {
+		prefix = "acme/app/"
+	}
+	rt, err := boxlite.NewRest(boxlite.BoxliteRestOptions{URL: url, Credential: cred})
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	ctx := context.Background()
+	registries, err := rt.Registries()
+	if err != nil {
+		return err
+	}
+	defer registries.Close()
+
+	// The password goes up once and is never returned.
+	login, err := registries.Create(ctx, boxlite.NewRegistryCredential{
+		RegistryHost:     strings.SplitN(image, "/", 2)[0],
+		RepositoryPrefix: prefix,
+		Username:         os.Getenv("REGISTRY_USERNAME"),
+		Password:         os.Getenv("REGISTRY_PASSWORD"),
+	})
+	if err != nil {
+		return err
+	}
+	// A login is refused removal while a box still pulls through it, so this
+	// runs after the box removal deferred below.
+	defer registries.Remove(ctx, login.ID)
+	fmt.Printf("login %s covers %s/%s*\n", login.ID, login.RegistryHost, login.RepositoryPrefix)
+
+	// Boxes from any image the login covers now pull with it.
+	box, err := rt.Create(ctx, image, boxlite.WithName(fmt.Sprintf("private-%d", time.Now().Unix())))
+	if err != nil {
+		return err
+	}
+	defer rt.ForceRemove(ctx, box.ID())
+	defer box.Close()
+	if err := box.Start(ctx); err != nil {
+		return err
+	}
+	result, err := box.Exec(ctx, "cat", "/etc/os-release")
+	if err != nil {
+		return err
+	}
+	firstLine, _, _ := strings.Cut(result.Stdout, "\n")
+	fmt.Printf("box %s from %s: %s\n", box.ID(), image, firstLine)
+	return nil
+}
+```
+
+```bash REST
+#!/usr/bin/env bash
+# private_image.sh — add a registry login, start a box from a private image, then clean up
+set -euo pipefail
+: "${BOXLITE_API_KEY:?Set BOXLITE_API_KEY to your blk_live_... key before running this.}"
+: "${REGISTRY_USERNAME:?Set REGISTRY_USERNAME}" "${REGISTRY_PASSWORD:?Set REGISTRY_PASSWORD}"
+
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
+AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
+PRIVATE_IMAGE="${PRIVATE_IMAGE:-ghcr.io/acme/app:1.0}"
+# Whole path segments ending in "/": this login covers ghcr.io/acme/app and nothing else.
+REPOSITORY_PREFIX="${REPOSITORY_PREFIX:-acme/app/}"
+BOX_ID=""
+
+# The password goes up once and is never returned.
+LOGIN_ID=$(jq -n --arg host "${PRIVATE_IMAGE%%/*}" --arg prefix "${REPOSITORY_PREFIX}" \
+    --arg user "${REGISTRY_USERNAME}" --arg pass "${REGISTRY_PASSWORD}" \
+    '{registry_host: $host, repository_prefix: $prefix, username: $user, password: $pass}' \
+  | curl -fsS -X POST "${BOXLITE_REST_URL}/v1/registries" "${AUTH[@]}" \
+      -H 'Content-Type: application/json' -d @- | jq -r .id)
+cleanup() {
+  if [ -n "${BOX_ID}" ]; then
+    curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${BOX_ID}?force=true" "${AUTH[@]}"
+  fi
+  # A login is refused removal while a box still pulls through it, so remove boxes first.
+  curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/registries/${LOGIN_ID}" "${AUTH[@]}"
+}
+trap cleanup EXIT
+echo "login ${LOGIN_ID}"
+
+# Boxes from any image the login covers now pull with it.
+BOX_ID=$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes" "${AUTH[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"image\":\"${PRIVATE_IMAGE}\",\"name\":\"private-$(date +%s)\"}" | jq -r .box_id)
+curl -fsS "${BOXLITE_REST_URL}/v1/boxes/${BOX_ID}" "${AUTH[@]}" | jq -r '"box \(.box_id) is \(.status), from \(.image)"'
+```
+
+</CodeGroup>
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `registry_host` (`registryHost`, `RegistryHost`) | string | Required | The registry the login is for; it must be one that takes logins, listed below |
+| `username` (`Username`) | string | Required | The registry account |
+| `password` (`Password`) | string | Required | A token or password with read access. It is sent once and never returned |
+| `repository_prefix` (`repositoryPrefix`, `RepositoryPrefix`) | string | None — the login covers the whole registry | Restricts the login to repositories under this prefix |
+
+A login covers every repository under its `repository_prefix` on its registry. The example scopes it to one repository with `acme/app/`. Set the prefix to whole path segments ending in `/`: `acme/` covers `ghcr.io/acme/app` but not `ghcr.io/acme-other/app`. Leave it out to cover the whole registry. When two logins cover an image, the one with the longer prefix wins.
+
+| Rule | Detail |
+|---|---|
+| Registries that take a login | `ghcr.io`, `docker.io`, `quay.io`, `gcr.io`, `us.gcr.io`, `eu.gcr.io`, `asia.gcr.io` |
+| One login per registry and prefix | A second one raises an already-exists error; remove the first to replace it |
+| Removal | Refused, naming the boxes, while a box still pulls through the login. Remove those boxes first |
+| Listing | `registries.list()` returns every login, oldest first, without passwords |
+
+A login also admits public images under its prefix, on a registry that takes logins, even if that registry is outside the set Cloud admits for anonymous pulls.
+
+## Pin a tag and roll it back
+
+`images.move_tag(name, tag, digest)` points a tag at one of the image's recorded versions, and creates the tag if it does not exist. The next box created with that tag boots that version. Boxes already created keep the version they booted, and nothing is pulled. Each move is added to the image's history.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | Required | The image name without a tag or digest, such as `docker.io/library/alpine` |
+| `tag` | string | Required | The tag to point; it is created if the image does not have it. It must be a valid OCI tag |
+| `digest` | string | Required | `sha256:` and 64 lowercase hex digits, naming a version the catalog holds for this image |
+
+It returns the image as it is after the move, with the move first in `history`. Moving a tag to the version it already points at records nothing.
+
+This example records two versions, moves `stable` to the newer one, then rolls it back:
+
+<CodeGroup>
+
+```python Python
+# pin_a_tag.py — point a tag at one recorded version, roll it back, and read the history
+# Run: python pin_a_tag.py
+import asyncio
+import os
+import time
+
+from boxlite import ApiKeyCredential, Boxlite, BoxliteRestOptions, BoxOptions, NotFoundError
+
+NAME = "docker.io/library/alpine"
+TAG = "stable"
+
+api_key = os.environ.get("BOXLITE_API_KEY")
+if not api_key:
+    raise SystemExit("Set BOXLITE_API_KEY to your blk_live_... key before running this.")
+
+
+async def recorded(rt, name: str, tag: str):
+    """The image and the version `tag` names, once the catalog has recorded it.
+
+    The runner reports a started box's image on its next sync, about ten seconds
+    later, so poll for up to 30 seconds while the box is still running.
+    """
+    for _ in range(30):
+        try:
+            detail = await rt.images.get(name)
+            version = next((v for v in detail.versions if tag in v.tags), None)
+            if version is not None:
+                return detail, version
+        except NotFoundError:
+            pass
+        await asyncio.sleep(1)
+    raise TimeoutError(f"{name}:{tag} was not recorded within 30 seconds")
+
+
+async def boot(rt, image: str) -> str:
+    """Create a box from `image`, print what it runs, and return its id."""
+    box = await rt.create(BoxOptions(image=image), name=f"pin-a-tag-{int(time.time() * 1000)}")
+    await box.start()
+    execution = await box.exec("cat", args=["/etc/alpine-release"])
+    release = "".join([line async for line in execution.stdout()]).strip()
+    await execution.wait()
+    print(f"{image} boots Alpine {release}")
+    return box.id
+
+
+async def main() -> None:
+    rt = Boxlite.rest(
+        BoxliteRestOptions(
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
+            credential=ApiKeyCredential(api_key),
+        )
+    )
+    boxes = []
+    try:
+        # Two tags of one repository record two versions of one image.
+        boxes.append(await boot(rt, f"{NAME}:3.19"))
+        _, older = await recorded(rt, NAME, "3.19")
+        boxes.append(await boot(rt, f"{NAME}:3.20"))
+        _, newer = await recorded(rt, NAME, "3.20")
+
+        # Point the tag at the newer version. The next box created with it boots that version.
+        await rt.images.move_tag(NAME, TAG, newer.digest)
+        boxes.append(await boot(rt, f"{NAME}:{TAG}"))
+
+        # Roll back. Boxes already created keep the version they booted.
+        detail = await rt.images.move_tag(NAME, TAG, older.digest)
+        boxes.append(await boot(rt, f"{NAME}:{TAG}"))
+
+        for event in detail.history:
+            if event.tag == TAG:
+                moved_from = event.from_digest or "(new)"
+                print(f"{event.moved_at}  {event.tag}: {moved_from} -> {event.to_digest}")
+    except Exception as exc:
+        print(f"failed: {type(exc).__name__}: {exc}")
+    finally:
+        for box_id in boxes:
+            await rt.remove(box_id, force=True)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript Node.js
+// pin_a_tag.ts — point a tag at one recorded version, roll it back, and read the history
+// Run: npx tsx pin_a_tag.ts
+import { ApiKeyCredential, BoxliteRestOptions, JsBoxlite, errorCode } from "@boxlite-ai/boxlite";
+
+const NAME = "docker.io/library/alpine";
+const TAG = "stable";
+
+type Runtime = ReturnType<typeof JsBoxlite.rest>;
+
+// The image and the version `tag` names, once the catalog has recorded it.
+// The runner reports a started box's image on its next sync, about ten seconds
+// later, so poll for up to 30 seconds while the box is still running.
+async function recorded(rt: Runtime, name: string, tag: string) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const detail = await rt.images.get(name);
+      const version = detail.versions.find((v) => v.tags.includes(tag));
+      if (version) return { detail, version };
+    } catch (err) {
+      if (errorCode(err) !== "not_found") throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`${name}:${tag} was not recorded within 30 seconds`);
+}
+
+// Create a box from `image`, print what it runs, and return its id.
+async function boot(rt: Runtime, image: string): Promise<string> {
+  const box = await rt.create({ image }, `pin-a-tag-${Date.now()}`);
+  await box.start();
+  const execution = await box.exec("cat", ["/etc/alpine-release"]);
+  const stdout = await execution.stdout();
+  let release = "";
+  for (let line = await stdout.next(); line !== null; line = await stdout.next()) {
+    release += line;
+  }
+  await execution.wait();
+  console.log(`${image} boots Alpine ${release.trim()}`);
+  return box.id;
+}
+
+async function main(): Promise<void> {
+  const apiKey = process.env.BOXLITE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Set BOXLITE_API_KEY to your blk_live_... key before running this.");
+  }
+  const rt = JsBoxlite.rest(
+    new BoxliteRestOptions({
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
+      credential: new ApiKeyCredential(apiKey),
+    }),
+  );
+
+  const boxes: string[] = [];
+  try {
+    // Two tags of one repository record two versions of one image.
+    boxes.push(await boot(rt, `${NAME}:3.19`));
+    const older = (await recorded(rt, NAME, "3.19")).version;
+    boxes.push(await boot(rt, `${NAME}:3.20`));
+    const newer = (await recorded(rt, NAME, "3.20")).version;
+
+    // Point the tag at the newer version. The next box created with it boots that version.
+    await rt.images.moveTag(NAME, TAG, newer.digest);
+    boxes.push(await boot(rt, `${NAME}:${TAG}`));
+
+    // Roll back. Boxes already created keep the version they booted.
+    const detail = await rt.images.moveTag(NAME, TAG, older.digest);
+    boxes.push(await boot(rt, `${NAME}:${TAG}`));
+
+    for (const event of detail.history.filter((e) => e.tag === TAG)) {
+      console.log(
+        `${event.movedAt}  ${event.tag}: ${event.fromDigest ?? "(new)"} -> ${event.toDigest}`,
+      );
+    }
+  } catch (err) {
+    console.error("failed:", err);
+  } finally {
+    for (const boxId of boxes) {
+      await rt.remove(boxId, true);
+    }
+    rt.close();
+  }
+}
+
+main();
+```
+
+```go Go
+// pin_a_tag — point a tag at one recorded version, roll it back, and read the history
+// Run: go run .
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"slices"
+	"strings"
+	"time"
+
+	boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+const (
+	name = "docker.io/library/alpine"
+	tag  = "stable"
+)
+
+// boot creates a box from image, prints what it runs, and returns its id.
+func boot(ctx context.Context, rt *boxlite.Runtime, image string) (string, error) {
+	box, err := rt.Create(ctx, image, boxlite.WithName(fmt.Sprintf("pin-a-tag-%d", time.Now().UnixMilli())))
+	if err != nil {
+		return "", err
+	}
+	defer box.Close()
+	if err := box.Start(ctx); err != nil {
+		return box.ID(), err
+	}
+	result, err := box.Exec(ctx, "cat", "/etc/alpine-release")
+	if err != nil {
+		return box.ID(), err
+	}
+	fmt.Printf("%s boots Alpine %s\n", image, strings.TrimSpace(result.Stdout))
+	return box.ID(), nil
+}
+
+// recorded returns the image and the version tag names, once the catalog has
+// recorded it. The runner reports a started box's image on its next sync, about
+// ten seconds later, so poll for up to 30 seconds while the box is still running.
+func recorded(ctx context.Context, images *boxlite.Images, name, tag string) (*boxlite.ImageDetail, *boxlite.ImageVersion, error) {
+	for range 30 {
+		detail, err := images.Get(ctx, name)
+		if err != nil && !boxlite.IsNotFound(err) {
+			return nil, nil, err
+		}
+		if detail != nil {
+			for i := range detail.Versions {
+				if slices.Contains(detail.Versions[i].Tags, tag) {
+					return detail, &detail.Versions[i], nil
+				}
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	return nil, nil, fmt.Errorf("%s:%s was not recorded within 30 seconds", name, tag)
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cred, ok := boxlite.ApiKeyCredentialFromEnv()
+	if !ok {
+		return fmt.Errorf("set BOXLITE_API_KEY to your blk_live_... key before running this")
+	}
+	url := os.Getenv("BOXLITE_REST_URL")
+	if url == "" {
+		url = "https://api.boxlite.ai"
+	}
+	rt, err := boxlite.NewRest(boxlite.BoxliteRestOptions{URL: url, Credential: cred})
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	ctx := context.Background()
+	images, err := rt.Images()
+	if err != nil {
+		return err
+	}
+	defer images.Close()
+
+	var boxes []string
+	defer func() {
+		for _, id := range boxes {
+			rt.ForceRemove(ctx, id)
+		}
+	}()
+	run := func(image string) error {
+		id, err := boot(ctx, rt, image)
+		if id != "" {
+			boxes = append(boxes, id)
+		}
+		return err
+	}
+
+	// Two tags of one repository record two versions of one image.
+	if err := run(name + ":3.19"); err != nil {
+		return err
+	}
+	_, older, err := recorded(ctx, images, name, "3.19")
+	if err != nil {
+		return err
+	}
+	if err := run(name + ":3.20"); err != nil {
+		return err
+	}
+	_, newer, err := recorded(ctx, images, name, "3.20")
+	if err != nil {
+		return err
+	}
+
+	// Point the tag at the newer version. The next box created with it boots that version.
+	if _, err := images.MoveTag(ctx, name, tag, newer.Digest); err != nil {
+		return err
+	}
+	if err := run(name + ":" + tag); err != nil {
+		return err
+	}
+
+	// Roll back. Boxes already created keep the version they booted.
+	detail, err := images.MoveTag(ctx, name, tag, older.Digest)
+	if err != nil {
+		return err
+	}
+	if err := run(name + ":" + tag); err != nil {
+		return err
+	}
+
+	for _, event := range detail.History {
+		if event.Tag != tag {
+			continue
+		}
+		from := event.FromDigest
+		if from == "" {
+			from = "(new)"
+		}
+		fmt.Printf("%s  %s: %s -> %s\n", event.MovedAt.Format(time.RFC3339), event.Tag, from, event.ToDigest)
+	}
+	return nil
+}
+```
+
+```bash REST
+#!/usr/bin/env bash
+# pin_a_tag.sh — point a tag at one recorded version, roll it back, and read the history
+set -euo pipefail
+: "${BOXLITE_API_KEY:?Set BOXLITE_API_KEY to your blk_live_... key before running this.}"
+
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
+AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
+NAME="docker.io/library/alpine"
+NAME_PATH="docker.io%2Flibrary%2Falpine"
+TAG="stable"
+
+# Print the digest of the version tag $1 names, once the catalog has recorded it.
+# The runner reports a started box's image on its next sync, about ten seconds
+# later, so poll for up to 30 seconds while the box is still running.
+recorded() {
+  local digest
+  for _ in $(seq 30); do
+    digest=$(curl -fsS "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}" "${AUTH[@]}" 2>/dev/null \
+      | jq -r --arg tag "$1" '.versions[] | select(.tags | index($tag)) | .digest' || true)
+    if [ -n "${digest}" ]; then echo "${digest}"; return 0; fi
+    sleep 1
+  done
+  echo "the version tagged $1 was not recorded within 30 seconds" >&2
+  return 1
+}
+BOXES=()
+cleanup() {
+  for id in "${BOXES[@]}"; do
+    curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${id}?force=true" "${AUTH[@]}" || true
+  done
+}
+trap cleanup EXIT
+
+# Create a box from $1 and print the image the server handed it.
+boot() {
+  local id
+  id=$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes" "${AUTH[@]}" \
+    -H 'Content-Type: application/json' \
+    -d "{\"image\":\"$1\",\"name\":\"pin-a-tag-$(date +%s)-${RANDOM}\"}" | jq -r .box_id)
+  BOXES+=("${id}")
+  echo "$1 boots $(curl -fsS "${BOXLITE_REST_URL}/v1/boxes/${id}" "${AUTH[@]}" | jq -r .image)"
+}
+
+move() {
+  curl -fsS -X PUT "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}/tags/${TAG}" "${AUTH[@]}" \
+    -H 'Content-Type: application/json' -d "{\"digest\":\"$1\"}"
+}
+
+# Two tags of one repository record two versions of one image.
+boot "${NAME}:3.19"
+OLDER=$(recorded 3.19)
+boot "${NAME}:3.20"
+NEWER=$(recorded 3.20)
+
+# Point the tag at the newer version. The next box created with it boots that version.
+move "${NEWER}" >/dev/null
+boot "${NAME}:${TAG}"
+
+# Roll back. Boxes already created keep the version they booted.
+move "${OLDER}" \
+  | jq -r --arg tag "${TAG}" '.history[] | select(.tag == $tag)
+      | "\(.moved_at)  \(.tag): \(.from_digest // "(new)") -> \(.to_digest)"'
+boot "${NAME}:${TAG}"
+```
+
+</CodeGroup>
+
+```text Python and Node.js output
+docker.io/library/alpine:3.19 boots Alpine 3.19.9
+docker.io/library/alpine:3.20 boots Alpine 3.20.10
+docker.io/library/alpine:stable boots Alpine 3.20.10
+docker.io/library/alpine:stable boots Alpine 3.19.9
+2026-10-10T11:48:05.731+00:00  stable: sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d -> sha256:5cd72f301a291887075a70d8b14aed6ee228fc9fd8f65e1e7eaa072f2115efd6
+2026-10-10T11:48:04.842+00:00  stable: (new) -> sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d
+```
+
+Any other digest is refused, for example with `Digest 'sha256:0000…0000' is not a version of image 'docker.io/library/alpine'`.
+
+### Pick up where a tag points upstream
+
+A pull never moves a recorded tag. To move a tag to a newer upstream build, either:
+
+- Boot a box from a reference the catalog has not recorded, such as a new tag or `name@digest`. That records the build as a version, and you can then move your tag to it.
+- Remove the image from the catalog and create a box with the tag again. The next box resolves the tag against the registry afresh. Removing an image drops its other tags and its history too.
+
+### When a version disappears upstream
+
+A registry can delete a build that one of your tags still points at. Runners that already hold the build keep starting it. On a runner that does not, `create()` raises an invalid-argument error whose message, after the `Box state transition failed:` prefix, reads like this:
+
+```text
+Failed to pull image 'docker.io/acme/app@sha256:…': docker.io no longer has it (MANIFEST_UNKNOWN). Boxes on runners that already hold it still start. Move the tag 'stable' to a version its registry still has, or remove the image from the catalog and use the reference again.
+```
+
+The catalog also marks the version: its `upstream_missing_at` field holds when a pull first found it gone. Move the tag to a version the registry still has, as the message says.
+
+## Keep the catalog under its limit
+
+An organization holds a limited number of images, 20 by default. `images.usage()` reports how many you hold, your limit, and the sum of their declared sizes. Once you reach the limit, a box from an image that is new to the catalog is refused; boxes from images you already hold still start.
+
+`images.remove(name)` removes an image from the catalog. It is refused, naming the boxes, while any box can still boot from it — including a stopped one. Runners keep the bytes they cached, and using the image again records it as a new entry.
+
+<CodeGroup>
+
+```python Python
+# manage_catalog.py — read usage, list the catalog, and remove an image once no box needs it
+# Run: python manage_catalog.py
+import asyncio
+import os
+import time
+
+from boxlite import (
+    ApiKeyCredential,
+    Boxlite,
+    BoxliteRestOptions,
+    BoxOptions,
+    InvalidStateError,
+    NotFoundError,
+)
+
+IMAGE = "docker.io/library/alpine:3.20"
+NAME = "docker.io/library/alpine"
+
+api_key = os.environ.get("BOXLITE_API_KEY")
+if not api_key:
+    raise SystemExit("Set BOXLITE_API_KEY to your blk_live_... key before running this.")
+
+
+async def recorded(rt, name: str, tag: str):
+    """The image and the version `tag` names, once the catalog has recorded it.
+
+    The runner reports a started box's image on its next sync, about ten seconds
+    later, so poll for up to 30 seconds while the box is still running.
+    """
+    for _ in range(30):
+        try:
+            detail = await rt.images.get(name)
+            version = next((v for v in detail.versions if tag in v.tags), None)
+            if version is not None:
+                return detail, version
+        except NotFoundError:
+            pass
+        await asyncio.sleep(1)
+    raise TimeoutError(f"{name}:{tag} was not recorded within 30 seconds")
+
+
+async def main() -> None:
+    rt = Boxlite.rest(
+        BoxliteRestOptions(
+            url=os.environ.get("BOXLITE_REST_URL", "https://api.boxlite.ai"),
+            credential=ApiKeyCredential(api_key),
+        )
+    )
+    box_id = None
+    try:
+        box = await rt.create(BoxOptions(image=IMAGE), name=f"catalog-{int(time.time())}")
+        box_id = box.id
+        await recorded(rt, NAME, "3.20")
+
+        usage = await rt.images.usage()
+        print(f"holding {usage.count} of {usage.limit} images, {usage.known_bytes} bytes declared")
+        for image in await rt.images.list():
+            print(f"{image.reference}  {image.id}")
+
+        # An image a box can still boot from cannot be removed.
+        try:
+            await rt.images.remove(NAME)
+        except InvalidStateError as exc:
+            print(f"refused: {exc}")
+
+        await rt.remove(box_id, force=True)
+        box_id = None
+        await rt.images.remove(NAME)
+        print(f"removed {NAME}; holding {(await rt.images.usage()).count} images")
+    except Exception as exc:
+        print(f"failed: {type(exc).__name__}: {exc}")
+    finally:
+        if box_id:
+            await rt.remove(box_id, force=True)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript Node.js
+// manage_catalog.ts — read usage, list the catalog, and remove an image once no box needs it
+// Run: npx tsx manage_catalog.ts
+import { ApiKeyCredential, BoxliteRestOptions, JsBoxlite, errorCode } from "@boxlite-ai/boxlite";
+
+const IMAGE = "docker.io/library/alpine:3.20";
+const NAME = "docker.io/library/alpine";
+
+type Runtime = ReturnType<typeof JsBoxlite.rest>;
+
+// The image and the version `tag` names, once the catalog has recorded it.
+// The runner reports a started box's image on its next sync, about ten seconds
+// later, so poll for up to 30 seconds while the box is still running.
+async function recorded(rt: Runtime, name: string, tag: string) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const detail = await rt.images.get(name);
+      const version = detail.versions.find((v) => v.tags.includes(tag));
+      if (version) return { detail, version };
+    } catch (err) {
+      if (errorCode(err) !== "not_found") throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`${name}:${tag} was not recorded within 30 seconds`);
+}
+
+async function main(): Promise<void> {
+  const apiKey = process.env.BOXLITE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Set BOXLITE_API_KEY to your blk_live_... key before running this.");
+  }
+  const rt = JsBoxlite.rest(
+    new BoxliteRestOptions({
+      url: process.env.BOXLITE_REST_URL ?? "https://api.boxlite.ai",
+      credential: new ApiKeyCredential(apiKey),
+    }),
+  );
+
+  let boxId: string | null = null;
+  try {
+    const box = await rt.create({ image: IMAGE }, `catalog-${Math.floor(Date.now() / 1000)}`);
+    boxId = box.id;
+    await recorded(rt, NAME, "3.20");
+
+    const usage = await rt.images.usage();
+    console.log(
+      `holding ${usage.count} of ${usage.limit} images, ${usage.knownBytes} bytes declared`,
+    );
+    for (const image of await rt.images.list()) {
+      console.log(`${image.reference}  ${image.id}`);
+    }
+
+    // An image a box can still boot from cannot be removed.
+    try {
+      await rt.images.remove(NAME);
+    } catch (err) {
+      if (errorCode(err) !== "invalid_state") throw err;
+      console.log(`refused: ${(err as Error).message}`);
+    }
+
+    await rt.remove(boxId, true);
+    boxId = null;
+    await rt.images.remove(NAME);
+    console.log(`removed ${NAME}; holding ${(await rt.images.usage()).count} images`);
+  } catch (err) {
+    console.error("failed:", err);
+  } finally {
+    if (boxId !== null) {
+      await rt.remove(boxId, true);
+    }
+    rt.close();
+  }
+}
+
+main();
+```
+
+```go Go
+// manage_catalog — read usage, list the catalog, and remove an image once no box needs it
+// Run: go run .
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"slices"
+	"strings"
+	"time"
+
+	boxlite "github.com/boxlite-ai/boxlite/sdks/go"
+)
+
+const (
+	image = "docker.io/library/alpine:3.20"
+	name  = "docker.io/library/alpine"
+)
+
+// recorded returns the image and the version tag names, once the catalog has
+// recorded it. The runner reports a started box's image on its next sync, about
+// ten seconds later, so poll for up to 30 seconds while the box is still running.
+func recorded(ctx context.Context, images *boxlite.Images, name, tag string) (*boxlite.ImageDetail, *boxlite.ImageVersion, error) {
+	for range 30 {
+		detail, err := images.Get(ctx, name)
+		if err != nil && !boxlite.IsNotFound(err) {
+			return nil, nil, err
+		}
+		if detail != nil {
+			for i := range detail.Versions {
+				if slices.Contains(detail.Versions[i].Tags, tag) {
+					return detail, &detail.Versions[i], nil
+				}
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	return nil, nil, fmt.Errorf("%s:%s was not recorded within 30 seconds", name, tag)
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cred, ok := boxlite.ApiKeyCredentialFromEnv()
+	if !ok {
+		return fmt.Errorf("set BOXLITE_API_KEY to your blk_live_... key before running this")
+	}
+	url := os.Getenv("BOXLITE_REST_URL")
+	if url == "" {
+		url = "https://api.boxlite.ai"
+	}
+	rt, err := boxlite.NewRest(boxlite.BoxliteRestOptions{URL: url, Credential: cred})
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	ctx := context.Background()
+	images, err := rt.Images()
+	if err != nil {
+		return err
+	}
+	defer images.Close()
+
+	box, err := rt.Create(ctx, image, boxlite.WithName(fmt.Sprintf("catalog-%d", time.Now().Unix())))
+	if err != nil {
+		return err
+	}
+	boxID := box.ID()
+	box.Close()
+	defer func() {
+		if boxID != "" {
+			rt.ForceRemove(ctx, boxID)
+		}
+	}()
+	if _, _, err := recorded(ctx, images, name, "3.20"); err != nil {
+		return err
+	}
+
+	usage, err := images.Usage(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("holding %d of %d images, %d bytes declared\n", usage.Count, usage.Limit, usage.KnownBytes)
+	held, err := images.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, info := range held {
+		fmt.Printf("%s  %s\n", info.Reference, info.ID)
+	}
+
+	// An image a box can still boot from cannot be removed.
+	if err := images.Remove(ctx, name); boxlite.IsInvalidState(err) {
+		fmt.Printf("refused: %v\n", strings.TrimSpace(err.Error()))
+	} else if err != nil {
+		return err
+	}
+
+	if err := rt.ForceRemove(ctx, boxID); err != nil {
+		return err
+	}
+	boxID = ""
+	if err := images.Remove(ctx, name); err != nil {
+		return err
+	}
+	if usage, err = images.Usage(ctx); err != nil {
+		return err
+	}
+	fmt.Printf("removed %s; holding %d images\n", name, usage.Count)
+	return nil
+}
+```
+
+```bash REST
+#!/usr/bin/env bash
+# manage_catalog.sh — read usage, list the catalog, and remove an image once no box needs it
+set -euo pipefail
+: "${BOXLITE_API_KEY:?Set BOXLITE_API_KEY to your blk_live_... key before running this.}"
+
+BOXLITE_REST_URL="${BOXLITE_REST_URL:-https://api.boxlite.ai}"
+AUTH=(-H "Authorization: Bearer ${BOXLITE_API_KEY}")
+NAME_PATH="docker.io%2Flibrary%2Falpine"
+
+# Print the digest of the version tag $1 names, once the catalog has recorded it.
+# The runner reports a started box's image on its next sync, about ten seconds
+# later, so poll for up to 30 seconds while the box is still running.
+recorded() {
+  local digest
+  for _ in $(seq 30); do
+    digest=$(curl -fsS "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}" "${AUTH[@]}" 2>/dev/null \
+      | jq -r --arg tag "$1" '.versions[] | select(.tags | index($tag)) | .digest' || true)
+    if [ -n "${digest}" ]; then echo "${digest}"; return 0; fi
+    sleep 1
+  done
+  echo "the version tagged $1 was not recorded within 30 seconds" >&2
+  return 1
+}
+
+BOX_ID=$(curl -fsS -X POST "${BOXLITE_REST_URL}/v1/boxes" "${AUTH[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"image\":\"docker.io/library/alpine:3.20\",\"name\":\"catalog-$(date +%s)\"}" | jq -r .box_id)
+recorded 3.20 >/dev/null
+
+curl -fsS "${BOXLITE_REST_URL}/v1/images/usage" "${AUTH[@]}" \
+  | jq -r '"holding \(.count) of \(.limit) images, \(.known_bytes) bytes declared"'
+curl -fsS "${BOXLITE_REST_URL}/v1/images" "${AUTH[@]}" | jq -r '.images[] | "\(.reference)  \(.id)"'
+
+# An image a box can still boot from cannot be removed: 409, naming the box.
+curl -sS -X DELETE "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}" "${AUTH[@]}" | jq -r '"refused: \(.message)"'
+
+curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${BOX_ID}?force=true" "${AUTH[@]}"
+curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/images/${NAME_PATH}" "${AUTH[@]}"
+curl -fsS "${BOXLITE_REST_URL}/v1/images/usage" "${AUTH[@]}" | jq -r '"removed; holding \(.count) images"'
+```
+
+</CodeGroup>
+
+```text Python output
+holding 1 of 20 images, 7451620 bytes declared
+docker.io/library/alpine:3.19  sha256:5cd72f301a291887075a70d8b14aed6ee228fc9fd8f65e1e7eaa072f2115efd6
+docker.io/library/alpine:3.20  sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d
+docker.io/library/alpine:stable  sha256:5cd72f301a291887075a70d8b14aed6ee228fc9fd8f65e1e7eaa072f2115efd6
+refused: invalid state: Image 'docker.io/library/alpine' cannot be removed while 1 box(es) can still boot from it: 9EzofXP9kIva
+removed docker.io/library/alpine; holding 0 images
+```
+
+## The console's images
+
+The console's **Base**, **Python**, and **Node.js** images — `base`, `python`, and `node` from code — are provided by BoxLite and shared by every organization. They are not part of your catalog: `list()` and `usage()` leave them out, and they do not count against your limit. `get()` on one of them answers with `curated` set and no versions. Removing one, or moving a tag of one, is refused.
+
+## API key permissions
+
+Each call needs a permission on the API key:
+
+| Call | Permission |
+|---|---|
+| `images.list()`, `images.get()`, `images.usage()` | `read:images` |
+| `images.move_tag()` | `write:images` |
+| `images.remove()` | `delete:images` |
+| `registries.list()` | `read:registries` |
+| `registries.create()` | `write:registries` |
+| `registries.remove()` | `delete:registries` |
+
+Creating a box records its image without any image permission. A key created before these permissions existed does not have them, and the call fails with a forbidden error (`403`). Create a new key in the console.
+
+## Errors
+
+| Situation | Python | Node.js `errorCode(err)` | Go |
+|---|---|---|---|
+| Pull failed, registry not allowed, bad reference, digest not a version, image limit reached | `InvalidArgumentError` | `invalid_argument` | `ErrInvalidArgument` |
+| Image or login not found | `NotFoundError` | `not_found` | `ErrNotFound` |
+| A login for that registry and prefix exists | `AlreadyExistsError` | `already_exists` | `ErrAlreadyExists` |
+| Image or login still in use by a box | `InvalidStateError` | `invalid_state` | `ErrInvalidState` |
+| Too many cold pulls in the window | `ResourceExhaustedError` | `resource_exhausted` | `ErrResourceExhausted` |
+| The key lacks the permission | `ConfigError` | `config_error` | `ErrConfig` |
+| `pull()`: "a REST runtime pulls an image when a box is created from it" | `UnsupportedError` | `unsupported` | `ErrUnsupported` |
+
+Over REST, the first six rows are `400`, `404`, `409` with the code `already_exists`, `409`, `429`, and `403`. There is no pull route.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Choose an image" icon="layer-group" href="/cloud/box-images">
+    The console's images, and which one to start from.
+  </Card>
+  <Card title="Cloud vs open source" icon="code-compare" href="/cloud/vs-opensource">
+    How images work on a self-hosted runtime, and every other difference.
+  </Card>
+</CardGroup>
