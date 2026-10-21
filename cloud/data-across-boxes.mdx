@@ -13,7 +13,31 @@ A box’s own disk dies with the box. A volume does not. This walks the proof en
 
 Every example reads both values from the environment, so nothing hard-codes a credential.
 
-The property that makes a volume worth using: write through the mount in one box, destroy that box, mount the same volume in a different box, and the data reads back. The volume is backed by managed storage, not by the box.
+## See it in six commands
+
+The whole proof, from a terminal. Box A writes, box A is destroyed, box B reads what A
+left behind:
+
+```bash
+boxlite volume create --name handoff-demo
+
+boxlite create python --name box-a -v handoff-demo:/data && boxlite start box-a
+boxlite exec box-a -- sh -c 'echo "produced by box A" > /data/handoff.txt'
+boxlite rm -f box-a                      # the box is gone, the volume is not
+
+boxlite create python --name box-b -v handoff-demo:/data && boxlite start box-b
+boxlite exec box-b -- cat /data/handoff.txt
+# produced by box A
+```
+
+`boxlite volume` talks to a REST server, so run `boxlite auth login` first — see
+[`boxlite volume`](/reference/cli#boxlite-volume).
+
+## Do the same from code
+
+The property that makes a volume worth using: write through the mount in one box,
+destroy that box, mount the same volume in a different box, and the data reads back.
+The volume is backed by managed storage, not by the box.
 
 <CodeGroup>
 
@@ -184,7 +208,19 @@ curl -fsS -X DELETE "${BOXLITE_REST_URL}/v1/boxes/${B}?force=true" "${AUTH[@]}"
 
 </CodeGroup>
 
-Only what you write **under the mount path** survives. A file written to the box's own filesystem outside `/data` goes away with the box.
+## Only what is under the mount path survives
+
+This is the part people get wrong. The volume is mounted at one path, and **only what
+you write under that path** outlives the box:
+
+| Where box A writes | After box A is destroyed |
+|---|---|
+| `/data/handoff.txt` — under the mount | Still there, readable from box B |
+| `/root/notes.txt` — the box's own disk | Gone |
+| `/tmp/anything` | Gone |
+
+If something you expected to survive did not, check which side of the mount path it was
+written to before suspecting the volume.
 
 ## Next steps
 

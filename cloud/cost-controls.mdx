@@ -6,7 +6,10 @@ description: "The two lifecycle controls that decide how long each half of a box
 
 Compute billing stops on its own. Disk billing does not. These are the controls that close that second loop.
 
-Two lifecycle controls decide how long each half of the bill runs, and their defaults pull in opposite directions:
+## Which half of the bill each control closes
+
+Two lifecycle controls decide how long each half of the bill runs, and their defaults
+pull in opposite directions:
 
 | Control | Default | What it does to your bill |
 |---|---|---|
@@ -15,7 +18,10 @@ Two lifecycle controls decide how long each half of the bill runs, and their def
 
 So by default you stop paying for compute automatically, and you pay for disk forever. Setting `auto_delete` closes that second loop.
 
-It must be larger than `auto_stop` when both are non-zero. This example gives a box 15 idle minutes to be reused, then deletes it an hour after it stops:
+## Cap a box's lifetime
+
+`auto_delete` must be larger than `auto_stop` when both are non-zero. This example gives
+a box 15 idle minutes to be reused, then deletes it an hour after it stops:
 
 <CodeGroup>
 
@@ -165,7 +171,28 @@ func main() {
 
 </CodeGroup>
 
-See [Lifecycle on Cloud](/cloud/box-lifecycle) for the full semantics of these fields, including how `auto_resume` brings a stopped box back.
+See [Lifecycle on Cloud](/cloud/box-lifecycle) for the full semantics of these fields,
+including how `auto_resume` brings a stopped box back.
+
+<Note>
+**From the CLI you can set only half of this.** `boxlite create` accepts `--auto-stop`,
+and takes a friendlier duration than the SDK — `30s`, `15m`, `2h`, `7d` rather than raw
+seconds:
+
+```bash
+boxlite create python --name worker --auto-stop 15m
+```
+
+`--auto-delete` is refused on a box made this way, because `boxlite create` makes a
+detached box:
+
+```
+Error: invalid argument: remove-on-stop is incompatible with detach=true.
+Detached boxes should use auto_delete=0 ... for manual lifecycle control.
+```
+
+To close the disk half of the bill, set `auto_delete` from an SDK, as above.
+</Note>
 
 ## Keep the data, drop the disk
 

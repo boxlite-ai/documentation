@@ -17,7 +17,17 @@ A tunnel moves bytes and interprets nothing along the way. When your service spe
 
 Every example reads both values from the environment, so nothing hard-codes a credential.
 
-`connect()` hands you the byte stream directly. This is the level you work at for a protocol that is not HTTP — a line protocol, a binary framing, a database wire protocol — or when you want full control over what goes on the wire.
+## Take the connection yourself
+
+`connect()` hands you the byte stream directly. This is the level you work at for a
+protocol that is not HTTP — a line protocol, a binary framing, a database wire
+protocol — or when you want full control over what goes on the wire.
+
+<Note>
+**`connect()` spends the tunnel.** So does `forward()`. Build a fresh
+`await box.network.tunnel(port)` for each connection you need; only `uri()` leaves a
+tunnel reusable.
+</Note>
 
 ```python
 # cloud_tunnel_bytes.py — talk to a non-HTTP TCP service inside a box
@@ -121,9 +131,24 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`read(max_bytes)` returns up to `max_bytes` bytes and an empty `bytes` object once the far side has closed. `max_bytes` of `0` raises `ValueError: max_bytes must be non-zero`, and reading after `close()` raises a BoxLite error carrying `connection is closed`.
+## Read until the far side closes
 
-A synchronous surface exists as well: `SyncBox.network` and `SyncBox.tunnel(port)` return the `SyncNetworkHandle` and `SyncTunnelForwarder` equivalents of the classes documented here.
+`read(max_bytes)` returns up to `max_bytes` bytes, and an **empty `bytes` object once
+the far side has closed** — that empty read is the end-of-stream signal the loop above
+breaks on. There is no separate EOF flag to check.
+
+| What you do | What happens |
+|---|---|
+| `read(n)` with data available | Up to `n` bytes |
+| `read(n)` after the far side closed | `b""` — stop reading |
+| `read(0)` | `ValueError: max_bytes must be non-zero` |
+| `read(n)` after your own `close()` | A BoxLite error carrying `connection is closed` |
+
+<Note>
+**Not using asyncio?** `SyncBox.network` and `SyncBox.tunnel(port)` return
+`SyncNetworkHandle` and `SyncTunnelForwarder`, the synchronous equivalents of
+everything on this page.
+</Note>
 
 ## Next steps
 
