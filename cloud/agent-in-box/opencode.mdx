@@ -1,0 +1,272 @@
+---
+title: "Deploy OpenCode on Cloud"
+sidebarTitle: "OpenCode"
+description: "Install OpenCode, connect a model provider, and run a task inside a Cloud box."
+---
+
+OpenCode runs its tools inside the box. Configure it with its native JSON file and submit a task through `boxlite exec`.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install OpenCode
+
+Save `create.py`. Before running it, replace `<YOUR_MODEL_HOST>` with your model endpoint's hostname, without the scheme or path. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                env=[("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt")],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Model provider API key: "),
+                    hosts=["<YOUR_MODEL_HOST>"],
+                )],
+            ),
+            name="opencode-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect opencode-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+Install the agent:
+
+```bash
+boxlite exec opencode-agent -- \
+  npm install -g --prefix /workspace/tools opencode-ai
+```
+
+## Configure OpenCode
+
+Save `opencode.json` locally. Keep the `apiKey` placeholder exactly as shown:
+
+```json opencode.json
+{
+  "model": "endpoint/<MODEL_ID>",
+  "permission": "allow",
+  "provider": {
+    "endpoint": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Model endpoint",
+      "options": {
+        "baseURL": "https://<YOUR_MODEL_HOST>/v1",
+        "apiKey": "<BOXLITE_SECRET:anthropic>"
+      },
+      "models": {
+        "<MODEL_ID>": {
+          "name": "My model"
+        }
+      }
+    }
+  }
+}
+```
+
+Use an OpenAI Chat Completions-compatible endpoint with tool support. Replace the API base URL and `<MODEL_ID>`, and set `Secret.hosts` in `create.py` to the endpoint hostname. For another provider, use [OpenCode's native provider configuration](https://opencode.ai/docs/providers/) and match the Secret's `hosts` to its API endpoint.
+
+`permission: "allow"` lets this trusted task use tools without interactive approval. The agent can use the model connection and access the files and network available inside its box. The real provider key remains outside it.
+
+Upload the placeholder-only configuration:
+
+```bash
+chmod 600 opencode.json
+boxlite cp opencode.json opencode-agent:/workspace/opencode.json
+boxlite exec opencode-agent -- chmod 600 /workspace/opencode.json
+```
+
+## Run a task
+
+```bash
+boxlite exec -e OPENCODE_CONFIG=/workspace/opencode.json -w /workspace opencode-agent -- sh -c '
+  exec /workspace/tools/bin/opencode run --format json \
+  "Run this exact shell command with your terminal tool: echo OPENCODE_READY > /workspace/proof.txt && cat /workspace/proof.txt" < /dev/null
+'
+boxlite exec opencode-agent -- cat /workspace/proof.txt
+# OPENCODE_READY
+```
+
+**OpenCode is ready.** Repeat the command with your own task. This example starts a new session for each call.
+
+## Optional: wake on a request
+
+OpenCode provides a [native HTTP server](https://opencode.ai/docs/server/). This walkthrough creates a separate `opencode-http` box and sends tasks through its session API.
+
+Run these commands on your workstation in the directory containing `opencode.json` from above. Automatic stop is optional: use `auto_stop=0` to keep the service running.
+
+### 1. Create the service box
+
+Save `create-http.py`, using the same model Secret and endpoint hostname as above:
+
+```python create-http.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=120, auto_resume=True, auto_delete=0, detach=True,
+                network=boxlite.NetworkSpec(inbound=boxlite.InboundNetworkSpec(mode="enabled")),
+                entrypoint=["/bin/sh", "-c"],
+                cmd=["""
+until test -x /workspace/tools/bin/opencode && test -s /workspace/opencode.json &&
+      test -s /workspace/server-password; do sleep 1; done
+export OPENCODE_SERVER_PASSWORD="$(cat /workspace/server-password)"
+export OPENCODE_CONFIG=/workspace/opencode.json
+cd /workspace
+exec /workspace/tools/bin/opencode serve --hostname 0.0.0.0 --port 4096 >> /workspace/http.log 2>&1
+"""],
+                env=[("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt")],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Model provider API key: "),
+                    hosts=["<YOUR_MODEL_HOST>"],
+                )],
+            ),
+            name="opencode-http",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect opencode-http before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create-http.py
+```
+
+The startup command waits for the installation and configuration, then starts OpenCode on every boot.
+
+### 2. Install and configure the server
+
+Generate a caller password locally. This password protects the HTTP API; it is separate from the model credential.
+
+```bash
+python3 - <<'PYTOKEN'
+import os
+import secrets
+from pathlib import Path
+os.umask(0o077)
+Path("server-password").write_text(secrets.token_hex(32))
+PYTOKEN
+boxlite exec opencode-http -- npm install -g --prefix /workspace/tools opencode-ai
+boxlite cp opencode.json opencode-http:/workspace/opencode.json
+boxlite cp server-password opencode-http:/workspace/server-password
+boxlite exec opencode-http -- chmod 600 /workspace/server-password
+boxlite network tunnel opencode-http 4096
+```
+
+Keep `server-password` outside Git. OpenCode reads this caller password inside the box; the real model key stays in BoxLite Secret.
+
+### 3. Create a session and run a task
+
+Set `OPENCODE_URL` to the HTTPS URL from the tunnel command. Keep this shell open for the wake check.
+
+```bash
+OPENCODE_URL='<YOUR_TUNNEL_URL>'
+curl --fail-with-body --max-time 30 "$OPENCODE_URL/global/health" \
+  -u "opencode:$(cat server-password)"
+```
+
+Retry the health request after a few seconds if the server is still starting. Create a session and save its ID:
+
+```bash
+curl --fail-with-body --max-time 60 "$OPENCODE_URL/session" \
+  -u "opencode:$(cat server-password)" \
+  -H 'Content-Type: application/json' -d '{}' > session.json
+SESSION_ID=$(python3 -c 'import json; print(json.load(open("session.json"))["id"])')
+```
+
+Send a task through the native message API:
+
+```bash
+curl --fail-with-body --max-time 240 "$OPENCODE_URL/session/$SESSION_ID/message" \
+  -u "opencode:$(cat server-password)" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"Run this exact shell command with your terminal tool: echo OPENCODE_HTTP_READY > /workspace/proof.txt && cat /workspace/proof.txt"}]}'
+boxlite exec opencode-http -- cat /workspace/proof.txt
+# OPENCODE_HTTP_READY
+```
+
+Check that the response has no `info.error` and that the independent file check prints the expected value.
+
+### 4. Wait for automatic stop
+
+Stop sending HTTP requests, including health checks. Use only this control-plane check until `Status` is `stopped`:
+
+```bash
+boxlite inspect opencode-http
+```
+
+Allow two idle minutes. Do not call `start`, `exec`, or `cp` before the next request.
+
+### 5. Wake the server, then submit a task
+
+Use an authenticated health request to wake the box and wait for OpenCode to be ready. This external request starts the box and its saved server command; do not call `start` or `exec` first.
+
+```bash
+curl --fail-with-body --max-time 15 --retry 5 --retry-all-errors --retry-delay 2 \
+  "$OPENCODE_URL/global/health" \
+  -u "opencode:$(cat server-password)"
+```
+
+This read-only health check retries startup failures and timeouts. Continue when it succeeds with `"healthy": true`; if it exhausts its retries, inspect the server before submitting a task. Then send a message to the existing session:
+
+
+```bash
+curl --fail-with-body --max-time 240 "$OPENCODE_URL/session/$SESSION_ID/message" \
+  -u "opencode:$(cat server-password)" \
+  -H 'Content-Type: application/json' \
+  -d '{"parts":[{"type":"text","text":"Run this exact shell command with your terminal tool: echo OPENCODE_HTTP_AWAKE > /workspace/awake.txt && cat /workspace/awake.txt"}]}'
+```
+
+The session is retained across the stop. After the task response, verify retained work and the new task:
+
+```bash
+boxlite exec opencode-http -- cat /workspace/proof.txt /workspace/awake.txt
+# OPENCODE_HTTP_READY
+# OPENCODE_HTTP_AWAKE
+```
+
+Leave it idle again and it stops automatically. Use the health request for cold startup: direct message submission during startup did not complete in this guide’s Cloud test. A task timeout can leave partial effects; inspect the session before resubmitting it.
+
+### 6. Clean up
+
+```bash
+boxlite rm --force opencode-http
+```
+
+## When you are finished
+
+```bash
+boxlite stop opencode-agent
+# To delete the box and its files:
+boxlite rm --force opencode-agent
+```

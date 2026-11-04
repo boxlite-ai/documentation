@@ -1,0 +1,62 @@
+---
+title: "Manually deploy an agent in a box"
+sidebarTitle: "Manual agent deployment"
+description: "Create a Cloud box, install your coding agent, and run a real task."
+---
+
+Your agent runs inside a Cloud box, with its own filesystem, shell, and network access. Install it, configure its model connection, and give it a task.
+
+Each guide creates a box with the native SDK, then uses the CLI and the agent's own configuration. Real model-provider keys stay outside the box. **An HTTP service and automatic stop/wake are optional additions.**
+
+## Choose your agent
+
+<CardGroup cols={2}>
+  <Card title="Claude Code" icon="robot" href="/cloud/agent-in-box/claude-code">
+    Install the CLI and run a coding task inside the box.
+  </Card>
+  <Card title="Codex" icon="code" href="/cloud/agent-in-box/codex">
+    Run Codex with a Responses-compatible model connection.
+  </Card>
+  <Card title="Pi" icon="circle-nodes" href="/cloud/agent-in-box/pi">
+    Configure a model provider and use Pi's file and shell tools.
+  </Card>
+  <Card title="OpenCode" icon="box-open" href="/cloud/agent-in-box/opencode">
+    Bring your provider configuration and run OpenCode in the box.
+  </Card>
+  <Card title="Hermes" icon="feather" href="/cloud/agent-in-box/hermes">
+    Use the official image and Hermes Gateway's native HTTP API.
+  </Card>
+</CardGroup>
+
+## Before you start
+
+Install the [Cloud CLI and Python SDK](/cloud/quickstart), and configure the native Cloud variables `BOXLITE_REST_URL` and `BOXLITE_API_KEY` on your workstation. Both SDK and CLI use that connection. Keep the Cloud API key outside the box.
+
+Each `create.py` asks for your SiliconFlow key without echoing it. The SDK sends that value only as a host-scoped `Secret`; files copied into the box contain `<BOXLITE_SECRET:siliconflow>` instead.
+
+```text
+Agent or model bridge in the box     BoxLite egress proxy       SiliconFlow
+Authorization: Bearer <placeholder> → inject for allowed host → real credential
+```
+
+The agent can call the model, but its configuration does not contain the real provider key. `hosts=["api.siliconflow.com"]` limits where substitution occurs; it does not replace an [egress allowlist](/cloud/network-policy).
+
+Python and Node clients use the system CA bundle specified in each create script, so TLS verification includes BoxLite's proxy certificate. Do not disable certificate verification. See [Secret behavior and parameters](/manage-sandbox/secrets-and-security).
+
+The examples use SiliconFlow and `Qwen/Qwen3.5-9B`. Claude Code and Codex need the [protocol bridge](/cloud/agent-in-box/model-bridge) for this provider. With a native protocol endpoint, configure its own host-scoped secret instead.
+
+`auto_stop=0` keeps the box running, and `auto_delete=0` retains its disk after stopping. Stop it when finished, or choose another [lifecycle policy](/cloud/box-lifecycle). HTTP serving and automatic stop/wake remain optional.
+
+<Note>
+  These examples were verified with real model calls and file tools. Acceptance also checked host-scoped injection, relevant guest files and process environments, and Secret substitution after the optional Hermes restart.
+</Note>
+
+## Add only what you need
+
+| You want to | Continue with |
+|---|---|
+| Wake an HTTP agent service when a request arrives | [Optional HTTP wake-up](/cloud/agent-in-box/http-entrypoint) |
+| Restore a service when its box starts | [Save its startup command](/cloud/agent-in-box/http-entrypoint#save-the-services-startup-command) |
+| Connect Claude Code or Codex to SiliconFlow | [Optional model protocol bridge](/cloud/agent-in-box/model-bridge) |
+| Keep files when replacing the box | [Data across boxes](/cloud/data-across-boxes) |
+| Run an agent on your own hardware | [Open-source Agent in a box](/agent-in-box/index) |

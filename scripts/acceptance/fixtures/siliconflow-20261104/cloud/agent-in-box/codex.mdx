@@ -1,0 +1,135 @@
+---
+title: "Deploy Codex on Cloud"
+sidebarTitle: "Codex"
+description: "Install Codex, configure a Responses-compatible provider, and run a task inside a Cloud box."
+---
+
+Codex runs inside the box with access to its files and shell. Submit a task directly through `boxlite exec`.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install Codex
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                entrypoint=["/bin/sh", "-c"],
+                cmd=["""
+until test -x /workspace/bridge/venv/bin/litellm &&
+      test -s /workspace/bridge/bridge.yaml &&
+      test -s /workspace/bridge/bridge_hooks.py; do sleep 1; done
+exec /workspace/bridge/venv/bin/litellm --config /workspace/bridge/bridge.yaml \
+  --host 127.0.0.1 --port 4000 >> /workspace/bridge/bridge.log 2>&1
+"""],
+                env=[
+                    ("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("PYTHONPATH", "/workspace/bridge"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="siliconflow",
+                    value=getpass("SiliconFlow API key: "),
+                    hosts=["api.siliconflow.com"],
+                )],
+            ),
+            name="codex-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect codex-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+The saved startup command waits for the bridge files installed below, then starts LiteLLM on loopback. It also restores the bridge after a box restart.
+
+Install the agent:
+
+```bash
+boxlite exec codex-agent -- \
+  npm install -g --prefix /workspace/tools @openai/codex
+boxlite exec codex-agent -- mkdir -p /workspace/codex
+```
+
+The `node` image includes glibc and system CA certificates, which the native Codex binary needs.
+
+## Configure Codex
+
+Codex requires Responses. For this SiliconFlow example, complete the [model protocol bridge setup](/cloud/agent-in-box/model-bridge), then save `config.toml`:
+
+```toml config.toml
+model = "agent-model"
+model_provider = "gateway"
+
+[model_providers.gateway]
+name = "Model gateway"
+base_url = "http://127.0.0.1:4000/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+```
+
+Save the local bridge credential separately:
+
+```bash codex.env
+OPENAI_API_KEY='<YOUR_RANDOM_BRIDGE_KEY>'
+```
+
+These are [Codex's native provider settings](https://learn.chatgpt.com/docs/config-file/config-reference). The bridge stores only `<BOXLITE_SECRET:siliconflow>` for upstream requests. Its local caller key is not your provider key.
+
+Keep both files outside Git and upload them:
+
+```bash
+chmod 600 config.toml codex.env
+boxlite cp config.toml codex-agent:/workspace/codex/config.toml
+boxlite cp codex.env codex-agent:/workspace/codex.env
+boxlite exec codex-agent -- chmod 600 /workspace/codex/config.toml /workspace/codex.env
+```
+
+## Run a task
+
+```bash
+boxlite exec -e CODEX_HOME=/workspace/codex -w /workspace codex-agent -- sh -c '
+  set -a
+  . /workspace/codex.env
+  set +a
+  exec /workspace/tools/bin/codex exec --skip-git-repo-check \
+    --dangerously-bypass-approvals-and-sandbox --json \
+    "Run this exact shell command with your terminal tool: echo CODEX_READY > /workspace/proof.txt && cat /workspace/proof.txt" < /dev/null
+'
+boxlite exec codex-agent -- cat /workspace/proof.txt
+# CODEX_READY
+```
+
+Codex's internal sandbox and approval prompts are disabled for this trusted task inside the Cloud box. Its files, local service credentials, and allowed network remain accessible to the agent.
+
+**Codex is ready.** Check for `turn.failed` events and verify the file before treating a task as successful.
+
+The verified model connection used SiliconFlow's `Qwen/Qwen3.5-9B` through the protocol bridge.
+
+## When you are finished
+
+```bash
+boxlite stop codex-agent
+# To delete the box and its files:
+boxlite rm --force codex-agent
+```
+
+Your application can invoke the same agent command through [Cloud SDK](/cloud/box-from-code). For an agent with a native HTTP service, see [optional request-triggered startup](/cloud/agent-in-box/http-entrypoint).

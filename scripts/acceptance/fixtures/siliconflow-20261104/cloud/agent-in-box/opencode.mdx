@@ -1,0 +1,115 @@
+---
+title: "Deploy OpenCode on Cloud"
+sidebarTitle: "OpenCode"
+description: "Install OpenCode, connect a model provider, and run a task inside a Cloud box."
+---
+
+OpenCode runs its tools inside the box. Configure it with its native JSON file and submit a task through `boxlite exec`.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install OpenCode
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                env=[("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt")],
+                secrets=[boxlite.Secret(
+                    name="siliconflow",
+                    value=getpass("SiliconFlow API key: "),
+                    hosts=["api.siliconflow.com"],
+                )],
+            ),
+            name="opencode-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect opencode-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+Install the agent:
+
+```bash
+boxlite exec opencode-agent -- \
+  npm install -g --prefix /workspace/tools opencode-ai
+```
+
+## Configure OpenCode
+
+Save `opencode.json` locally. Keep the `apiKey` placeholder exactly as shown:
+
+```json opencode.json
+{
+  "model": "siliconflow/Qwen/Qwen3.5-9B",
+  "permission": "allow",
+  "provider": {
+    "siliconflow": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://api.siliconflow.com/v1",
+        "apiKey": "<BOXLITE_SECRET:siliconflow>"
+      },
+      "models": {
+        "Qwen/Qwen3.5-9B": {
+          "name": "Qwen/Qwen3.5-9B",
+          "limit": {"context": 128000, "output": 4096}
+        }
+      }
+    }
+  }
+}
+```
+
+`permission: "allow"` lets this trusted task use tools without interactive approval. The agent can use the model connection and access the files and network available inside its box. The real provider key remains outside it.
+
+Upload the placeholder-only configuration:
+
+```bash
+chmod 600 opencode.json
+boxlite cp opencode.json opencode-agent:/workspace/opencode.json
+boxlite exec opencode-agent -- chmod 600 /workspace/opencode.json
+```
+
+## Run a task
+
+```bash
+boxlite exec -e OPENCODE_CONFIG=/workspace/opencode.json -w /workspace opencode-agent -- sh -c '
+  exec /workspace/tools/bin/opencode run --format json \
+  "Run this exact shell command with your terminal tool: echo OPENCODE_READY > /workspace/proof.txt && cat /workspace/proof.txt" < /dev/null
+'
+boxlite exec opencode-agent -- cat /workspace/proof.txt
+# OPENCODE_READY
+```
+
+**OpenCode is ready.** Repeat the command with your own task. This example starts a new session for each call.
+
+## When you are finished
+
+```bash
+boxlite stop opencode-agent
+# To delete the box and its files:
+boxlite rm --force opencode-agent
+```
+
+Your application can invoke the same agent command through [Cloud SDK](/cloud/box-from-code). For an agent with a native HTTP service, see [optional request-triggered startup](/cloud/agent-in-box/http-entrypoint).

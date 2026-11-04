@@ -1,0 +1,14 @@
+{"info":{"parentID":"msg_1a61ba122001UhvbsDAm9pXlsW","role":"assistant","mode":"build","agent":"build","path":{"cwd":"/workspace","root":"/"},"cost":0,"tokens":{"total":8200,"input":8177,"output":2,"reasoning":21,"cache":{"write":0,"read":0}},"modelID":"Qwen/Qwen3.5-9B","providerID":"endpoint","time":{"created":1793788194223,"completed":1793788196323},"finish":"stop","id":"msg_1a61badaf001TPCgELDCOzdwr4","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n"},"parts":[{"type":"step-start","id":"prt_1a61bb463001D40pbRHlrYXNiQ","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a61badaf001TPCgELDCOzdwr4"},{"type":"reasoning","text":"The command executed successfully. The proof.txt file contains \"OPENCODE_HTTP_READY\" as expected.\n","time":{"start":1793788195942,"end":1793788196280},"id":"prt_1a61bb466001bZtqtDrARKHEAQ","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a61badaf001TPCgELDCOzdwr4"},{"type":"text","text":"\n\nDone","time":{"start":1793788196284,"end":1793788196312},"id":"prt_1a61bb5bc001opuKXCadmhp8Tp","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a61badaf001TPCgELDCOzdwr4"},{"reason":"stop","type":"step-finish","tokens":{"total":8200,"input":8177,"output":2,"reasoning":21,"cache":{"write":0,"read":0}},"cost":0,"id":"prt_1a61bb5dd001t91OtD6RqJN0oX","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a61badaf001TPCgELDCOzdwr4"}]}OPENCODE_HTTP_READY
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   166    0     0  100   166      0     93  0:00:01  0:00:01 --:--:--    93
+100   166    0     0  100   166      0     59  0:00:02  0:00:02 --:--:--    59
+100   166    0     0  100   166      0     43  0:00:03  0:00:03 --:--:--    43
+100   166    0     0  100   166      0     34  0:00:04  0:00:04 --:--:--    34
+100   166    0     0  100   166      0     28  0:00:05  0:00:05 --:--:--    33
+100   166    0     0  100   166      0     24  0:00:06  0:00:06 --:--:--     0
+100  1572    0  1406  100   166    201     23  0:00:07  0:00:06  0:00:01   335

@@ -1,0 +1,16 @@
+{"ok":true,"events":[{"type":"thread.started","thread_id":"01a1a617-6654-7fd0-9e5d-6292c763d034"},{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `agent-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}},{"type":"turn.started"},{"type":"item.completed","item":{"id":"item_1","type":"reasoning","text":"User wants me to run a specific shell command to create a file and display its contents. I'll execute this command using the exec_command tool.\n"}},{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"\n\n"}},{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'echo CODEX_HTTP_AWAKE > /workspace/awake.txt && cat /workspace/awake.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}},{"type":"item.completed","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'echo CODEX_HTTP_AWAKE > /workspace/awake.txt && cat /workspace/awake.txt'","aggregated_output":"CODEX_HTTP_AWAKE\n","exit_code":0,"status":"completed"}},{"type":"item.completed","item":{"id":"item_4","type":"reasoning","text":"The command executed successfully - it created awake.txt containing 'CODEX_HTTP_AWAKE' and echoed it back. I should confirm this to the user.\n"}},{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"\n\nDone. Created `/workspace/awake.txt` containing `CODEX_HTTP_AWAKE` and displayed it."}},{"type":"turn.completed","usage":{"input_tokens":17541,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":136,"reasoning_output_tokens":64}}]}
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   139    0     0  100   139      0     84  0:00:01  0:00:01 --:--:--    84
+100   139    0     0  100   139      0     52  0:00:02  0:00:02 --:--:--    52
+100   139    0     0  100   139      0     38  0:00:03  0:00:03 --:--:--    38
+100   139    0     0  100   139      0     29  0:00:04  0:00:04 --:--:--    29
+100   139    0     0  100   139      0     24  0:00:05  0:00:05 --:--:--    24
+100   139    0     0  100   139      0     20  0:00:06  0:00:06 --:--:--     0
+100   139    0     0  100   139      0     18  0:00:07  0:00:07 --:--:--     0
+100   139    0     0  100   139      0     16  0:00:08  0:00:08 --:--:--     0
+100   139    0     0  100   139      0     14  0:00:09  0:00:09 --:--:--     0
+100   139    0     0  100   139      0     13  0:00:10  0:00:10 --:--:--     0
+100  1812    0  1673  100   139    156     12  0:00:11  0:00:10  0:00:01   414

@@ -1,0 +1,123 @@
+---
+title: "Deploy Hermes on Cloud"
+sidebarTitle: "Hermes"
+description: "Run the official Hermes image and send tasks through its native Gateway API."
+---
+
+The official Hermes image includes its runtime, tools, and Gateway. Configure Hermes directly, then send a request to its native HTTP API.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="docker.io/nousresearch/hermes-agent@sha256:a11574b7fe8e1631d7d88d556677dac693bc058abf558cdeb899155688c1bf05",
+                cpus=2, memory_mib=4096, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                cmd=["gateway", "run"],
+                network=boxlite.NetworkSpec(inbound=boxlite.InboundNetworkSpec(mode="enabled")),
+                env=[("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")],
+                secrets=[boxlite.Secret(
+                    name="siliconflow",
+                    value=getpass("SiliconFlow API key: "),
+                    hosts=["api.siliconflow.com"],
+                )],
+            ),
+            name="hermes-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect hermes-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+The official image entrypoint and `gateway run` restore Gateway on every boot. This image digest was used for verification.
+
+## Configure Hermes
+
+Save these two files on your workstation. The provider key remains a BoxLite placeholder. `API_SERVER_KEY` is a separate credential for callers of your Gateway.
+
+```yaml config.yaml
+model:
+  provider: custom
+  default: Qwen/Qwen3.5-9B
+  base_url: https://api.siliconflow.com/v1
+  api_mode: chat_completions
+  key_env: OPENAI_API_KEY
+terminal:
+  backend: local
+```
+
+```bash .env
+OPENAI_API_KEY='<BOXLITE_SECRET:siliconflow>'
+OPENAI_BASE_URL='https://api.siliconflow.com/v1'
+API_SERVER_ENABLED=true
+API_SERVER_HOST=0.0.0.0
+API_SERVER_PORT=8642
+API_SERVER_KEY='<YOUR_RANDOM_GATEWAY_KEY>'
+```
+
+Use a separate random key for Gateway callers. You can generate one with `python3 -c 'import secrets; print(secrets.token_hex(32))'`.
+
+Keep these files outside Git. Upload them and set ownership for Hermes:
+
+```bash
+chmod 600 config.yaml .env
+boxlite cp config.yaml hermes-agent:/opt/data/config.yaml
+boxlite cp .env hermes-agent:/opt/data/.env
+boxlite exec hermes-agent -- sh -c \
+  'chown 10000:10000 /opt/data/config.yaml /opt/data/.env && chmod 600 /opt/data/config.yaml /opt/data/.env'
+boxlite restart hermes-agent
+boxlite network tunnel hermes-agent 8642
+```
+
+## Send a task
+
+Replace `<YOUR_TUNNEL_URL>` with the returned URL. Load the Gateway credential from your local `.env`:
+
+```bash
+. ./.env
+curl --fail-with-body --max-time 300 '<YOUR_TUNNEL_URL>/v1/chat/completions' \
+  -H "Authorization: Bearer $API_SERVER_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"hermes-agent","messages":[{"role":"user","content":"Run this exact shell command with your terminal tool: echo HERMES_READY > /opt/data/proof.txt && cat /opt/data/proof.txt"}],"stream":false,"model_options":{"reasoning":{"enabled":false}}}'
+boxlite exec hermes-agent -- cat /opt/data/proof.txt
+# HERMES_READY
+```
+
+Wait for Gateway to become ready after the restart. A successful task has `finish_reason: "stop"` and the expected file content.
+
+**Hermes is ready.** Any client supporting its [Gateway API](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server) can submit tasks. No example-specific request client is required.
+
+## Optional: stop when idle and wake on a request
+
+To use this mode, set `auto_stop=120` instead of `auto_stop=0` in `create.py`. Follow [the HTTP wake-up check](/cloud/agent-in-box/http-entrypoint#optional-stop-and-wake) after the first task succeeds.
+
+Keep `auto_stop=0` and skip that check if you want the service to stay running.
+
+## When you are finished
+
+```bash
+boxlite stop hermes-agent
+# To delete the box and its files:
+boxlite rm --force hermes-agent
+```

@@ -1,0 +1,79 @@
+[
+  {
+    "uid": 1001,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/awake.txt",
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/workspace/codex/queue_1.sqlite",
+      "/workspace/codex/goals_1.sqlite",
+      "/workspace/codex/installation_id",
+      "/workspace/codex/state_5.sqlite",
+      "/workspace/codex/thread_history_1.sqlite",
+      "/workspace/codex/logs_2.sqlite",
+      "/workspace/codex/memories_1.sqlite",
+      "/workspace/codex/config.toml",
+      "/workspace/codex/.sandbox_migration",
+      "/workspace/codex/.sqlite-maintenance.lock",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-20-56-01a1a613-772e-7e43-8fa7-db217f2f5e03.jsonl",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-25-13-01a1a617-6654-7fd0-9e5d-6292c763d034.jsonl",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-16-02-01a1a60e-fc91-74d1-92ae-69ceae60907c.jsonl",
+      "/workspace/codex/thread-writer-locks/.coordination.lock",
+      "/workspace/codex/shell_snapshots/01a1a60e-fc91-74d1-92ae-69ceae60907c.1793787362455100858.sh",
+      "/workspace/codex/.tmp/plugins.sha",
+      "/workspace/codex/.tmp/plugins.sync.lock"
+    ],
+    "processes": [
+      "/proc/1/environ",
+      "/proc/83/environ"
+    ],
+    "unreadable": [
+      "/root/.claude",
+      "/root/.codex",
+      "/root/.pi",
+      "/root/.hermes",
+      "/root/.local/share/opencode",
+      "/root/.config/opencode"
+    ],
+    "skipped": []
+  },
+  {
+    "uid": 0,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/awake.txt",
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/workspace/codex/queue_1.sqlite",
+      "/workspace/codex/goals_1.sqlite",
+      "/workspace/codex/installation_id",
+      "/workspace/codex/state_5.sqlite",
+      "/workspace/codex/thread_history_1.sqlite",
+      "/workspace/codex/logs_2.sqlite",
+      "/workspace/codex/memories_1.sqlite",
+      "/workspace/codex/config.toml",
+      "/workspace/codex/.sandbox_migration",
+      "/workspace/codex/.sqlite-maintenance.lock",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-20-56-01a1a613-772e-7e43-8fa7-db217f2f5e03.jsonl",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-25-13-01a1a617-6654-7fd0-9e5d-6292c763d034.jsonl",
+      "/workspace/codex/sessions/2026/11/04/rollout-2026-11-04T10-16-02-01a1a60e-fc91-74d1-92ae-69ceae60907c.jsonl",
+      "/workspace/codex/thread-writer-locks/.coordination.lock",
+      "/workspace/codex/shell_snapshots/01a1a60e-fc91-74d1-92ae-69ceae60907c.1793787362455100858.sh",
+      "/workspace/codex/.tmp/plugins.sha",
+      "/workspace/codex/.tmp/plugins.sync.lock"
+    ],
+    "processes": [
+      "/proc/86/environ"
+    ],
+    "unreadable": [
+      "/proc/1/environ",
+      "/proc/85/environ"
+    ],
+    "skipped": []
+  }
+]

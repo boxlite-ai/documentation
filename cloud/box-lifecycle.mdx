@@ -86,7 +86,9 @@ Pass this helper a box you already created and started, using the pattern in [Cr
 
 Resume is on by default — the console switch starts on, and `auto_resume` defaults to `true` over the API. With it enabled, a stopped box comes back on its own when you reach for it:
 
-> SDK exec, file operations and terminal attach wake a stopped box. Preview URL traffic keeps a running box alive but cannot wake a stopped one.
+SDK exec, file operations, and terminal attach can wake a stopped box. Requests to a registered HTTPS service URL can also start the box and reach its saved startup service. See the [Hermes Gateway walkthrough](/cloud/agent-in-box/hermes#optional-wake-on-a-request).
+
+Waking a stopped box starts new guest processes with the retained disk. It does not restore process memory; a service must have a saved startup command.
 
 This is what makes a named Cloud box feel durable: your script calls `exec` after a weekend, the box restarts with its disk intact, and your code carries on. Enable it for any box you intend to reuse. Leave it off when a stop should be final until you intervene.
 

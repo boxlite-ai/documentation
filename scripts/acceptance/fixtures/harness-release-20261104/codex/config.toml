@@ -1,0 +1,8 @@
+model = "<MODEL_ID>"
+model_provider = "endpoint"
+
+[model_providers.endpoint]
+name = "Model endpoint"
+base_url = "https://<YOUR_MODEL_HOST>/v1"
+wire_api = "responses"
+env_key = "CODEX_API_KEY"

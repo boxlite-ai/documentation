@@ -1,0 +1,120 @@
+---
+title: "Deploy Pi on Cloud"
+sidebarTitle: "Pi"
+description: "Install Pi, configure its model provider, and run a tool task inside a Cloud box."
+---
+
+Pi reads, writes, and executes commands inside the box. This example connects it directly to SiliconFlow.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install Pi
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                env=[("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt")],
+                secrets=[boxlite.Secret(
+                    name="siliconflow",
+                    value=getpass("SiliconFlow API key: "),
+                    hosts=["api.siliconflow.com"],
+                )],
+            ),
+            name="pi-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect pi-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+Install the agent:
+
+```bash
+boxlite exec pi-agent -- \
+  npm install -g --ignore-scripts --prefix /workspace/tools @earendil-works/pi-coding-agent
+boxlite exec pi-agent -- mkdir -p /workspace/pi
+```
+
+## Configure Pi
+
+Save `models.json` on your workstation. Keep the `apiKey` placeholder exactly as shown; BoxLite substitutes it on requests to SiliconFlow.
+
+```json models.json
+{
+  "providers": {
+    "siliconflow": {
+      "baseUrl": "https://api.siliconflow.com/v1",
+      "api": "openai-completions",
+      "apiKey": "<BOXLITE_SECRET:siliconflow>",
+      "models": [
+        {
+          "id": "Qwen/Qwen3.5-9B",
+          "reasoning": true,
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "compat": {"supportsDeveloperRole": false, "thinkingFormat": "qwen"}
+        }
+      ]
+    }
+  }
+}
+```
+
+The Qwen thinking format lets `--thinking off` disable backend reasoning for this model.
+
+Upload the placeholder-only configuration:
+
+```bash
+chmod 600 models.json
+boxlite cp models.json pi-agent:/workspace/pi/models.json
+boxlite exec pi-agent -- chmod 600 /workspace/pi/models.json
+```
+
+The agent sees the placeholder, not the provider key. For other providers, match the secret's `hosts` to the provider endpoint and use [Pi's provider configuration](/agent-in-box/run-pi#custom-or-self-hosted-endpoints).
+
+## Run a task
+
+```bash
+boxlite exec -e PI_CODING_AGENT_DIR=/workspace/pi pi-agent -- sh -c '
+  exec /workspace/tools/bin/pi --provider siliconflow --model Qwen/Qwen3.5-9B \
+  --mode json --no-session --thinking off -p \
+  "Use your tools to write PI_READY to /workspace/proof.txt, then read it back." < /dev/null
+'
+boxlite exec pi-agent -- cat /workspace/proof.txt
+# PI_READY
+```
+
+Check the file and Pi's output. A JSON `stopReason: "error"` means the model request failed, even if the CLI exited with code zero.
+
+**Pi is ready.** Repeat the `exec` command with your own task. `--no-session` makes each call an independent turn.
+
+## When you are finished
+
+```bash
+boxlite stop pi-agent
+# To delete the box and its files:
+boxlite rm --force pi-agent
+```
+
+Your application can invoke the same agent command through [Cloud SDK](/cloud/box-from-code). For an agent with a native HTTP service, see [optional request-triggered startup](/cloud/agent-in-box/http-entrypoint).

@@ -1,0 +1,57 @@
+[
+  {
+    "uid": 1001,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/opencode.json",
+      "/workspace/server-password",
+      "/home/boxlite/.local/share/opencode/opencode.db-shm",
+      "/home/boxlite/.local/share/opencode/opencode.db-wal",
+      "/home/boxlite/.local/share/opencode/opencode.db",
+      "/home/boxlite/.local/share/opencode/log/opencode.log",
+      "/home/boxlite/.config/opencode/.gitignore",
+      "/home/boxlite/.config/opencode/package-lock.json",
+      "/home/boxlite/.config/opencode/package.json"
+    ],
+    "processes": [
+      "/proc/1/environ",
+      "/proc/27/environ"
+    ],
+    "unreadable": [
+      "/root/.claude",
+      "/root/.codex",
+      "/root/.pi",
+      "/root/.hermes",
+      "/root/.local/share/opencode",
+      "/root/.config/opencode"
+    ],
+    "skipped": []
+  },
+  {
+    "uid": 0,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/opencode.json",
+      "/workspace/server-password",
+      "/home/boxlite/.local/share/opencode/opencode.db-shm",
+      "/home/boxlite/.local/share/opencode/opencode.db-wal",
+      "/home/boxlite/.local/share/opencode/opencode.db",
+      "/home/boxlite/.local/share/opencode/log/opencode.log",
+      "/home/boxlite/.config/opencode/.gitignore",
+      "/home/boxlite/.config/opencode/package-lock.json",
+      "/home/boxlite/.config/opencode/package.json"
+    ],
+    "processes": [
+      "/proc/31/environ"
+    ],
+    "unreadable": [
+      "/proc/1/environ",
+      "/proc/30/environ"
+    ],
+    "skipped": []
+  }
+]

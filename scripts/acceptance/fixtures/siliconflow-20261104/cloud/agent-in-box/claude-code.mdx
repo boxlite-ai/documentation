@@ -1,0 +1,121 @@
+---
+title: "Deploy Claude Code on Cloud"
+sidebarTitle: "Claude Code"
+description: "Install Claude Code, configure its model connection, and run a task inside a Cloud box."
+---
+
+Run Claude Code inside a Cloud box. The CLI performs file and shell operations there, and `boxlite exec` returns its output.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install Claude Code
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                entrypoint=["/bin/sh", "-c"],
+                cmd=["""
+until test -x /workspace/bridge/venv/bin/litellm &&
+      test -s /workspace/bridge/bridge.yaml &&
+      test -s /workspace/bridge/bridge_hooks.py; do sleep 1; done
+exec /workspace/bridge/venv/bin/litellm --config /workspace/bridge/bridge.yaml \
+  --host 127.0.0.1 --port 4000 >> /workspace/bridge/bridge.log 2>&1
+"""],
+                env=[
+                    ("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("PYTHONPATH", "/workspace/bridge"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="siliconflow",
+                    value=getpass("SiliconFlow API key: "),
+                    hosts=["api.siliconflow.com"],
+                )],
+            ),
+            name="claude-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect claude-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+The saved startup command waits for the bridge files installed below, then starts LiteLLM on loopback. It also restores the bridge after a box restart.
+
+Install the agent:
+
+```bash
+boxlite exec claude-agent -- \
+  npm install -g --prefix /workspace/tools @anthropic-ai/claude-code
+```
+
+The `node` image runs as the non-root `boxlite` user. Claude Code requires a non-root user for permission-bypass mode.
+
+## Connect your model
+
+Claude Code requires Anthropic Messages. For this SiliconFlow example, complete the [model protocol bridge setup](/cloud/agent-in-box/model-bridge), then save its local connection as `claude.env`:
+
+```bash claude.env
+ANTHROPIC_BASE_URL='http://127.0.0.1:4000'
+ANTHROPIC_AUTH_TOKEN='<YOUR_RANDOM_BRIDGE_KEY>'
+ANTHROPIC_MODEL='agent-model'
+```
+
+The bridge holds only `<BOXLITE_SECRET:siliconflow>` for upstream authentication. The random bridge key authenticates local callers; it is not your provider key.
+
+Keep the credential file outside Git, then copy it into the box:
+
+```bash
+chmod 600 claude.env
+boxlite cp claude.env claude-agent:/workspace/claude.env
+boxlite exec claude-agent -- chmod 600 /workspace/claude.env
+```
+
+## Run a task
+
+```bash
+boxlite exec -w /workspace claude-agent -- sh -c '
+  set -a
+  . /workspace/claude.env
+  set +a
+  exec /workspace/tools/bin/claude --permission-mode bypassPermissions --output-format json -p \
+    "Run this exact shell command with your terminal tool: echo CLAUDE_READY > /workspace/proof.txt && cat /workspace/proof.txt" < /dev/null
+'
+boxlite exec claude-agent -- cat /workspace/proof.txt
+# CLAUDE_READY
+```
+
+Permission-bypass mode lets the task execute unattended inside the box. Use it for trusted tasks: the agent can use the model connection and access the files, local service credentials, and network available there.
+
+**Claude Code is ready.** Replace the prompt with your own task. Check `is_error` in the JSON response as well as the actual file.
+
+The verified run used `Qwen/Qwen3.5-9B` through the protocol bridge. This verifies the Claude Code CLI with that backend; it is not a Claude-model benchmark.
+
+## When you are finished
+
+```bash
+boxlite stop claude-agent
+# To delete the box and its files:
+boxlite rm --force claude-agent
+```
+
+Your application can invoke the same agent command through [Cloud SDK](/cloud/box-from-code). For an agent with a native HTTP service, see [optional request-triggered startup](/cloud/agent-in-box/http-entrypoint).

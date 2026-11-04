@@ -110,7 +110,7 @@ One isolation property is worth stating on its own: **two boxes serving on the s
 
 Three properties of this path to design around.
 
-**A `CONNECT` to a stopped box can be accepted before the stream fails.** A successful connect is not proof that the box is running — the accept can land and the stream fail immediately afterwards. Treat your first successful read or write as the readiness signal. Tunnel traffic also does not wake a stopped box: the console is explicit that preview traffic keeps a running box alive but does not wake a stopped one, so start the box yourself and check [Stop when idle](/cloud/box-lifecycle#stop-when-idle) if it stops under you.
+**A `CONNECT` to a stopped box can be accepted before the stream fails.** A successful connect is not proof that the box is running — the accept can land and the stream fail immediately afterwards. Treat your first successful read or write as the readiness signal. For this raw `CONNECT` path, start the box first and check [Stop when idle](/cloud/box-lifecycle#stop-when-idle) if it stops under you. Registered HTTPS service URLs also support [request-triggered startup](/cloud/agent-in-box/hermes#optional-wake-on-a-request); the Hermes guide walks through that service path.
 
 **A response can be lost after `shutdown_write()`.** TCP half-close is not carried end to end, so a guest that waits for end-of-input before it replies may never reply, and a reply already in flight can be dropped. Use a protocol that frames its own messages — a newline, a length prefix, `Content-Length` — instead of one that signals "done" with EOF.
 

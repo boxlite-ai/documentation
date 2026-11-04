@@ -1,0 +1,115 @@
+---
+title: "Connect SiliconFlow to Claude Code or Codex"
+sidebarTitle: "Optional model bridge"
+description: "Adapt SiliconFlow Chat Completions for an agent that requires Anthropic Messages or Responses."
+---
+
+Use this only when your model provider's protocol differs from the agent's. Claude Code requires Anthropic Messages; Codex requires Responses. The tested SiliconFlow endpoint serves Chat Completions.
+
+LiteLLM performs the protocol translation inside the box. It sends the BoxLite placeholder upstream; BoxLite substitutes the real key outside the guest. **This is provider compatibility setup, not a BoxLite deployment requirement.** Skip it when your endpoint already speaks the required protocol.
+
+## Save the bridge configuration
+
+Create `bridge.yaml` locally. Keep the upstream placeholder unchanged and use a separate random key for the loopback bridge:
+
+```yaml bridge.yaml
+model_list:
+  - model_name: agent-model
+    litellm_params:
+      model: custom_openai/Qwen/Qwen3.5-9B
+      api_base: https://api.siliconflow.com/v1
+      api_key: "<BOXLITE_SECRET:siliconflow>"
+litellm_settings:
+  drop_params: true
+  openai_system_messages_first: true
+general_settings:
+  master_key: <YOUR_RANDOM_BRIDGE_KEY>
+```
+
+Generate a bridge key with `python3 -c 'import secrets; print("sk-" + secrets.token_hex(32))'`. LiteLLM requires a strong master key even on loopback.
+
+Download the [SiliconFlow instruction hook](/assets/cloud-agents/bridge_hooks.py):
+
+```bash
+curl --fail --show-error --location \
+  https://docs.boxlite.ai/assets/cloud-agents/bridge_hooks.py --output bridge_hooks.py
+chmod 600 bridge.yaml
+```
+
+For Codex, add this callback under `litellm_settings` in `bridge.yaml`:
+
+```yaml
+  callbacks:
+    - bridge_hooks.system_first
+```
+
+The Codex hook combines instruction messages into the single leading instruction that this endpoint accepts. Leave it out for Claude Code. The agent still executes its own tools.
+
+## Install and start the bridge
+
+Create and install your agent first, then select its box below. Its saved BoxLite startup command waits for these files and starts the bridge automatically. No attached terminal or background `exec` is needed.
+
+<Tabs>
+<Tab title="Claude Code">
+
+```bash
+boxlite exec claude-agent -- sh -c \
+  'python3 -m venv /workspace/bridge/venv && /workspace/bridge/venv/bin/pip install "litellm[proxy]"'
+boxlite cp bridge.yaml claude-agent:/workspace/bridge/bridge.yaml
+boxlite cp bridge_hooks.py claude-agent:/workspace/bridge/bridge_hooks.py
+boxlite exec claude-agent -- chmod 600 /workspace/bridge/bridge.yaml
+```
+
+</Tab>
+<Tab title="Codex">
+
+```bash
+boxlite exec codex-agent -- sh -c \
+  'python3 -m venv /workspace/bridge/venv && /workspace/bridge/venv/bin/pip install "litellm[proxy]"'
+boxlite cp bridge.yaml codex-agent:/workspace/bridge/bridge.yaml
+boxlite cp bridge_hooks.py codex-agent:/workspace/bridge/bridge_hooks.py
+boxlite exec codex-agent -- chmod 600 /workspace/bridge/bridge.yaml
+```
+
+</Tab>
+</Tabs>
+
+Wait until port 4000 accepts requests before running the agent. Startup and request errors are saved in `/workspace/bridge/bridge.log`. The bridge is bound to loopback; it does not need a Cloud tunnel. The agent's create script registers the host-scoped `Secret` and configures Python to trust the system CA bundle.
+
+## Use the connection in your agent
+
+<Tabs>
+<Tab title="Claude Code">
+
+Use these values in [claude.env](/cloud/agent-in-box/claude-code#connect-your-model):
+
+```bash
+ANTHROPIC_BASE_URL='http://127.0.0.1:4000'
+ANTHROPIC_AUTH_TOKEN='<YOUR_RANDOM_BRIDGE_KEY>'
+ANTHROPIC_MODEL='agent-model'
+```
+
+</Tab>
+<Tab title="Codex">
+
+In [Codex's configuration](/cloud/agent-in-box/codex#configure-codex), use:
+
+```toml
+model = "agent-model"
+model_provider = "gateway"
+
+[model_providers.gateway]
+name = "Loopback model bridge"
+base_url = "http://127.0.0.1:4000/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+```
+
+Set `OPENAI_API_KEY` in `codex.env` to the random bridge key, not the SiliconFlow key.
+
+</Tab>
+</Tabs>
+
+Return to the agent guide and run its file-writing task. The model response and an independently verified file establish that protocol translation and tools both work.
+
+BoxLite restarts the saved entrypoint when the box starts again, restoring the bridge from its placeholder-only configuration. Wait for port 4000 before submitting a task after a restart. See [service startup and optional lifecycle](/cloud/agent-in-box/http-entrypoint).

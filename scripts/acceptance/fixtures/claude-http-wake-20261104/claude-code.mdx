@@ -1,0 +1,335 @@
+---
+title: "Deploy Claude Code on Cloud"
+sidebarTitle: "Claude Code"
+description: "Install Claude Code, configure its model connection, and run a task inside a Cloud box."
+---
+
+Run Claude Code inside a Cloud box. The CLI performs file and shell operations there, and `boxlite exec` returns its output.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install Claude Code
+
+Save `create.py`. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                env=[
+                    ("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("ANTHROPIC_API_KEY", "<BOXLITE_SECRET:anthropic>"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Anthropic API key: "),
+                    hosts=["api.anthropic.com"],
+                )],
+            ),
+            name="claude-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect claude-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+Install the agent:
+
+```bash
+boxlite exec claude-agent -- \
+  npm install -g --prefix /workspace/tools @anthropic-ai/claude-code
+```
+
+The `node` image runs as the non-root `boxlite` user. Claude Code requires a non-root user for permission-bypass mode.
+
+## Connect your model
+
+The create script uses Claude Code's native `ANTHROPIC_API_KEY` setting. Its value inside the box is the literal `<BOXLITE_SECRET:anthropic>`; BoxLite supplies the real key on outbound requests to `api.anthropic.com`.
+
+Claude Code selects its default model. To select another, add its native `--model` option to the command below. For a different supported provider, follow [Claude Code's model configuration](https://code.claude.com/docs/en/model-config) and match the Secret's `hosts` to its API endpoint.
+
+## Run a task
+
+```bash
+boxlite exec -w /workspace claude-agent -- sh -c '
+  exec /workspace/tools/bin/claude --permission-mode bypassPermissions --output-format json -p \
+    "Run this exact shell command with your terminal tool: echo CLAUDE_READY > /workspace/proof.txt && cat /workspace/proof.txt" < /dev/null
+'
+boxlite exec claude-agent -- cat /workspace/proof.txt
+# CLAUDE_READY
+```
+
+Permission-bypass mode lets the task execute unattended inside the box. Use it for trusted tasks: the agent can use the model connection and access the files, local service credentials, and network available there.
+
+**Claude Code is ready.** Replace the prompt with your own task. Check `is_error` in the JSON response as well as the actual file.
+
+## Optional: wake on a request
+
+This walkthrough creates a separate `claude-http` box with an authenticated `POST /tasks` endpoint. After two idle minutes, the box stops. Sending another task to the same URL starts the box and runs Claude Code again.
+
+Run every command below on your workstation, in one directory. You will create two source files and a local caller token. The token's hash goes into the box; the real model key stays in BoxLite's `Secret`.
+
+### 1. Create the HTTP box
+
+Save this as `create-http.py`. Its startup command waits for the files installed in step 3, then starts the service on every boot.
+
+```python create-http.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=120, auto_resume=True, auto_delete=0, detach=True,
+                network=boxlite.NetworkSpec(
+                    inbound=boxlite.InboundNetworkSpec(mode="enabled")
+                ),
+                entrypoint=["/bin/sh", "-c"],
+                cmd=["""
+until test -x /workspace/tools/bin/claude &&
+      test -s /workspace/server.mjs &&
+      test -s /workspace/http-token.sha256; do sleep 1; done
+exec node /workspace/server.mjs >> /workspace/http.log 2>&1
+"""],
+                env=[
+                    ("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("ANTHROPIC_API_KEY", "<BOXLITE_SECRET:anthropic>"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Anthropic API key: "),
+                    hosts=["api.anthropic.com"],
+                )],
+            ),
+            name="claude-http",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect claude-http before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create-http.py
+```
+
+Use `auto_stop=0` instead if you want this HTTP service to stay running. Keep the value shown to try automatic stop and wake.
+
+For an existing Anthropic Messages-compatible endpoint, add `ANTHROPIC_BASE_URL` and `ANTHROPIC_MODEL` to `env`, and change `Secret.hosts` to that endpoint's hostname. Supply its key at the prompt; keep the placeholder unchanged.
+
+### 2. Save the HTTP service
+
+Save the complete code below as `server.mjs`. The service accepts `{"prompt":"..."}`, runs one Claude task at a time with a three-minute limit, and returns Claude's JSON result. `POST /tasks` is this example's application API.
+
+<Accordion title="server.mjs — complete source">
+
+```javascript server.mjs
+import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { execFile } from 'node:child_process';
+
+const tokenHash = Buffer.from(readFileSync('/workspace/http-token.sha256', 'utf8').trim(), 'hex');
+if (tokenHash.length !== 32) throw new Error('Invalid HTTP token hash');
+let busy = false;
+
+function reply(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+const server = http.createServer(async (req, res) => {
+  const authorization = req.headers.authorization ?? '';
+  const token = authorization.slice(7);
+  const suppliedHash = createHash('sha256').update(token).digest();
+  if (!authorization.startsWith('Bearer ') || !timingSafeEqual(suppliedHash, tokenHash)) {
+    return reply(res, 401, { error: 'Unauthorized' });
+  }
+  if (req.method === 'GET' && req.url === '/health') {
+    return reply(res, 200, { ready: true, busy });
+  }
+  if (req.method !== 'POST' || req.url !== '/tasks') {
+    return reply(res, 404, { error: 'Use POST /tasks' });
+  }
+
+  let prompt;
+  try {
+    req.setEncoding('utf8');
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
+      if (Buffer.byteLength(body) > 65536) {
+        return reply(res, 413, { error: 'Request too large' });
+      }
+    }
+    ({ prompt } = JSON.parse(body));
+    if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('Invalid prompt');
+  } catch {
+    return reply(res, 400, { error: 'Send JSON with a nonempty prompt string' });
+  }
+  if (busy) return reply(res, 409, { error: 'A task is already running' });
+  busy = true;
+
+  const abort = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) abort.abort(); });
+  const child = execFile('/workspace/tools/bin/claude', [
+    '--permission-mode', 'bypassPermissions', '--output-format', 'json', '-p', prompt,
+  ], {
+    cwd: '/workspace', detached: true, timeout: 180000, killSignal: 'SIGKILL',
+    maxBuffer: 2 * 1024 * 1024, signal: abort.signal,
+  }, (error, stdout) => {
+    busy = false;
+    if (error && child.pid) {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+    }
+    if (res.destroyed) return;
+    try {
+      const result = JSON.parse(stdout);
+      return reply(res, error || result.is_error ? 502 : 200, result);
+    } catch {
+      return reply(res, error?.killed ? 504 : 502, { error: 'Claude did not return a result' });
+    }
+  });
+  child.stdin.end();
+});
+
+server.requestTimeout = 30000;
+server.listen(8080, '0.0.0.0');
+```
+
+</Accordion>
+
+Only give the caller token to clients allowed to run tasks in this box. This example uses Claude's permission-bypass mode, as in the CLI task above.
+
+### 3. Install and start the service
+
+Generate the caller token and its hash locally:
+
+```bash
+python3 - <<'PYTOKEN'
+import hashlib
+import os
+import secrets
+from pathlib import Path
+
+os.umask(0o077)
+token = secrets.token_hex(32)
+Path("http-token").write_text(token)
+Path("http-token.sha256").write_text(hashlib.sha256(token.encode()).hexdigest())
+PYTOKEN
+```
+
+Keep `http-token` on your workstation and out of Git. Install Claude Code, upload the service and token hash, then register port 8080:
+
+```bash
+boxlite exec claude-http -- \
+  npm install -g --prefix /workspace/tools @anthropic-ai/claude-code
+boxlite cp server.mjs claude-http:/workspace/server.mjs
+boxlite cp http-token.sha256 claude-http:/workspace/http-token.sha256
+boxlite exec claude-http -- chmod 600 /workspace/http-token.sha256
+boxlite network tunnel claude-http 8080
+```
+
+The saved startup command starts the service as soon as these files exist. It starts it again after every wake; no attached terminal is required.
+
+### 4. Send the first task
+
+Set `CLAUDE_URL` to the HTTPS URL returned by the last command. Keep this shell open for the wake-up check.
+
+```bash
+CLAUDE_URL='<YOUR_TUNNEL_URL>'
+curl --fail-with-body --max-time 30 "$CLAUDE_URL/health" \
+  -H "Authorization: Bearer $(cat http-token)"
+# {"ready":true,"busy":false}
+```
+
+If the service is still starting, retry this health request after a few seconds. Then ask Claude to create a file:
+
+```bash
+curl --fail-with-body --max-time 240 "$CLAUDE_URL/tasks" \
+  -H "Authorization: Bearer $(cat http-token)" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Run this exact shell command with your terminal tool: echo CLAUDE_HTTP_READY > /workspace/proof.txt && cat /workspace/proof.txt"}'
+boxlite exec claude-http -- cat /workspace/proof.txt
+# CLAUDE_HTTP_READY
+```
+
+Success means the response contains `"is_error": false` and the independent file check prints `CLAUDE_HTTP_READY`.
+
+### 5. Wait for automatic stop
+
+Stop sending HTTP requests, including health checks. Run only this control-plane check until `Status` is `stopped`:
+
+```bash
+boxlite inspect claude-http
+```
+
+Allow two idle minutes. Do not use `start`, `exec`, or `cp` before the next request: the HTTP request should be the action that wakes the box.
+
+### 6. Wake Claude with another task
+
+Send a new task to the same URL:
+
+```bash
+curl --fail-with-body --max-time 240 "$CLAUDE_URL/tasks" \
+  -H "Authorization: Bearer $(cat http-token)" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Run this exact shell command with your terminal tool: echo CLAUDE_HTTP_AWAKE > /workspace/awake.txt && cat /workspace/awake.txt"}'
+```
+
+Cloud starts the box; its saved command starts the HTTP service, which runs Claude. After the response, check both files:
+
+```bash
+boxlite exec claude-http -- cat /workspace/proof.txt /workspace/awake.txt
+# CLAUDE_HTTP_READY
+# CLAUDE_HTTP_AWAKE
+```
+
+The first file checks retained work; the second checks that Claude ran tools after wake. Leave the box idle again and it stops automatically.
+
+This stop/wake workflow was verified with real model and file-tool calls through an Anthropic Messages-compatible endpoint.
+
+If Cloud returns `503 BOX_STARTING`, wait for `Retry-After` before retrying. The service returns `401` for a wrong caller token and `409` while another task is running. A timed-out request can have partial effects: inspect its output before resubmitting it.
+
+### 7. Clean up the HTTP box
+
+```bash
+boxlite rm --force claude-http
+```
+
+For applications that already use Cloud `exec`, the CLI command above also supports [wake on access](/cloud/box-lifecycle#wake-on-access); this HTTP service is optional.
+
+## When you are finished
+
+```bash
+boxlite stop claude-agent
+# To delete the box and its files:
+boxlite rm --force claude-agent
+```

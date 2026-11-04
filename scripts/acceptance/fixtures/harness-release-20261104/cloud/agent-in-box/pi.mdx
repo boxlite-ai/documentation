@@ -1,0 +1,363 @@
+---
+title: "Deploy Pi on Cloud"
+sidebarTitle: "Pi"
+description: "Install Pi, configure its model provider, and run a tool task inside a Cloud box."
+---
+
+Pi reads, writes, and executes commands inside the box. This example uses an OpenAI Chat Completions-compatible endpoint with tool support.
+
+Complete the [workstation setup](/cloud/agent-in-box/index#before-you-start). Run all commands below on your workstation.
+
+## Create the box and install Pi
+
+Save `create.py`. Before running it, replace `<YOUR_MODEL_HOST>` with your model endpoint's hostname, without the scheme or path. The prompt reads the real model key on your workstation; only BoxLite's `Secret` configuration receives it.
+
+```python create.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=0, auto_delete=0, detach=True,
+                env=[
+                    ("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("ANTHROPIC_API_KEY", "<BOXLITE_SECRET:anthropic>"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Model provider API key: "),
+                    hosts=["<YOUR_MODEL_HOST>"],
+                )],
+            ),
+            name="pi-agent",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect pi-agent before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create.py
+```
+
+Install the agent:
+
+```bash
+boxlite exec pi-agent -- \
+  npm install -g --ignore-scripts --prefix /workspace/tools @earendil-works/pi-coding-agent
+boxlite exec pi-agent -- mkdir -p /workspace/pi
+```
+
+## Connect your model
+
+Use an existing OpenAI Chat Completions-compatible endpoint with tool support. Set `Secret.hosts` in `create.py` to its hostname. Save `models.json`, replacing the API base URL and model ID; set the context and output limits to values supported by your model:
+
+```json models.json
+{
+  "providers": {
+    "endpoint": {
+      "baseUrl": "https://<YOUR_MODEL_HOST>/v1",
+      "api": "openai-completions",
+      "apiKey": "<BOXLITE_SECRET:anthropic>",
+      "models": [
+        {
+          "id": "<MODEL_ID>",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 32768,
+          "maxTokens": 4096
+        }
+      ]
+    }
+  }
+}
+```
+
+Keep the Secret placeholder unchanged. The real provider key stays outside the box. Upload the configuration:
+
+```bash
+boxlite cp models.json pi-agent:/workspace/pi/models.json
+```
+
+## Run a task
+
+```bash
+boxlite exec -e PI_CODING_AGENT_DIR=/workspace/pi pi-agent -- sh -c '
+  exec /workspace/tools/bin/pi --provider endpoint --model "<MODEL_ID>" \
+  --mode json --no-session -p \
+  "Use your tools to write PI_READY to /workspace/proof.txt, then read it back." < /dev/null
+'
+boxlite exec pi-agent -- cat /workspace/proof.txt
+# PI_READY
+```
+
+Check the file and Pi's output. A JSON `stopReason: "error"` means the model request failed, even if the CLI exited with code zero.
+
+**Pi is ready.** Repeat the `exec` command with your own task. `--no-session` makes each call an independent turn.
+
+## Optional: wake on a request
+
+This walkthrough creates a separate `pi-http` box with an authenticated `POST /tasks` endpoint. After two idle minutes, the box stops. Sending another task to the same URL starts the box and runs Pi again.
+
+Run every command below on your workstation, in one directory. You will create two source files and a local caller token. The token's hash goes into the box; the real model key stays in BoxLite's `Secret`.
+
+### 1. Create the HTTP box
+
+Save this as `create-http.py`. Its startup command waits for the files installed in step 3, then starts the service on every boot.
+
+```python create-http.py
+import asyncio
+from getpass import getpass
+import boxlite
+
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions.from_env())
+    try:
+        box = await runtime.create(
+            boxlite.BoxOptions(
+                image="node",
+                cpus=1, memory_mib=2048, disk_size_gb=10,
+                auto_stop=120, auto_resume=True, auto_delete=0, detach=True,
+                network=boxlite.NetworkSpec(inbound=boxlite.InboundNetworkSpec(mode="enabled")),
+                entrypoint=["/bin/sh", "-c"],
+                cmd=["""
+until test -x /workspace/tools/bin/pi && test -s /workspace/pi/models.json &&
+      test -s /workspace/server.mjs && test -s /workspace/http-token.sha256; do sleep 1; done
+exec node /workspace/server.mjs >> /workspace/http.log 2>&1
+"""],
+                env=[
+                    ("NODE_EXTRA_CA_CERTS", "/etc/ssl/certs/ca-certificates.crt"),
+                    ("ANTHROPIC_API_KEY", "<BOXLITE_SECRET:anthropic>"),
+                ],
+                secrets=[boxlite.Secret(
+                    name="anthropic",
+                    value=getpass("Model provider API key: "),
+                    hosts=["<YOUR_MODEL_HOST>"],
+                )],
+            ),
+            name="pi-http",
+        )
+        print(box.id)
+        await box.start()
+    except Exception as exc:
+        raise SystemExit(f"{type(exc).__name__}: inspect pi-http before retrying creation.") from None
+    finally:
+        runtime.close()
+
+asyncio.run(main())
+```
+
+```bash
+python3 create-http.py
+```
+
+Use `auto_stop=0` instead if you want this HTTP service to stay running. Keep the value shown to try automatic stop and wake.
+
+Use the same model endpoint and Secret settings as the CLI deployment above.
+
+### 2. Save the HTTP service
+
+Save the complete code below as `server.mjs`. Replace `<MODEL_ID>` with the same model ID from `models.json`. The service accepts `{"prompt":"..."}`, runs one Pi task at a time with a three-minute limit, and returns Pi's JSON result. `POST /tasks` is this example's application API.
+
+<Accordion title="server.mjs — complete source">
+
+```javascript server.mjs
+import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { execFile } from 'node:child_process';
+
+const tokenHash = Buffer.from(readFileSync('/workspace/http-token.sha256', 'utf8').trim(), 'hex');
+if (tokenHash.length !== 32) throw new Error('Invalid HTTP token hash');
+let busy = false;
+
+function reply(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+const server = http.createServer(async (req, res) => {
+  const authorization = req.headers.authorization ?? '';
+  const token = authorization.slice(7);
+  const suppliedHash = createHash('sha256').update(token).digest();
+  if (!authorization.startsWith('Bearer ') || !timingSafeEqual(suppliedHash, tokenHash)) {
+    return reply(res, 401, { error: 'Unauthorized' });
+  }
+  if (req.method === 'GET' && req.url === '/health') {
+    return reply(res, 200, { ready: true, busy });
+  }
+  if (req.method !== 'POST' || req.url !== '/tasks') {
+    return reply(res, 404, { error: 'Use POST /tasks' });
+  }
+
+  let prompt;
+  try {
+    req.setEncoding('utf8');
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
+      if (Buffer.byteLength(body) > 65536) {
+        return reply(res, 413, { error: 'Request too large' });
+      }
+    }
+    ({ prompt } = JSON.parse(body));
+    if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('Invalid prompt');
+  } catch {
+    return reply(res, 400, { error: 'Send JSON with a nonempty prompt string' });
+  }
+  if (busy) return reply(res, 409, { error: 'A task is already running' });
+  busy = true;
+
+  const abort = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) abort.abort(); });
+  const child = execFile('/workspace/tools/bin/pi', [
+    '--provider', 'endpoint', '--model', '<MODEL_ID>', '--mode', 'json', '--no-session', '-p', prompt,
+  ], {
+    env: { ...process.env, PI_CODING_AGENT_DIR: '/workspace/pi' },
+    cwd: '/workspace', detached: true, timeout: 180000, killSignal: 'SIGKILL',
+    maxBuffer: 2 * 1024 * 1024, signal: abort.signal,
+  }, (error, stdout) => {
+    busy = false;
+    if (error && child.pid) {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+    }
+    if (res.destroyed) return;
+    try {
+      const events = stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+      const failed = Boolean(error) || events.some(event => event.message?.stopReason === 'error' || event.message?.stopReason === 'aborted');
+      return reply(res, failed ? 502 : 200, { ok: !failed, events });
+    } catch {
+      return reply(res, error?.killed ? 504 : 502, { error: 'Pi did not return a result' });
+    }
+  });
+  child.stdin.end();
+});
+
+server.requestTimeout = 30000;
+server.listen(8080, '0.0.0.0');
+```
+
+</Accordion>
+
+Only give the caller token to clients allowed to run tasks in this box. Tasks have access to the files and network available to this box.
+
+### 3. Install and start the service
+
+Generate the caller token and its hash locally:
+
+```bash
+python3 - <<'PYTOKEN'
+import hashlib
+import os
+import secrets
+from pathlib import Path
+
+os.umask(0o077)
+token = secrets.token_hex(32)
+Path("http-token").write_text(token)
+Path("http-token.sha256").write_text(hashlib.sha256(token.encode()).hexdigest())
+PYTOKEN
+```
+
+Keep `http-token` on your workstation and out of Git. Keep `models.json` from the model setup above. Install Pi, upload the model configuration, service and token hash, then register port 8080:
+
+```bash
+boxlite exec pi-http -- \
+  npm install -g --ignore-scripts --prefix /workspace/tools @earendil-works/pi-coding-agent
+boxlite exec pi-http -- mkdir -p /workspace/pi
+boxlite cp models.json pi-http:/workspace/pi/models.json
+boxlite cp server.mjs pi-http:/workspace/server.mjs
+boxlite cp http-token.sha256 pi-http:/workspace/http-token.sha256
+boxlite exec pi-http -- chmod 600 /workspace/http-token.sha256
+boxlite network tunnel pi-http 8080
+```
+
+The saved startup command starts the service as soon as these files exist. It starts it again after every wake; no attached terminal is required.
+
+### 4. Send the first task
+
+Set `PI_URL` to the HTTPS URL returned by the last command. Keep this shell open for the wake-up check.
+
+```bash
+PI_URL='<YOUR_TUNNEL_URL>'
+curl --fail-with-body --max-time 30 "$PI_URL/health" \
+  -H "Authorization: Bearer $(cat http-token)"
+# {"ready":true,"busy":false}
+```
+
+If the service is still starting, retry this health request after a few seconds. Then ask Pi to create a file:
+
+```bash
+curl --fail-with-body --max-time 240 "$PI_URL/tasks" \
+  -H "Authorization: Bearer $(cat http-token)" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Run this exact shell command with your terminal tool: echo PI_HTTP_READY > /workspace/proof.txt && cat /workspace/proof.txt"}'
+boxlite exec pi-http -- cat /workspace/proof.txt
+# PI_HTTP_READY
+```
+
+Success means the response contains `"ok": true` and the independent file check prints `PI_HTTP_READY`.
+
+### 5. Wait for automatic stop
+
+Stop sending HTTP requests, including health checks. Run only this control-plane check until `Status` is `stopped`:
+
+```bash
+boxlite inspect pi-http
+```
+
+Allow two idle minutes. Do not use `start`, `exec`, or `cp` before the next request: the HTTP request should be the action that wakes the box.
+
+### 6. Wake Pi with another task
+
+Send a new task to the same URL:
+
+```bash
+curl --fail-with-body --max-time 240 "$PI_URL/tasks" \
+  -H "Authorization: Bearer $(cat http-token)" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Run this exact shell command with your terminal tool: echo PI_HTTP_AWAKE > /workspace/awake.txt && cat /workspace/awake.txt"}'
+```
+
+Cloud starts the box; its saved command starts the HTTP service, which runs Pi. After the response, check both files:
+
+```bash
+boxlite exec pi-http -- cat /workspace/proof.txt /workspace/awake.txt
+# PI_HTTP_READY
+# PI_HTTP_AWAKE
+```
+
+The first file checks retained work; the second checks that Pi ran tools after wake. Leave the box idle again and it stops automatically.
+
+The file checks verify real tool execution and retained work across a stop and wake.
+
+If Cloud returns `503 BOX_STARTING`, wait for `Retry-After` before retrying. The service returns `401` for a wrong caller token and `409` while another task is running. A timed-out request can have partial effects: inspect its output before resubmitting it.
+
+### 7. Clean up the HTTP box
+
+```bash
+boxlite rm --force pi-http
+```
+
+For applications that already use Cloud `exec`, the CLI command above also supports [wake on access](/cloud/box-lifecycle#wake-on-access); this HTTP service is optional.
+
+## When you are finished
+
+```bash
+boxlite stop pi-agent
+# To delete the box and its files:
+boxlite rm --force pi-agent
+```

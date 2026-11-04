@@ -1,0 +1,18 @@
+{"ok":true,"events":[{"type":"thread.started","thread_id":"01a1a613-772e-7e43-8fa7-db217f2f5e03"},{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `agent-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}},{"type":"turn.started"},{"type":"item.completed","item":{"id":"item_1","type":"reasoning","text":"User wants me to run a specific shell command to create a proof file and display its contents. I'll execute the exact command as specified.\n"}},{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"\n\n"}},{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'echo CODEX_HTTP_READY > /workspace/proof.txt && cat /workspace/proof.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}},{"type":"item.completed","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'echo CODEX_HTTP_READY > /workspace/proof.txt && cat /workspace/proof.txt'","aggregated_output":"CODEX_HTTP_READY\n","exit_code":0,"status":"completed"}},{"type":"item.completed","item":{"id":"item_4","type":"reasoning","text":"The command executed successfully. The proof file was created with the content 'CODEX_HTTP_READY' and when cat was run, it displayed 'CODEX_HTTP_READY'. The task is complete.\n"}},{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"\n\nDone. The command executed successfully, creating `/workspace/proof.txt` with the content `CODEX_HTTP_READY`."}},{"type":"turn.completed","usage":{"input_tokens":17528,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":138,"reasoning_output_tokens":70}}]}CODEX_HTTP_READY
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   139    0     0  100   139      0    111  0:00:01  0:00:01 --:--:--   111
+100   139    0     0  100   139      0     61  0:00:02  0:00:02 --:--:--    61
+100   139    0     0  100   139      0     42  0:00:03  0:00:03 --:--:--    42
+100   139    0     0  100   139      0     32  0:00:04  0:00:04 --:--:--    32
+100   139    0     0  100   139      0     26  0:00:05  0:00:05 --:--:--    26
+100   139    0     0  100   139      0     22  0:00:06  0:00:06 --:--:--     0
+100   139    0     0  100   139      0     19  0:00:07  0:00:07 --:--:--     0
+100   139    0     0  100   139      0     16  0:00:08  0:00:08 --:--:--     0
+100   139    0     0  100   139      0     14  0:00:09  0:00:09 --:--:--     0
+100   139    0     0  100   139      0     13  0:00:10  0:00:10 --:--:--     0
+100  1866    0  1727  100   139    154     12  0:00:11  0:00:11 --:--:--   351
+100  1866    0  1727  100   139    154     12  0:00:11  0:00:11 --:--:--   442

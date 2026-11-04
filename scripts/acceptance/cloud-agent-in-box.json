@@ -1,0 +1,56 @@
+{
+  "updated_on": "2026-11-04",
+  "status": "ready_for_publication",
+  "scope": "Five manual deployment guides and their documented optional HTTP wake paths; acceptance uses compatible model endpoints, not every provider account.",
+  "current_acceptance": "fixtures/harness-release-20261104/report.json",
+  "claude_acceptance": "fixtures/claude-http-wake-20261104/report.json",
+  "historical_acceptance": "fixtures/siliconflow-20261104/report.json",
+  "remaining_live_checks": [],
+  "limitations": [
+    "Provider compatibility is scoped to the tested endpoints and model; official Anthropic/OpenAI accounts were not exercised.",
+    "Guest credential audits cover listed readable files and process environments, not exhaustive memory or disk forensics.",
+    "OpenCode direct cold POST timed out without creating a task message or output file; the final documented path uses external health wake, then a message to the retained session.",
+    "Examples are single-user trusted-task deployments, not multi-tenant production services.",
+    "The first OpenCode health request after cold startup can time out; the documented read-only health check uses bounded retries. Task POST requests are not automatically retried."
+  ],
+  "current_source_sha256": {
+    "cloud/agent-in-box/pi.mdx": "c2a59de3474766c7104379c9ff728056f4be31948c350608f9e80b5037b37c86",
+    "cloud/agent-in-box/index.mdx": "9edbd9493ce692d89a41e732252960943b2511b8665f745a03e9a148a66f6f42",
+    "cloud/agent-in-box/codex.mdx": "3cb7524289b894a11185688e2fadbcd343bfcbc51611d635a9e34a7688d0d5b9",
+    "cloud/agent-in-box/claude-code.mdx": "67ff2af27495bbb85bfe8940e3b9d91a5a9da2b2ab9fe865880fbb5e5e56c982",
+    "cloud/agent-in-box/opencode.mdx": "b143c03cf95f494ffc73ef176cf8324cb345415ea3a974ff4ec0c842cb58709d",
+    "cloud/agent-in-box/hermes.mdx": "0bbd2049ee40436654dfd3b09df893962476b3d614d3098f432c4b5342a17d89"
+  },
+  "documentation_checks": {
+    "mintlify_build": "passed",
+    "internal_links": "passed",
+    "docs_lint": "passed",
+    "llms_index": "passed",
+    "diff_whitespace": "passed",
+    "snippet_syntax": {
+      "python": 9,
+      "bash": 64,
+      "json": 2,
+      "javascript": 3,
+      "text": 1,
+      "toml": 1,
+      "yaml": 1
+    },
+    "browser": "All five desktop and 390px mobile pages render without page-wide overflow; complete service source expands.",
+    "runtime_source": "Documented code executed with endpoint/model substitutions; CLI commands used the already-installed service test boxes, changing only the box name.",
+    "tls_verification_enabled": true
+  },
+  "cleanup": {
+    "owned_test_boxes_removed": 5,
+    "preexisting_boxes_preserved": 8,
+    "generated_credentials_removed": true
+  },
+  "editorial_revisions": [
+    {
+      "file": "cloud/agent-in-box/hermes.mdx",
+      "change": "Explain workstation-local .env loading and annotate all three Gateway requests.",
+      "runtime_commands": "Unchanged after removing shell comments and whitespace; all other code blocks unchanged.",
+      "validation": "All Bash blocks pass bash -n; original live acceptance remains applicable."
+    }
+  ]
+}

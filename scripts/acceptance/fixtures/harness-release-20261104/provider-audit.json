@@ -1,0 +1,17 @@
+{
+  "uid": 0,
+  "upstream_model_and_cloud_keys_absent": true,
+  "files": [
+    "/workspace/bridge/bridge_hooks.py",
+    "/workspace/bridge/bridge.yaml",
+    "/workspace/bridge/bridge.log"
+  ],
+  "processes": [
+    "/proc/10/environ"
+  ],
+  "unreadable": [
+    "/proc/1/environ",
+    "/proc/9/environ"
+  ],
+  "skipped": []
+}

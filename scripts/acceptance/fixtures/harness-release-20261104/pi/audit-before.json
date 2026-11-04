@@ -1,0 +1,49 @@
+[
+  {
+    "uid": 1001,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/workspace/pi/auth.json",
+      "/workspace/pi/models-store.json",
+      "/workspace/pi/models.json"
+    ],
+    "processes": [
+      "/proc/1/environ",
+      "/proc/71/environ"
+    ],
+    "unreadable": [
+      "/root/.claude",
+      "/root/.codex",
+      "/root/.pi",
+      "/root/.hermes",
+      "/root/.local/share/opencode",
+      "/root/.config/opencode"
+    ],
+    "skipped": []
+  },
+  {
+    "uid": 0,
+    "provider_and_cloud_keys_absent": true,
+    "files": [
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/workspace/pi/auth.json",
+      "/workspace/pi/models-store.json",
+      "/workspace/pi/models.json"
+    ],
+    "processes": [
+      "/proc/74/environ"
+    ],
+    "unreadable": [
+      "/proc/1/environ",
+      "/proc/73/environ"
+    ],
+    "skipped": []
+  }
+]

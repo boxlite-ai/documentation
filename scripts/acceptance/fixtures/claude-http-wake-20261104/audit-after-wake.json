@@ -1,0 +1,59 @@
+[
+  {
+    "box": "agent",
+    "uid": 1001,
+    "real_provider_key_absent": true,
+    "cloud_key_absent": true,
+    "model_endpoint_key_absent": true,
+    "files_checked": [
+      "/workspace/awake.txt",
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/home/boxlite/.claude/.last-cleanup",
+      "/home/boxlite/.claude/projects/-workspace/3330627a-939f-4f3a-aa39-b5f35bc29dfb.jsonl",
+      "/home/boxlite/.claude/projects/-workspace/b13e46d9-cfa9-4455-94f7-ad6bfb896a4c.jsonl",
+      "/home/boxlite/.claude/backups/.claude.json.backup.1793785775433"
+    ],
+    "process_environments_checked": [
+      "/proc/1/environ",
+      "/proc/37/environ"
+    ],
+    "unreadable": [
+      "/root/.claude",
+      "/root/.codex",
+      "/root/.pi",
+      "/root/.hermes",
+      "/root/.local/share/opencode",
+      "/root/.config/opencode"
+    ],
+    "skipped": []
+  },
+  {
+    "box": "agent",
+    "uid": 0,
+    "real_provider_key_absent": true,
+    "cloud_key_absent": true,
+    "model_endpoint_key_absent": true,
+    "files_checked": [
+      "/workspace/awake.txt",
+      "/workspace/http.log",
+      "/workspace/proof.txt",
+      "/workspace/server.mjs",
+      "/workspace/http-token.sha256",
+      "/home/boxlite/.claude/.last-cleanup",
+      "/home/boxlite/.claude/projects/-workspace/3330627a-939f-4f3a-aa39-b5f35bc29dfb.jsonl",
+      "/home/boxlite/.claude/projects/-workspace/b13e46d9-cfa9-4455-94f7-ad6bfb896a4c.jsonl",
+      "/home/boxlite/.claude/backups/.claude.json.backup.1793785775433"
+    ],
+    "process_environments_checked": [
+      "/proc/40/environ"
+    ],
+    "unreadable": [
+      "/proc/1/environ",
+      "/proc/39/environ"
+    ],
+    "skipped": []
+  }
+]

@@ -192,6 +192,18 @@
             ]
           },
           {
+            "group": "Manually deploy an agent",
+            "icon": "robot",
+            "root": "cloud/agent-in-box/index",
+            "pages": [
+              "cloud/agent-in-box/claude-code",
+              "cloud/agent-in-box/codex",
+              "cloud/agent-in-box/pi",
+              "cloud/agent-in-box/opencode",
+              "cloud/agent-in-box/hermes"
+            ]
+          },
+          {
             "group": "Images",
             "icon": "layer-group",
             "root": "cloud/images",
@@ -462,6 +474,14 @@
     {
       "source": "/cloud/box-images",
       "destination": "/cloud/images"
+    },
+    {
+      "source": "/cloud/agent-in-box/model-bridge",
+      "destination": "/cloud/agent-in-box/index"
+    },
+    {
+      "source": "/cloud/agent-in-box/http-entrypoint",
+      "destination": "/cloud/agent-in-box/hermes#optional-wake-on-a-request"
     }
   ]
 }

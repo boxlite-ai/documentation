@@ -99,6 +99,14 @@
 - [Box lifecycle on Cloud](/cloud/box-lifecycle.md): The three controls that decide when a Cloud box stops, whether it wakes again, and when it is deleted — and the idle rule that can end a job…
 - [Create, reuse, and remove a box from code](/cloud/box-from-code.md): The full create-start-use-remove cycle over REST, reusing a box by name, managing one from the console, and passing environment variables.
 
+### Manually deploy an agent
+- [Manually deploy an agent in a box](/cloud/agent-in-box/index.md): Create a Cloud box, install your coding agent, and run a real task.
+- [Deploy Claude Code on Cloud](/cloud/agent-in-box/claude-code.md): Install Claude Code, configure its model connection, and run a task inside a Cloud box.
+- [Deploy Codex on Cloud](/cloud/agent-in-box/codex.md): Install Codex, configure a Responses-compatible provider, and run a task inside a Cloud box.
+- [Deploy Pi on Cloud](/cloud/agent-in-box/pi.md): Install Pi, configure its model provider, and run a tool task inside a Cloud box.
+- [Deploy OpenCode on Cloud](/cloud/agent-in-box/opencode.md): Install OpenCode, connect a model provider, and run a task inside a Cloud box.
+- [Deploy Hermes on Cloud](/cloud/agent-in-box/hermes.md): Run the official Hermes image and send tasks through its native Gateway API.
+
 ### Images
 - [Images](/cloud/images.md): The images BoxLite maintains for you, and how to start a box from one of your own instead.
 - [Use your own image](/cloud/use-your-image.md): Start a Cloud box from any image on a public registry, and see what your catalog recorded about it.

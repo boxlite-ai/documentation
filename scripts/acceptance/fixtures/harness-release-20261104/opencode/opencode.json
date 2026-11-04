@@ -1,0 +1,19 @@
+{
+  "model": "endpoint/<MODEL_ID>",
+  "permission": "allow",
+  "provider": {
+    "endpoint": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Model endpoint",
+      "options": {
+        "baseURL": "https://<YOUR_MODEL_HOST>/v1",
+        "apiKey": "<BOXLITE_SECRET:anthropic>"
+      },
+      "models": {
+        "<MODEL_ID>": {
+          "name": "My model"
+        }
+      }
+    }
+  }
+}

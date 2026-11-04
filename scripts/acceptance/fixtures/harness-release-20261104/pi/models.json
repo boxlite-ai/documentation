@@ -1,0 +1,20 @@
+{
+  "providers": {
+    "endpoint": {
+      "baseUrl": "https://<YOUR_MODEL_HOST>/v1",
+      "api": "openai-completions",
+      "apiKey": "<BOXLITE_SECRET:anthropic>",
+      "models": [
+        {
+          "id": "<MODEL_ID>",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 32768,
+          "maxTokens": 4096
+        }
+      ]
+    }
+  }
+}

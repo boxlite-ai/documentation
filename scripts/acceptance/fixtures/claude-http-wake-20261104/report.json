@@ -1,0 +1,65 @@
+{
+  "tested_on": "2026-11-04",
+  "status": "passed",
+  "scope": "Claude HTTP service and automatic idle-stop / external-request wake using the documented compatible-endpoint option.",
+  "model_connection": {
+    "protocol": "Anthropic Messages",
+    "endpoint": "external test-only protocol adapter, separate from the Claude box",
+    "upstream_provider": "SiliconFlow",
+    "upstream_model": "Qwen/Qwen3.5-9B",
+    "direct_anthropic_service_tested": false,
+    "documented_model_overrides": [
+      "ANTHROPIC_BASE_URL",
+      "ANTHROPIC_MODEL",
+      "Secret.hosts / Secret.value"
+    ]
+  },
+  "documented_runtime_sources": {
+    "create-http.py": "885f816976682645181220de1291c3e1f7985379ebed6549a118078e3bae7e8e",
+    "server.mjs": "5d6cf427945529357e57bc81382545f2616fd871329ae08115af4085a29b7f0c"
+  },
+  "public_page_sha256": "67ff2af27495bbb85bfe8940e3b9d91a5a9da2b2ab9fe865880fbb5e5e56c982",
+  "results": {
+    "warm_real_model_and_tool_task": true,
+    "warm_file": "CLAUDE_HTTP_READY",
+    "automatic_stop_observations": 2,
+    "cold_task_only_wake_trigger": "documented HTTPS POST /tasks, no preceding start/exec/cp",
+    "cold_request_seconds": 11.5,
+    "cold_real_model_and_tool_task": true,
+    "old_file_retained": true,
+    "new_file": "CLAUDE_HTTP_AWAKE",
+    "new_guest_boot_validated": true,
+    "additional_control": "After the second automatic stop, external GET /health restored the service; a valid boot UUID differed from the warm UUID.",
+    "missing_caller_token_status": 401,
+    "empty_prompt_status": 400,
+    "tls_verification_enabled": true
+  },
+  "credential_boundary": {
+    "upstream_provider_key_sent_to_guest": false,
+    "cloud_api_key_sent_to_guest": false,
+    "agent_model_endpoint_key_sent_to_guest": false,
+    "http_caller_token_sent_to_guest": false,
+    "guest_http_authentication": "SHA-256 token verifier only",
+    "before_wake_audit": "audit-before-wake.json",
+    "after_wake_audit": "audit-after-wake.json",
+    "scan_scope": "Relevant readable configuration, workspace files, logs, session files, and process environments, using agent-user and guest-root contexts. Listed unreadable entries and skipped files are not claimed to be audited. Not an exhaustive memory/disk forensic proof."
+  },
+  "limitations": [
+    "Official Anthropic endpoint was not exercised; this run used the documented compatible Messages endpoint configuration.",
+    "Unauthenticated request to the test-only model adapter returned HTTP 500, so that probe is not treated as a successful authentication assertion. The documented task service itself returned the expected 401.",
+    "This is a single-task example, not a multi-tenant load or durability test."
+  ],
+  "documentation_checks": {
+    "mintlify_build": "passed",
+    "internal_links": "passed",
+    "docs_lint": "passed",
+    "llms_index": "passed",
+    "python_shell_javascript_syntax": "passed",
+    "browser": "Full service source expands; desktop and 390px mobile have no page-wide horizontal overflow."
+  },
+  "cleanup": {
+    "owned_test_boxes_removed": 2,
+    "preexisting_boxes_preserved": 8,
+    "generated_credentials_removed": true
+  }
+}

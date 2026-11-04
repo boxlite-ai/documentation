@@ -1,0 +1,14 @@
+{"info":{"parentID":"msg_1a622299a001VWd3szwD34q7dC","role":"assistant","mode":"build","agent":"build","path":{"cwd":"/workspace","root":"/"},"cost":0,"tokens":{"total":8294,"input":8269,"output":2,"reasoning":23,"cache":{"write":0,"read":0}},"modelID":"Qwen/Qwen3.5-9B","providerID":"endpoint","time":{"created":1793788624022,"completed":1793788626227},"finish":"stop","id":"msg_1a6223c96001hn78HgQFlG0F22","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n"},"parts":[{"type":"step-start","id":"prt_1a62243950019HuB0hCoZmhgbJ","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a6223c96001hn78HgQFlG0F22"},{"type":"reasoning","text":"The command executed successfully and the output shows \"OPENCODE_HTTP_AWAKE\". I should respond briefly.\n","time":{"start":1793788625830,"end":1793788626178},"id":"prt_1a62243a6001cYPZnTZnVMo1tU","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a6223c96001hn78HgQFlG0F22"},{"type":"text","text":"\n\nDone","time":{"start":1793788626182,"end":1793788626217},"id":"prt_1a6224506001WI11TEyuyH1p3T","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a6223c96001hn78HgQFlG0F22"},{"reason":"stop","type":"step-finish","tokens":{"total":8294,"input":8269,"output":2,"reasoning":23,"cache":{"write":0,"read":0}},"cost":0,"id":"prt_1a622452c001aHXZq45MnaCMt3","sessionID":"ses_e59f10abbffeFbI7sXdUYObC5n","messageID":"msg_1a6223c96001hn78HgQFlG0F22"}]}
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   166    0     0  100   166      0    112  0:00:01  0:00:01 --:--:--   112
+100   166    0     0  100   166      0     67  0:00:02  0:00:02 --:--:--    67
+100   166    0     0  100   166      0     47  0:00:03  0:00:03 --:--:--    47
+100   166    0     0  100   166      0     37  0:00:04  0:00:04 --:--:--    37
+100   166    0     0  100   166      0     30  0:00:05  0:00:05 --:--:--    30
+100   166    0     0  100   166      0     25  0:00:06  0:00:06 --:--:--     0
+100   166    0     0  100   166      0     22  0:00:07  0:00:07 --:--:--     0
+100  1578    0  1412  100   166    167     19  0:00:08  0:00:08 --:--:--   285
+100  1578    0  1412  100   166    167     19  0:00:08  0:00:08 --:--:--   357
