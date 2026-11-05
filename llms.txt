@@ -98,6 +98,7 @@
 - [Choose a size for a Cloud box](/cloud/box-sizes.md): The three preset sizes, the per-organization ceilings that bound any single box, and the SDK fields that set them.
 - [Box lifecycle on Cloud](/cloud/box-lifecycle.md): The three controls that decide when a Cloud box stops, whether it wakes again, and when it is deleted — and the idle rule that can end a job…
 - [Create, reuse, and remove a box from code](/cloud/box-from-code.md): The full create-start-use-remove cycle over REST, reusing a box by name, managing one from the console, and passing environment variables.
+- [SSH into a Cloud box](/cloud/ssh.md): Set up SSH, connect from your terminal, and reconnect to a BoxLite Cloud box without repeating setup.
 
 ### Manually deploy an agent
 - [Manually deploy an agent in a box](/cloud/agent-in-box/index.md): Create a Cloud box, install your coding agent, and run a real task.

@@ -1,0 +1,165 @@
+---
+title: "SSH into a Cloud box"
+sidebarTitle: "SSH access"
+description: "Set up SSH, connect from your terminal, and reconnect to a BoxLite Cloud box without repeating setup."
+---
+
+Connect to a Cloud box from your local terminal using OpenSSH. Set up access once, then reuse the generated connection command.
+
+You can configure SSH through the CLI or through the Dashboard when its **SSH** tab is available. Both paths require a local BoxLite CLI signed in to Cloud.
+
+## Before you start
+
+- Have a [Cloud box](/cloud/boxes) in your account.
+- Install the latest BoxLite CLI using the command below.
+- Have OpenSSH, including `ssh` and `ssh-keygen`, installed on your computer.
+
+Install the latest CLI in your **local terminal**:
+
+```bash
+curl -fsSL https://sh.boxlite.ai | sh
+```
+
+Then check that the CLI and OpenSSH are available:
+
+```bash
+boxlite ssh --help
+ssh -V
+```
+
+## Log in and prepare your box
+
+In [the console](https://app.boxlite.ai), open **API Keys**, click **Create Key**, and copy the key. Run:
+
+```bash
+boxlite --context app auth login \
+  --url https://api.boxlite.ai --method api-key
+```
+
+Paste the key at the prompt. The CLI saves your credentials and organization routing information locally.
+
+`app` names your saved CLI context. The API address is `https://api.boxlite.ai`; `https://app.boxlite.ai` is the web console.
+
+Copy the box ID from **Boxes** in the console. Replace `<YOUR_BOX_ID>` below, keeping the quotes:
+
+```bash
+BOX='<YOUR_BOX_ID>'
+boxlite --context app start "$BOX"
+boxlite --context app network inbound "$BOX" enabled
+```
+
+Keep this terminal open for the following commands.
+
+## Set up SSH once
+
+Choose **one** setup method. If this box already has SSH configured and you have its private key and connection command, skip to [Reconnect](#reconnect).
+
+<Tabs>
+<Tab title="CLI">
+
+```bash
+boxlite --context app ssh "$BOX"
+```
+
+The CLI generates and saves keys on your computer, configures guest SSH, and prints:
+
+- Your private-key path.
+- The box's SSH host-key fingerprint.
+- A complete `ssh` connection command.
+
+Copy the **entire command** after **Copy and run the following command to enter the box**. Run it in your local terminal to connect.
+
+</Tab>
+<Tab title="Dashboard">
+
+If your box details page has no **SSH** tab, use the **CLI** instructions instead.
+
+The generated command uses the local BoxLite CLI for its connection. Select the context you logged into above:
+
+```bash
+boxlite context use app
+```
+
+This makes `app` the default for subsequent CLI commands.
+
+1. Open your running box in the console and select **SSH**.
+2. Click **Setup**, then **Set up SSH**.
+3. Click **Download private key** and save the file before leaving the page.
+4. In your local terminal, change to the directory containing the downloaded key.
+5. Run the commands shown in the dialog, including any key-permission command, followed by the complete `ssh` command.
+
+Keep the downloaded key and connection command for future connections.
+
+</Tab>
+</Tabs>
+
+<Note>
+Setup configures SSH; it does not open a shell. Running setup again replaces the SSH configuration and disconnects existing clients. Reconnecting does not require setup.
+</Note>
+
+## Confirm your connection
+
+On the first connection, OpenSSH asks whether to trust the host. Compare its fingerprint with the fingerprint shown during setup. If they match, type `yes`.
+
+Once connected, run:
+
+```bash
+whoami
+uname -s
+```
+
+On the BoxLite agent base image, these print `boxlite` and `Linux`. You are now running commands inside the box.
+
+Save the generated connection command. Keep its quoting, key path, and `ProxyCommand` intact; a command copied from someone else's computer may reference their local files.
+
+## Reconnect
+
+Run your saved `ssh` command again. Keep the matching private key on your computer and your CLI signed in to the same Cloud account.
+
+If the box is stopped, start it first:
+
+```bash
+boxlite --context app start "$BOX"
+```
+
+If SSH was disabled, enable the saved configuration on the running box:
+
+```bash
+boxlite --context app ssh --enable "$BOX"
+```
+
+Then run your saved `ssh` command. You can also click **Enable** in the Dashboard's **SSH** tab when available.
+
+## Leave the session or close access
+
+To leave the shell, run:
+
+```bash
+exit
+```
+
+The box keeps running. The public tunnel opened by the SSH proxy also remains open; SSH authentication still requires your private key.
+
+To close access, run both commands in your **local terminal** while the box is running:
+
+```bash
+boxlite --context app network tunnel --revoke "$BOX" 22
+boxlite --context app ssh --disable "$BOX"
+```
+
+Disabling SSH disconnects existing SSH clients. To return later, follow [Reconnect](#reconnect); the proxy opens the tunnel again when you connect.
+
+To stop the box itself, see [Box lifecycle](/cloud/box-lifecycle).
+
+## If you cannot connect
+
+| What you see | What to do |
+|---|---|
+| `ssh` is an unknown BoxLite command | Install the latest CLI using the command above, then open a new terminal and try again. |
+| Authentication fails, or the box cannot be found | Confirm the box ID and log in to the same Cloud account as the console, using the `app` context. |
+| SSH is disabled | Start the box, run `boxlite --context app ssh --enable "$BOX"`, then reuse your connection command. |
+| OpenSSH rejects private-key permissions | On macOS or Linux, run `chmod 600 /path/to/your/private-key`, substituting the actual key path. |
+| `Permission denied (publickey)` | Use the private key matching the box's current SSH setup. Another setup may have replaced the authorized key. |
+| The host fingerprint changed | Compare it with `boxlite --context app ssh --status "$BOX"` before updating your SSH known-host entry. |
+
+The printed `0.0.0.0:22` is the guest's listening address. Connect using the generated command, which routes through Cloud; you do not need a public box IP.

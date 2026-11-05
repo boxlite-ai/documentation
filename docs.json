@@ -188,7 +188,8 @@
             "pages": [
               "cloud/box-sizes",
               "cloud/box-lifecycle",
-              "cloud/box-from-code"
+              "cloud/box-from-code",
+              "cloud/ssh"
             ]
           },
           {
