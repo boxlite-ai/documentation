@@ -239,6 +239,13 @@
             ]
           },
           {
+            "group": "Domains",
+            "icon": "link",
+            "pages": [
+              "cloud/domains"
+            ]
+          },
+          {
             "group": "Pricing",
             "icon": "credit-card",
             "root": "cloud/pricing",

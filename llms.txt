@@ -130,6 +130,9 @@
 - [Read and write raw bytes over a tunnel](/cloud/raw-streams.md): Drive a tunnel as a bidirectional byte stream when you are speaking a protocol of your own rather than HTTP.
 - [Control inbound and outbound access to a box](/cloud/network-policy.md): Decide who may reach a Cloud box — keep it private, share one port through a signed link, or make it public — and set what the box itself is…
 
+### Domains
+- [Give your service a fixed public domain](/cloud/domains.md): Reach a service inside a Cloud box through a named HTTPS address, and keep that address when you move to another box.
+
 ### Pricing
 - [Pricing](/cloud/pricing.md): What BoxLite Cloud charges for: three metered resources billed by the hour, funded by a prepaid wallet or a plan's included quota.
 - [What a box costs](/cloud/box-costs.md): The three metered rates, the formula they combine into, what the standard sizes come to per hour and per month, and exactly which hours are…
