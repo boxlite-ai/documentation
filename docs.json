@@ -241,9 +241,8 @@
           {
             "group": "Domains",
             "icon": "link",
-            "pages": [
-              "cloud/domains"
-            ]
+            "root": "cloud/domains",
+            "pages": []
           },
           {
             "group": "Pricing",
