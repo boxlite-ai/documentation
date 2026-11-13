@@ -239,6 +239,12 @@
             ]
           },
           {
+            "group": "Secrets",
+            "icon": "key",
+            "root": "cloud/secrets",
+            "pages": []
+          },
+          {
             "group": "Domains",
             "icon": "link",
             "root": "cloud/domains",

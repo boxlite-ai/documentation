@@ -19,7 +19,7 @@
 - [Volumes and mounts](/manage-sandbox/volumes.md): Mount a host directory into the sandbox so both sides read and write the same files.
 - [Network access](/manage-sandbox/network-access.md): Control the sandbox's network boundary: expose a service to the host with port forwarding, restrict outbound traffic with an egress allowlis…
 - [Snapshots and clones](/manage-sandbox/snapshots.md): Save a sandbox's disk state, create a fully independent copy, or pack an entire sandbox into a portable archive.
-- [Inject secrets and harden a box](/manage-sandbox/secrets-and-security.md): Deliver credentials to a sandbox without letting the sandbox see them, and tighten the isolation boundary so untrusted code runs safely.
+- [Use secrets in a local box](/manage-sandbox/secrets-and-security.md): Make an LLM call from a local box using Python, TypeScript, or CLI without putting the model key inside the box.
 
 ### Agent tools
 - [Agent tools](/agent-tools/index.md): The capabilities an agent calls: run code, run any command, drive a terminal, a browser, or a desktop, and expose it all over MCP.
@@ -129,6 +129,9 @@
 - [Forward a box port to a local port](/cloud/port-forwarding.md): Publish a port inside a Cloud box on an address on your own machine, so any TCP client can reach it without knowing about BoxLite.
 - [Read and write raw bytes over a tunnel](/cloud/raw-streams.md): Drive a tunnel as a bidirectional byte stream when you are speaking a protocol of your own rather than HTTP.
 - [Control inbound and outbound access to a box](/cloud/network-policy.md): Decide who may reach a Cloud box — keep it private, share one port through a signed link, or make it public — and set what the box itself is…
+
+### Secrets
+- [Use API keys without putting them in your box](/cloud/secrets.md): Make an LLM call from a Cloud box using Python, TypeScript, or CLI without putting the model key inside the box.
 
 ### Domains
 - [Give your service a fixed public domain](/cloud/domains.md): Reach a service inside a Cloud box through a named HTTPS address, and keep that address when you move to another box.
