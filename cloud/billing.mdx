@@ -51,13 +51,9 @@ This tab is the authority on what you were actually charged — the hourly figur
 
 **Billing** also publishes the ceilings that apply to every box in your organization:
 
-| Resource | Ceiling per box |
-|---|---|
-| Compute | 4 vCPU |
-| Memory | 32 GiB |
-| Storage | 120 GiB |
+Read the current CPU, memory, and storage ceilings for your organization in **Billing**. They can differ by organization and plan; the values shown for one account are not universal product limits.
 
-These bound how large a **single box** can be — a different constraint from your plan's concurrency limit, which bounds how many boxes run at once. A request above a ceiling is rejected before the box is created, so you get a clear error rather than a box that fails later. See [Choose a size](/cloud/box-sizes) for the presets and custom fields available within them.
+These bound how large a **single box** can be — a different constraint from your plan's concurrency limit, which bounds how many boxes run at once. A request above a ceiling is rejected before the box is created, so you get a clear error rather than a box that fails later. See [Choose a size](/cloud/box-sizes) for fractional CPU and independently configured memory within those ceilings.
 
 If a workload genuinely needs a larger single box, that is an Enterprise conversation — custom limits go through [sales@boxlite.ai](mailto:sales@boxlite.ai).
 

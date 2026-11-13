@@ -24,6 +24,7 @@ This page is the single place where those differences are enumerated. Every othe
 | Managed checkpoints | Not supported by the local runtime or local `boxlite serve` | Save a stopped box and create independent boxes from it — see [Checkpoints](/cloud/checkpoints) |
 | Lifecycle management | Fully manual — you start, stop, and remove every box | Idle-stop, resume-on-access, and delete-after-stopping, set in the console or with `auto_stop` / `auto_resume` / `auto_delete` — see [Boxes](/cloud/boxes) |
 | Image operations | `boxlite pull` and the `images` API are available | Not supported over REST. Shared Linux base images are available automatically to keys with Boxes access |
+| Fractional CPU | Requires a Linux execution host, the jailer, and cgroup v2 CPU control; local macOS uses whole CPU allocations | Supported through SDKs and CLI, including clients running on macOS — see [Sizes](/cloud/box-sizes) |
 | Resource limits | Whatever your hardware allows | Per-box ceilings, plus a plan-level concurrency limit — see [Managing billing](/cloud/billing#per-box-resource-ceilings) |
 | Cost | Free software; you pay for your own servers | Metered — a subscription quota is consumed first, and a wallet funds the rest |
 

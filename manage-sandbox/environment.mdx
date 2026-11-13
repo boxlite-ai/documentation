@@ -18,7 +18,7 @@ The fields below are forwarded through `**kwargs` to the underlying `BoxOptions`
 | `cmd` | Optional | `list[str]` | `string[]` (`cmd`) | Overrides the image's CMD (default arguments). The ENTRYPOINT is preserved. The final command = ENTRYPOINT + CMD. |
 | `user` | Optional | `str` | `string` (`user`) | Running user, format `<name\|uid>[:<group\|gid>]`, e.g. `1000:1000`, `nobody`, `nobody:nobody`. Defaults to the image's USER (usually root). |
 | `working_dir` | Optional | `str` | `string` (`workingDir`) | Default working directory inside the container. |
-| `cpus` | Optional | `int` | `number` (`cpus`) | Number of CPU cores. |
+| `cpus` | Optional | `float` | `number` (`cpus`) | Number of CPU cores. |
 | `memory_mib` | Optional | `int` | `number` (`memoryMib`) | Memory limit (MiB). Defaults to 1024 MiB when unset; specify it explicitly in production. See [Compute resources](/manage-sandbox/compute-resources). |
 | `name` | Optional | `str` | `string` (`name`) | Sandbox name (must be unique). |
 | `auto_remove` | Optional | `bool` (default True) | `boolean` (`autoRemove`, default true) | Remove automatically on stop. |

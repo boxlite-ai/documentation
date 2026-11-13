@@ -123,7 +123,7 @@ import { DEFAULT_CPUS, DEFAULT_MEMORY_MIB } from "@boxlite-ai/boxlite";
 |---|---|---|---|---|
 | `image` | `string` | one of the two | — | OCI image (such as `alpine:latest`). At least one of `image` / `rootfsPath` must be given |
 | `rootfsPath` | `string` | one of the two | — | A prepared rootfs directory (in place of `image`) |
-| `cpus` | `number` | no | `undefined` (see note) | CPU cores. When unset, the runtime allocates 1 vCPU |
+| `cpus` | `number` | no | `undefined` (see note) | CPU allocation, including fractions on Linux. See [Compute resources](/manage-sandbox/compute-resources#fractional-cpu). When unset, the runtime allocates 1 vCPU |
 | `memoryMib` | `number` | no | `undefined` (see note) | Memory in MiB. When unset, the runtime allocates 1024 MiB |
 | `diskSizeGb` | `number` | no | — | Persistent disk size in GB |
 | `runtime` | `JsBoxlite` | no | built-in default runtime | Reuse a custom runtime |
@@ -592,7 +592,7 @@ When `pathPrefix` is unset, the client builds URLs without the segment (`/v1/box
 
 `await box.info()` returns `JsBoxInfo`: `{ id, name?, state: JsBoxStateInfo, createdAt, image, cpus, memoryMib, healthStatus }`.
 
-> `cpus` / `memoryMib`: the configured resource values. To read the real allocation, run `nproc` / read `/proc/meminfo` inside the box.
+> `cpus` / `memoryMib`: the configured resource values. `nproc` reports guest-visible vCPUs, not fractional CPU-time limits; `/proc/meminfo` reports guest-available memory.
 
 State lives in `JsBoxStateInfo`: `{ status: string; running: boolean; pid?: number }`. Correct access: `box.info().state.status`.
 

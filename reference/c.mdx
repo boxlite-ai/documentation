@@ -504,7 +504,7 @@ The full error-code enum has 22 entries (`Ok = 0` through `SessionReaped = 21`),
 | `status` | `char *` | Status string (e.g. `running` / `stopped`) |
 | `running` | `int` | Whether running |
 | `pid` | `int` | Process PID |
-| `cpus` | `int` | The CPU value from the image configuration. To read the real allocation, run `nproc` inside the box |
+| `cpus` | `double` | Configured CPU allocation. `nproc` reports guest-visible vCPUs, not fractional CPU-time limits |
 | `memory_mib` | `int` | The memory value from the image configuration. To read the real allocation, read `/proc/meminfo` |
 | `created_at` | `int64_t` | Creation timestamp |
 
@@ -613,7 +613,7 @@ void boxlite_execution_free(CExecutionHandle *e);
 
 /* options (synchronous setters) */
 enum BoxliteErrorCode boxlite_options_new(const char *image, CBoxliteOptions **out_opts, CBoxliteError *err);
-void boxlite_options_set_cpus(CBoxliteOptions *opts, int cpus);
+void boxlite_options_set_cpus(CBoxliteOptions *opts, double cpus);
 void boxlite_options_set_memory(CBoxliteOptions *opts, int memory_mib);
 void boxlite_options_add_bind_mount(CBoxliteOptions *opts, const char *host_path, const char *guest_path, int read_only); /* read_only: 1=read-only 0=read-write */
 enum BoxliteErrorCode boxlite_options_add_port(CBoxliteOptions *opts, uint16_t host_port, uint16_t guest_port, enum BoxlitePortProtocol protocol, const char *host_ip); /* host_port=0 => same as guest_port */
@@ -621,7 +621,7 @@ void boxlite_options_add_secret(CBoxliteOptions *opts, const char *name, const c
 void boxlite_options_free(CBoxliteOptions *opts);
 
 /* Simple API (synchronous blocking) */
-enum BoxliteErrorCode boxlite_simple_new(const char *image, int cpus, int memory_mib, CBoxliteSimple **out, CBoxliteError *err);
+enum BoxliteErrorCode boxlite_simple_new(const char *image, double cpus, int memory_mib, CBoxliteSimple **out, CBoxliteError *err);
 enum BoxliteErrorCode boxlite_simple_run(CBoxliteSimple *box, const char *command, const char *const *args, int argc, CBoxliteExecResult **out, CBoxliteError *err);
 void boxlite_simple_free(CBoxliteSimple *box);
 void boxlite_result_free(CBoxliteExecResult *result);

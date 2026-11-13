@@ -374,7 +374,7 @@ use boxlite::runtime::options::{PortSpec, VolumeSpec};  // not re-exported at th
 use boxlite::{AdvancedBoxOptions, BoxOptions, NetworkSpec, RootfsSpec, SecurityOptions};
 
 let options = BoxOptions {
-    cpus: Some(2),                                       // None = the runtime default of 1 vCPU (see note in 4.1)
+    cpus: Some(2.0),                                       // None = the runtime default of 1 vCPU (see note in 4.1)
     memory_mib: Some(1024),                              // None = the runtime default of 1024 MiB (see note in 4.1)
     rootfs: RootfsSpec::Image("python:3.11-slim".into()),
     env: vec![("PYTHONPATH".to_string(), "/app".to_string())],
@@ -398,7 +398,7 @@ let options = BoxOptions {
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `cpus` | `Option<u8>` | Optional | `None` | Number of vCPUs. When `None`, the runtime allocates 1 vCPU (`vm_defaults::DEFAULT_CPUS`). |
+| `cpus` | `Option<f64>` | Optional | `None` | CPU allocation; fractions require Linux. See [Compute resources](/manage-sandbox/compute-resources#fractional-cpu). When `None`, the runtime allocates 1 vCPU (`vm_defaults::DEFAULT_CPUS`). |
 | `memory_mib` | `Option<u32>` | Optional | `None` | Memory in MiB. When `None`, the runtime allocates 1024 MiB (`vm_defaults::DEFAULT_MEMORY_MIB`). |
 | `disk_size_gb` | `Option<u64>` | Optional | `None` | rootfs disk cap (sparse, grows on demand) |
 | `working_dir` | `Option<String>` | Optional | `None` | Default working directory inside the box |
@@ -708,7 +708,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `litebox.info().await?` returns a `BoxInfo`. **At the Rust core layer, `BoxInfo` has a `status: BoxStatus` field directly** (this differs from the Python/Node binding layer, where it is the two-level `info.state.status`).
 
-`BoxInfo` fields: `id: BoxID`, `name: Option<String>`, `status: BoxStatus`, `created_at`, `last_updated`, `pid: Option<u32>`, `image: String`, `cpus: u8`, `memory_mib: u32`, `labels`, `health_status: HealthStatus`.
+`BoxInfo` fields: `id: BoxID`, `name: Option<String>`, `status: BoxStatus`, `created_at`, `last_updated`, `pid: Option<u32>`, `image: String`, `cpus: f64`, `memory_mib: u32`, `labels`, `health_status: HealthStatus`.
 
 ```rust
 pub enum BoxStatus {

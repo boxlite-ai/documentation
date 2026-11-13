@@ -1,62 +1,199 @@
 ---
-title: "Choose a size for a Cloud box"
+title: "Choose CPU and memory for a Cloud box"
 sidebarTitle: "Sizes"
-description: "The three preset sizes, the per-organization ceilings that bound any single box, and the SDK fields that set them."
+description: "Create Cloud boxes with fractional CPU, choose memory independently, and verify the requested configuration."
 ---
 
-Size is vCPU, memory, and disk. Pick the smallest preset that runs your workload comfortably — it is what you pay for by the hour.
+Choose CPU, memory, and disk independently. A small CPU allocation does not require a small memory allocation: both `0.125` CPU with 4 GiB and `2` CPUs with 256 MiB are valid combinations within your organization's limits.
 
-## Prerequisites
+## Choose a preset or customize
 
-- An API key from the console, exported as `BOXLITE_API_KEY`. See [API keys](/cloud/api-keys).
-- `pip install boxlite`, and the REST URL exported as `BOXLITE_REST_URL`. See [Quickstart](/cloud/quickstart).
-
-## Choose a size
-
-The console offers three presets and a custom option:
+The console offers three preset sizes and a custom option:
 
 | Size | vCPU | Memory | Disk |
 |---|---|---|---|
 | **Small** | 1 | 1 GiB | 10 GiB |
 | **Medium** | 2 | 4 GiB | 20 GiB |
 | **Large** | 4 | 8 GiB | 50 GiB |
-| **Custom** | Your value | Your value, in GiB | Your value, in GiB |
+| **Custom** | Your allocation, including fractional CPU | Your memory allocation | Your disk size |
 
-Pick **Small** for shell work and short scripts, **Medium** for test suites and dependency installs, **Large** for builds and anything that keeps several processes hot.
+Choose **Small** for shell work and short scripts, **Medium** for test suites and dependency installs, or **Large** for builds and workloads with several active processes. Check your organization's limits before creating a box.
 
-## Per-organization ceilings
+Use a preset when it fits your workload. Customize CPU, memory, and disk when you need a different combination, such as less than one CPU or more memory without more CPU. The example below shows how to specify a custom size through the SDK or CLI.
 
-**Custom** is bounded. Your organization has one ceiling per box:
+## Create a box with 0.5 CPU and 256 MiB
 
-| Resource | Ceiling per box |
-|---|---|
-| Compute | 4 vCPU |
-| Memory | 32 GiB |
-| Storage | 120 GiB |
+Run this example on your workstation with a [Cloud API key](/cloud/api-keys). Choose one client below. Each example creates a box, starts it, checks its configuration, and removes it.
 
-The console shows these under **Box limits** on the Billing page, with the reason:
+<Tabs>
+<Tab title="Python">
 
-> Limits mitigate misuse and keep box and compute capacity fairly available across all users.
+Install the latest SDK:
 
-Read your current ceilings in [Managing billing](/cloud/billing#per-box-resource-ceilings). Split a workload that wants more than one box can hold across several boxes rather than trying to raise a single box past the ceiling.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade boxlite
+```
 
-## The SDK's sizing fields
+Save as `size_demo.py`. Enter your Cloud API key at the prompt:
 
-`BoxOptions` accepts `cpus`, `memory_mib`, and `disk_size_gb`. Their types, units, and general behavior live in [Compute resources](/manage-sandbox/compute-resources) — the console sizes above are the verified way to size a Cloud box, so set the size in the console when you want a specific shape.
+```python size_demo.py
+import asyncio
+from getpass import getpass
+import boxlite
 
-The disk field is named `disk_size_gb`. `disk_gib` is a common guess and fails at construction with a no-such-field error.
+async def main():
+    runtime = boxlite.Boxlite.rest(boxlite.BoxliteRestOptions(
+        url="https://api.boxlite.ai",
+        credential=boxlite.ApiKeyCredential(getpass("Cloud API key: ")),
+    ))
+    box = None
+    try:
+        box = await runtime.create(boxlite.BoxOptions(
+            image="python:alpine", cpus=0.5, memory_mib=256,
+            disk_size_gb=3, auto_stop=0, auto_delete=0,
+        ))
+        print("Box:", box.id)
+        await box.start()
+        info = await runtime.get_info(box.id)
+        print(f"CPU: {info.cpus}; memory: {info.memory_mib} MiB")
+    finally:
+        try:
+            if box is not None:
+                await runtime.remove(box.id, force=True)
+        finally:
+            runtime.close()
 
+asyncio.run(main())
+```
+
+```bash
+python size_demo.py
+```
+</Tab>
+<Tab title="TypeScript">
+
+Install the SDK and enter your Cloud API key on your workstation (Bash or Zsh):
+
+```bash
+npm install @boxlite-ai/boxlite tsx
+read -r -s BOXLITE_API_KEY
+export BOXLITE_API_KEY
+```
+
+Save as `size_demo.ts`:
+
+```typescript size_demo.ts
+import { ApiKeyCredential, BoxliteRestOptions, JsBoxlite } from '@boxlite-ai/boxlite';
+
+async function main() {
+  const key = process.env.BOXLITE_API_KEY;
+  if (!key) throw new Error('Set BOXLITE_API_KEY on your workstation');
+  const runtime = JsBoxlite.rest(new BoxliteRestOptions({
+    url: 'https://api.boxlite.ai', credential: new ApiKeyCredential(key),
+  }));
+  let box: Awaited<ReturnType<typeof runtime.create>> | undefined;
+  try {
+    box = await runtime.create({
+      image: 'python:alpine', cpus: 0.5, memoryMib: 256,
+      diskSizeGb: 3, autoStop: 0, autoDelete: 0,
+    });
+    console.log('Box:', box.id);
+    await box.start();
+    const info = await runtime.getInfo(box.id);
+    if (!info) throw new Error('Box not found');
+    console.log(`CPU: ${info.cpus}; memory: ${info.memoryMib} MiB`);
+  } finally {
+    try { if (box) await runtime.remove(box.id, true); }
+    finally { runtime.close(); }
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });
+```
+
+```bash
+npx tsx size_demo.ts
+```
+</Tab>
+<Tab title="CLI">
+
+Install the latest CLI and log in with your Cloud API key:
+
+```bash
+curl -fsSL https://sh.boxlite.ai | sh
+boxlite --context app auth login --url https://api.boxlite.ai --method api-key
+```
+
+Run in the same Bash or Zsh terminal:
+
+```bash
+BOX=$(boxlite --context app create --cpus 0.5 --memory 256 --disk-size 3 \
+  --auto-stop 0 --auto-delete 0 python:alpine)
+boxlite --context app start "$BOX"
+boxlite --context app inspect "$BOX" --format json
+```
+
+Look for `"Cpus": 0.5` and `"Memory": 268435456` in the output. The CLI accepts memory in MiB, but inspect displays it in bytes.
+
+Remove the test box when finished:
+
+```bash
+boxlite --context app rm --force "$BOX"
+```
+</Tab>
+</Tabs>
+
+The SDK examples print `CPU: 0.5; memory: 256 MiB`. If an operation fails, inspect the printed box ID before retrying or removing it.
+
+## What fractional CPU means
+
+`cpus=0.5` allocates half a CPU's worth of processing time. It does not expose half a processor to the guest. For allocations below one CPU, `nproc` or `os.cpu_count()` still reports one virtual CPU.
+
+Use the box's configuration to check the requested allocation. A CPU-bound test can verify its effect on execution time; the guest processor count alone cannot.
+
+Support depends on the execution host, not the client machine. A macOS client can request fractional CPU through Cloud because the execution host is Linux. See [Compute resources](/manage-sandbox/compute-resources#fractional-cpu) for CPU range, precision, and local-host requirements.
+
+## Choose memory independently
+
+There is no fixed CPU-to-memory ratio. Presets are convenient starting points, not mandatory combinations. These combinations have been verified by creating a Cloud box, starting it, and running a command:
+
+| CPU allocation | Memory | Example fit |
+|---|---|---|
+| 0.125 | 128 MiB | Minimal shell work with a small guest footprint |
+| 0.125 | 4 GiB | Work that holds data in memory but uses little CPU |
+| 0.5 | 256 MiB | Lightweight scripts and services |
+| 0.5 | 4 GiB | Memory-heavy work with modest CPU demand |
+| 2 | 256 MiB | Small working sets that need more CPU |
+
+Choose based on your application's measured working set and CPU demand. A valid combination can still run out of memory for a particular workload. Increase CPU for sustained computation; increase memory for larger working sets.
+
+For example, change only `memory_mib` to `4096` in Python, `memoryMib` to `4096` in TypeScript, or `--memory` to `4096` in the CLI to keep 0.5 CPU with 4 GiB of memory.
+
+## Limits and units
+
+CPU and memory have separate limits. Cloud memory starts at 128 MiB and accepts whole-MiB increments. Your organization's CPU, memory, and disk ceilings may impose tighter limits than the runtime supports; check [Billing](/cloud/billing#per-box-resource-ceilings) for your current ceilings.
+
+Use `memory_mib` in Python, `memoryMib` in TypeScript, or `--memory` in the CLI. All three take MiB: `256` is 256 MiB, and `4096` is 4 GiB. Guest `MemTotal` is smaller than configured memory because the kernel reserves some RAM.
+
+The Python disk field is `disk_size_gb`, not `disk_gib`. For shared parameter definitions, see [Compute resources](/manage-sandbox/compute-resources#resource-parameters-core).
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `BoxOptions(disk_gib=20)` fails with a no-such-field error | The field is `disk_size_gb` | Use `BoxOptions(disk_size_gb=20)`. See [Compute resources](/manage-sandbox/compute-resources) |
-| A box request asks for more CPU, memory, or disk than your organization allows | Ceilings are 4 vCPU compute, 32 GiB memory, and 120 GiB storage per box | Lower the request, or spread the work across several boxes. Check your ceilings in [Managing billing](/cloud/billing#per-box-resource-ceilings) |
-## Next steps
+| Symptom | What to do |
+|---|---|
+| A fractional CPU request is rejected | Check the [CPU range and precision](/manage-sandbox/compute-resources#fractional-cpu), your organization limit, and that you installed the latest client. |
+| `nproc` prints 1 for a 0.125 or 0.5 CPU box | This is expected: visible virtual CPU count differs from CPU-time allocation. Check the box configuration. |
+| Memory is rejected | Use whole MiB, at least 128, within your organization ceiling. Do not pass bytes to a MiB field. |
+| `BoxOptions(disk_gib=20)` fails | Use `disk_size_gb=20`. |
+| A valid configuration runs out of memory | Raise memory based on workload needs; you do not have to raise CPU with it. |
+| Resources exceed a per-box ceiling | Reduce the requested resource or check your organization's current limits. |
 
 <CardGroup cols={2}>
-  <Card title="Boxes" icon="arrow-left" href="/cloud/boxes">
-    Everything else about configuring a box on Cloud.
+  <Card title="Box lifecycle" icon="arrows-rotate" href="/cloud/box-lifecycle">
+    Control idle-stop, wake on access, and automatic deletion.
+  </Card>
+  <Card title="Billing" icon="credit-card" href="/cloud/billing">
+    Check usage and the resource ceilings for your organization.
   </Card>
 </CardGroup>

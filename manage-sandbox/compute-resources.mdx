@@ -5,6 +5,40 @@ description: "Allocate CPU (cpus), memory (memory_mib), and disk (disk_size_gb) 
 
 A test suite needs CPU, a large build needs disk, a long-lived service needs stable memory. Set all three explicitly in production rather than relying on defaults.
 
+CPU and memory can be set independently; there is no fixed ratio. For hosted boxes, use the complete [Cloud sizing examples](/cloud/box-sizes).
+
+## Fractional CPU
+
+`cpus` accepts numbers from **0.125 to 16**, in **0.001-core increments**, with the bundled guest kernel. Examples include `0.125`, `0.5`, `1`, and `1.5`.
+
+A fractional allocation limits aggregate CPU time on a Linux execution host. The guest sees the allocation rounded up to a whole number of virtual CPUs: `0.5` exposes one, and `1.5` exposes two. `nproc` reports that visible count, not the CPU-time limit.
+
+For a **local** box, fractional CPU requires Linux, the jailer, and an available cgroup v2 CPU controller. Local macOS execution accepts whole CPU allocations only. A client on macOS can still request fractional CPU from a Linux REST execution host; see [Cloud vs open source](/cloud/vs-opensource).
+
+<Note>
+On a self-hosted Linux machine, CPU quota application is best-effort. If the cgroup CPU controller cannot be configured, startup can succeed without the requested bandwidth limit and logs an error. Verify host cgroup setup before relying on quota enforcement.
+</Note>
+
+Configure a small local Linux box with either SDK:
+
+<CodeGroup>
+```python Python
+options = boxlite.BoxOptions(
+    image="alpine:latest", cpus=0.5, memory_mib=256,
+)
+# Pass options to your local runtime.create(...).
+```
+```typescript TypeScript
+const options = { image: 'alpine:latest', cpus: 0.5, memoryMib: 256 };
+// Pass options to your local runtime.create(...).
+```
+```bash CLI
+boxlite create --cpus 0.5 --memory 256 alpine:latest
+```
+</CodeGroup>
+
+Increase memory independently, for example to 4096 MiB while keeping `cpus=0.5`. Physical host capacity and any REST service quotas still apply.
+
 ## Quick Example
 
 The following uses Python to create a sandbox with **2 cores / 1024 MiB of memory / 8 GB of disk** and prints the configuration that actually takes effect.
@@ -79,7 +113,7 @@ main();
 
 | Parameter | Python (`SimpleBox` / `BoxOptions`) | Node (`SimpleBoxOptions`) | Type | Required | Description |
 |---|---|---|---|---|---|
-| CPU cores | `cpus` | `cpus` | Integer (Rust `u8`, max 255) | Optional | Number of vCPUs allocated to the sandbox |
+| CPU cores | `cpus` | `cpus` | Number (Python `float`, Rust `f64`) | Optional | CPU allocation; see [Fractional CPU](#fractional-cpu) for range and host requirements |
 | Memory | `memory_mib` | `memoryMib` | Integer (MiB, Rust `u32`) | Optional | Memory limit, in **MiB** (not bytes, not MB) |
 | Disk | `disk_size_gb` | `diskSizeGb` | Integer (GB, Rust `u64`) | Optional | Sandbox root disk size, in **GB** |
 
@@ -87,7 +121,7 @@ main();
 
 ### Defaults
 
-When `cpus` / `memory_mib` are not specified, the VM is provisioned with **1 vCPU / 1024 MiB**. Both values come from one place — `vm_defaults::DEFAULT_CPUS` / `DEFAULT_MEMORY_MIB` in `src/boxlite/src/runtime/constants.rs` — which the VM engine and the stored box config both read, so `box.info()` and the real allocation agree. To confirm the resources from inside the Box, query `nproc` (CPU) and `MemTotal` from `/proc/meminfo` (memory).
+When `cpus` / `memory_mib` are not specified, the VM is provisioned with **1 vCPU / 1024 MiB**. Both values come from one place — `vm_defaults::DEFAULT_CPUS` / `DEFAULT_MEMORY_MIB` in `src/boxlite/src/runtime/constants.rs` — which the VM engine and the stored box config both read, so `box.info()` and the real allocation agree. Read configured CPU from box information. Inside the guest, `nproc` reports visible vCPUs, while `MemTotal` from `/proc/meminfo` reports memory available after kernel reservations.
 
 When `disk_size_gb` is not specified, the disk is sparse and grows on demand (default cap 10 GB).
 
@@ -123,7 +157,7 @@ Some specialized sandboxes have their own higher resource defaults that override
 
 Symptom: you need to confirm how much a sandbox actually gets when `cpus` / `memory_mib` / `memoryMib` are not passed.
 
-Explanation: when not passed, the VM is provisioned with **1 vCPU / 1024 MiB**. To query the resources from inside the Box, read `nproc` (CPU) and `MemTotal` from `/proc/meminfo` (memory). See the "Defaults" subsection above.
+Explanation: when not passed, the VM is provisioned with **1 vCPU / 1024 MiB**. Read configured CPU from box information; `nproc` shows guest-visible vCPUs, not a fractional CPU-time limit. See the "Defaults" subsection above.
 
 Fix: for deterministic resources, **specify the parameters explicitly**; production code should not rely on implicit defaults:
 
@@ -150,15 +184,11 @@ Cause: `memory_mib` is in **MiB**, and `disk_size_gb` is in **GB**.
 
 Fix: write 2 GB of memory as `memory_mib=2048`; write 10 GB of disk as `disk_size_gb=10`.
 
-### CPU count exceeds 255
+### CPU allocation is rejected
 
-Symptom:
-- The SDK (Python/Node) passing `cpus=300` raises `OverflowError` directly when constructing `BoxOptions` (Python: `out of range integral type conversion attempted`), because the field is `u8` on the Rust side.
-- The CLI passing `--cpus 300` does not error; it prints a warning (`CPU limit capped at 255`) and truncates the value to 255.
+Use the range and precision under [Fractional CPU](#fractional-cpu). Out-of-range values are rejected instead of silently changing the requested allocation.
 
-Cause: the CPU count is `u8` (max 255) on the Rust side. The SDK path overflows during the PyO3/napi integer conversion; the CLI path explicitly applies `min(255)` and warns in the `cpus > 255` guard in `src/cli/src/cli.rs`.
-
-Fix: use a reasonable core count (typically 1-8), not exceeding the host's physical cores, and not exceeding 255.
+For `fractional cpus requires a Linux host`, use whole CPU allocations locally on macOS or connect to a Linux execution host. For a jailer or cgroup error, check the Linux host configuration.
 
 ### Startup fails in a no-virtualization environment
 

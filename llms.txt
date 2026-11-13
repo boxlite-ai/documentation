@@ -95,7 +95,7 @@
 
 ### Boxes
 - [Boxes](/cloud/boxes.md): A box on BoxLite Cloud is a microVM you address by name or id from anywhere your API key reaches — choose its image and size, and know when…
-- [Choose a size for a Cloud box](/cloud/box-sizes.md): The three preset sizes, the per-organization ceilings that bound any single box, and the SDK fields that set them.
+- [Choose CPU and memory for a Cloud box](/cloud/box-sizes.md): Create Cloud boxes with fractional CPU, choose memory independently, and verify the requested configuration.
 - [Box lifecycle on Cloud](/cloud/box-lifecycle.md): The three controls that decide when a Cloud box stops, whether it wakes again, and when it is deleted — and the idle rule that can end a job…
 - [Create, reuse, and remove a box from code](/cloud/box-from-code.md): The full create-start-use-remove cycle over REST, reusing a box by name, managing one from the console, and passing environment variables.
 - [SSH into a Cloud box](/cloud/ssh.md): Set up SSH, connect from your terminal, and reconnect to a BoxLite Cloud box without repeating setup.

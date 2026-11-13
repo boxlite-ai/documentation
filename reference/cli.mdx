@@ -624,7 +624,7 @@ The following flag groups are reused across multiple commands (`src/cli/src/cli.
 
 | Flag | Description |
 |---|---|
-| `--cpus <N>` | Number of vCPUs (values above 255 are clamped to 255 with a warning, cli.rs:420-423) |
+| `--cpus <N>` | CPU allocation, including fractions such as `0.5` on Linux execution hosts. See [Compute resources](/manage-sandbox/compute-resources#fractional-cpu) |
 | `--memory <MiB>` | Memory cap (MiB) |
 | `--disk-size <GB>` | Virtual rootfs disk size (GB); the copy-on-write overlay grows sparsely, and a value smaller than the base image is ignored |
 

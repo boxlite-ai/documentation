@@ -216,7 +216,7 @@ BoxOptions(
 |---|---|---|---|---|
 | `image` | `str` | one of image/rootfs_path | — | OCI image reference, e.g. `"alpine:latest"` |
 | `rootfs_path` | `str` | one of image/rootfs_path | — | Path to a local OCI image layout directory (the on-disk form of a container image); an alternative to `image` |
-| `cpus` | `int` | optional | `None` (see note) | Number of CPU cores. When unset, the runtime allocates 1 vCPU |
+| `cpus` | `float` | optional | `None` (see note) | CPU allocation, including fractions on Linux. See [Compute resources](/manage-sandbox/compute-resources#fractional-cpu). When unset, the runtime allocates 1 vCPU |
 | `memory_mib` | `int` | optional | `None` (see note) | Memory in MiB. When unset, the runtime allocates 1024 MiB |
 | `disk_size_gb` | `int` | optional | `None` | Persistent disk size (None = ephemeral) |
 | `working_dir` | `str` | optional | image config | Working directory inside the container |
@@ -324,7 +324,7 @@ SimpleBox(
 | `image` | `str` | one of image/rootfs_path | — | Image |
 | `rootfs_path` | `str` | one of image/rootfs_path | — | Path to a local OCI image layout directory (the on-disk form of a container image); an alternative to `image` |
 | `memory_mib` | `int` | optional | system default | Memory in MiB |
-| `cpus` | `int` | optional | system default | Number of CPU cores |
+| `cpus` | `float` | optional | system default | CPU allocation; see [Compute resources](/manage-sandbox/compute-resources#fractional-cpu) |
 | `runtime` | `Boxlite` | optional | global default | Runtime instance |
 | `name` | `str` | optional | `None` | Unique name |
 | `auto_remove` | `bool` | optional | `True` | Clean up on stop |
@@ -492,7 +492,7 @@ print(info.id, info.image, info.cpus, info.memory_mib)
 | `state` | `BoxStateInfo` | **State object (not a string)** |
 | `created_at` | — | Creation time |
 | `image` | `str` | Image |
-| `cpus` / `memory_mib` | `int` | The configured resource values. To read the real allocation, run `nproc` / read `/proc/meminfo` inside the box |
+| `cpus` / `memory_mib` | `float` / `int` | Configured CPU allocation and memory. `nproc` reports guest-visible vCPUs, not fractional CPU-time limits |
 | `health_status` | `HealthStatus` | Health status |
 
 | `BoxStateInfo` field | Type | Notes |

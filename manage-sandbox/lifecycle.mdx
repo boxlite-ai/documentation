@@ -696,7 +696,7 @@ Verified: real run prints `running boxes before shutdown: 3`, `shutdown complete
 |---|---|---|---|---|
 | `image` | str | Optional\* | — | Image reference, e.g. `alpine:latest`. At least one of `image` and `rootfs_path` |
 | `rootfs_path` | str | Optional\* | — | Path to a local OCI image layout directory (the on-disk form of a container image); an alternative to `image` |
-| `cpus` | int | Optional | 1 (see [Compute resources](/manage-sandbox/compute-resources)) | Number of vCPUs |
+| `cpus` | number | Optional | 1 (see [Compute resources](/manage-sandbox/compute-resources)) | CPU allocation; see [Compute resources](/manage-sandbox/compute-resources#fractional-cpu) |
 | `memory_mib` | int | Optional | 1024 | Memory in MiB |
 | `auto_remove` | bool | Optional | `True` | Whether to remove automatically on `stop()` (mutually exclusive with `detach=True`\*\*) |
 | `detach` | bool | Optional | `False` | Whether to survive the parent process (mutually exclusive with `auto_remove=True`\*\*) |
