@@ -5,6 +5,10 @@ description: "Save a sandbox's disk state, create a fully independent copy, or p
 
 Three distinct primitives: **snapshot** marks a disk state in place, **clone** produces a brand-new independent box from an existing one, and **export / import** packs a box into a portable `.boxlite` archive. They are not interchangeable — the differences are in [Parameters and Returns](#parameters-and-returns).
 
+<Note>
+For hosted boxes, use [Cloud checkpoints](/cloud/checkpoints) to save a stopped box and create new boxes from its saved state. See [Cloud vs open source](/cloud/vs-opensource) for API availability.
+</Note>
+
 ## Which one do you need?
 
 | Need | Use | Number of copies | Cross-machine |

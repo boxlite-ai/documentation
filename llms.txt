@@ -115,6 +115,9 @@
 - [Use a private image](/cloud/private-images.md): Register one registry login so BoxLite can pull your private images, and know which images that login covers.
 - [What the catalog records](/cloud/image-catalog.md): Every image your boxes have booted is recorded once, outlives the box, and counts against a limit — here is how to see it and clear it.
 
+### Checkpoints
+- [Checkpoints: save and reuse a box](/cloud/checkpoints.md): Prepare a workspace once, save a checkpoint, and create independent boxes from it with Python, TypeScript, or CLI.
+
 ### Volumes
 - [Volumes](/cloud/volumes.md): Storage that outlives the box that wrote it — create a managed volume, mount it by a name you choose, and keep the data after the box is gon…
 - [Create a volume and mount it into a box](/cloud/mount-a-volume.md): Create a managed volume, mount it into a box at a path you choose, and write and read through the mount.

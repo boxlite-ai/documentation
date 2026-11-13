@@ -216,6 +216,12 @@
             ]
           },
           {
+            "group": "Checkpoints",
+            "icon": "camera",
+            "root": "cloud/checkpoints",
+            "pages": []
+          },
+          {
             "group": "Volumes",
             "icon": "database",
             "root": "cloud/volumes",
