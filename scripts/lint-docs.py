@@ -49,6 +49,12 @@ ALLOWED_LINES = [
 ]
 
 
+# Exact product statuses approved in the subscription design, not general promises.
+SUBSCRIPTION_STATUS_LINES = {
+    "| API key usage limits | — | — | Coming soon |",
+    "| Enterprise SSO | — | — | Coming soon |",
+}
+
 def strip_inline_code(line: str) -> str:
     """Blank out `inline code` spans so quoted error strings are not flagged."""
     return re.sub(r"`[^`]*`", "``", line)
@@ -64,6 +70,8 @@ def check(path: Path) -> list[tuple[int, str, str, str]]:
         if in_fence:
             continue
         if any(allowed in raw for allowed in ALLOWED_LINES):
+            continue
+        if path.parts[-2:] == ("cloud", "plans.mdx") and raw.strip() in SUBSCRIPTION_STATUS_LINES:
             continue
         prose = strip_inline_code(raw)
         for pattern, suggestion in BANNED:

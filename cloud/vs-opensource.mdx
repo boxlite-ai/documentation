@@ -179,7 +179,7 @@ This one catches people who came from the open-source reference server. That ser
 | `BoxOptions` rejects `idle_timeout` or `wake_on_access` as unknown fields | Those are not the field names | Use `auto_stop`, `auto_resume`, and `auto_delete` — see [Boxes](/cloud/boxes) |
 | `boxlite pull` and image APIs report that the operation is unsupported | Image operations are not supported over REST | Use a console base image or `ghcr.io/boxlite-ai/boxlite-agent-base:v0.1.0` |
 | HTTP 401 on every call | The key is missing, wrong, or expired | Check `BOXLITE_API_KEY` and the key's expiry — see [API keys](/cloud/api-keys) |
-| Box creation fails once a number of boxes are already running | You reached your plan's concurrency limit | Remove idle boxes, or change plan — see [Wallet or a plan?](/cloud/plans#concurrency-is-a-separate-decision) |
+| Box creation or startup fails because a limit is reached | The total Box count and running concurrency have separate limits | Delete unused Boxes to free total capacity; stop idle Boxes to free running capacity. See [Plans and limits](/cloud/plans#box-limits) |
 | A long-running job stops partway through | The box hit its idle timeout — work inside the box does not count as activity | Adjust the idle switches for that box — see [Boxes](/cloud/boxes) |
 
 ## Next

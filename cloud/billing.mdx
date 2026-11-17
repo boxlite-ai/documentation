@@ -4,7 +4,7 @@ sidebarTitle: "Managing billing"
 description: "Fund your wallet, set automatic reload so boxes never stop for lack of balance, read what you have actually been charged, and know the per-box ceilings that apply to every box in your organization."
 ---
 
-This page covers running the account. For what a box costs see [What a box costs](/cloud/box-costs); for whether to subscribe see [Wallet or a plan?](/cloud/plans).
+This page covers running the account. For what a box costs see [What a box costs](/cloud/box-costs); for whether to subscribe see [Plans and limits](/cloud/plans).
 
 Your **wallet** is a prepaid balance. It funds usage once a plan's included quota is consumed, and it funds everything if you have no plan.
 
@@ -28,7 +28,7 @@ It prefills $20 and $100. Reload stays off until you save it, and it charges you
 
 ### Connect a payment method
 
-Until a card is attached the console shows the payment method as not connected, with a **Connect** button beside it. Connecting one earns an additional **$100 of credits**.
+Until a card is attached the console shows the payment method as not connected, with a **Connect** button beside it.
 
 ### Redeem a coupon
 
@@ -55,7 +55,7 @@ Read the current CPU, memory, and storage ceilings for your organization in **Bi
 
 These bound how large a **single box** can be — a different constraint from your plan's concurrency limit, which bounds how many boxes run at once. A request above a ceiling is rejected before the box is created, so you get a clear error rather than a box that fails later. See [Choose a size](/cloud/box-sizes) for fractional CPU and independently configured memory within those ceilings.
 
-If a workload genuinely needs a larger single box, that is an Enterprise conversation — custom limits go through [sales@boxlite.ai](mailto:sales@boxlite.ai).
+For custom resource limits, [book a call](https://boxlite.ai/contact).
 
 ## Troubleshooting
 
@@ -65,7 +65,7 @@ If a workload genuinely needs a larger single box, that is an Enterprise convers
 | Boxes stopped and the console reports credits depleted | Nothing remains to fund them, so the platform stops boxes rather than running up an unfunded bill | Top up, then set automatic reload so it does not recur |
 | Automatic reload is configured but never fires | Reload needs a card to charge, and no payment method is connected | Connect a card on the **Wallet** tab |
 | The available balance drops while you have taken no payment | The figure is the ongoing balance, which already includes usage accrued but not yet settled | Nothing is wrong. Compare against the **Usage** tab for settled cost |
-| The payment method shows as not connected | No card is attached to the account | Click **Connect** on the **Wallet** tab. Connecting one also earns $100 of credits |
+| The payment method shows as not connected | No card is attached to the account | Click **Connect** on the **Wallet** tab. |
 | A box request asks for more CPU, memory, or disk than allowed | It exceeds a per-box ceiling for the organization | Lower the request, or spread the work across several boxes within your concurrency limit |
 | Cost is higher than expected with no obvious cause | Stopped boxes are still billed for their disk until they are deleted | Delete boxes you have finished with. See [What each box state costs](/cloud/box-costs#what-each-box-state-costs) |
 
@@ -75,7 +75,7 @@ If a workload genuinely needs a larger single box, that is an Enterprise convers
   <Card title="What a box costs" icon="calculator" href="/cloud/box-costs">
     Rates, worked examples, and the two controls that cap what you keep paying.
   </Card>
-  <Card title="Wallet or a plan?" icon="scale-balanced" href="/cloud/plans">
-    The usage level at which a subscription starts costing less.
+  <Card title="Plans and limits" icon="scale-balanced" href="/cloud/plans">
+    Compare usage funding, limits, and capabilities.
   </Card>
 </CardGroup>

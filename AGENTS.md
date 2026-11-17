@@ -188,6 +188,8 @@ The word **`yet`** is the signal. Delete it and the sentence is usually correct.
 
 Legitimate exceptions — these describe a point-in-time state, not a future promise, and must not be rewritten: real SDK error strings (`Error: Box not yet created...`), lifecycle descriptions ("VM not yet started"), transient states ("the box is not yet ready"), and prose addressed to the reader ("if you have not yet read...").
 
+The subscription design explicitly labels API key usage limits and Enterprise SSO as `Coming soon`. Only these two exact status rows in `cloud/plans.mdx` are allowed; the page must also state that they are not available entitlements. Do not extend this exception to other capabilities or prose.
+
 `scripts/lint-docs.py` enforces this in CI. Run it before opening a PR:
 
 ```bash

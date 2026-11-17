@@ -4,6 +4,8 @@ sidebarTitle: "Volumes"
 description: "Storage that outlives the box that wrote it — create a managed volume, mount it by a name you choose, and keep the data after the box is gone."
 ---
 
+Volumes and high-performance volumes are Team capabilities. See [Storage entitlements](/cloud/plans#domains-storage-and-images).
+
 A box loses everything on its disk when it is destroyed. A volume does not. Mount one into a box and the data outlives it.
 
 A volume has a server-assigned `id` and a `name`, and **either one mounts it** — so a worker can mount `("training-data", "/data")` without ever looking up an id.
