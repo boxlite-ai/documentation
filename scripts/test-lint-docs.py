@@ -11,6 +11,10 @@ spec.loader.exec_module(lint)
 
 class SubscriptionStatusTests(unittest.TestCase):
     def test_only_exact_status_rows_on_plans_page_are_allowed(self):
+        self.assertEqual(lint.SUBSCRIPTION_STATUS_LINES, {
+            "| API key usage limits | — | — | Coming soon |",
+            "| Enterprise SSO | — | — | Coming soon |",
+        })
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "cloud").mkdir()

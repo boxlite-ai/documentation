@@ -15,6 +15,8 @@ jobs:
           python-version: "3.12"
       - name: No soft promises (AGENTS.md)
         run: python3 scripts/lint-docs.py .
+      - name: Subscription status lint regression
+        run: python3 scripts/test-lint-docs.py
       - name: llms.txt matches docs.json and page frontmatter
         run: python3 scripts/gen-llms-txt.py --check
       - name: Nav targets, MDX hazards, table defaults
