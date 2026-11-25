@@ -182,6 +182,13 @@
             ]
           },
           {
+            "group": "MCP",
+            "icon": "plug",
+            "pages": [
+              "cloud/mcp"
+            ]
+          },
+          {
             "group": "Boxes",
             "icon": "cube",
             "root": "cloud/boxes",

@@ -93,6 +93,9 @@
 - [Run untrusted code on BoxLite Cloud](/cloud/quickstart.md): Create an API key, point the SDK at BoxLite Cloud, and run a command inside a hardware-isolated box — no local virtualization, no daemon, th…
 - [API keys and authentication](/cloud/api-keys.md): Create a BoxLite Cloud API key, hand it to the SDK, CLI, or curl through the environment, and rotate it without downtime.
 
+### MCP
+- [MCP server](/cloud/mcp.md): Connect your coding agent to BoxLite Cloud to manage boxes, run commands, and transfer files over MCP.
+
 ### Boxes
 - [Boxes](/cloud/boxes.md): A box on BoxLite Cloud is a microVM you address by name or id from anywhere your API key reaches — choose its image and size, and know when…
 - [Choose CPU and memory for a Cloud box](/cloud/box-sizes.md): Create Cloud boxes with fractional CPU, choose memory independently, and verify the requested configuration.

@@ -1,0 +1,168 @@
+---
+title: "MCP server"
+description: "Connect your coding agent to BoxLite Cloud to manage boxes, run commands, and transfer files over MCP."
+---
+
+Connect your coding agent to BoxLite Cloud through the hosted Model Context Protocol (MCP) server. Your agent can create boxes, run code, and move files without installing the BoxLite CLI, SDK, or a plugin ZIP.
+
+## Connect your agent
+
+You need a [BoxLite Cloud API key](/cloud/api-keys) and an agent with an MCP client that supports **Streamable HTTP** and bearer authentication.
+
+### 1. Make your key available
+
+Store your API key in your agent's private secret store or in the environment of the process that starts it. For a terminal-launched agent:
+
+```bash
+read -rs BOXLITE_API_KEY
+export BOXLITE_API_KEY
+```
+
+Start the agent from that shell. For a desktop or hosted agent, configure the secret in that application's environment; exporting it in another terminal does not make it available there.
+
+### 2. Add the hosted server
+
+Use your agent's remote MCP server settings:
+
+| Setting | Value |
+|---|---|
+| Name | `boxlite` |
+| Transport | Streamable HTTP |
+| URL | `https://api.boxlite.ai/mcp` |
+| HTTP header | `Authorization: Bearer <YOUR_API_KEY>` |
+
+Have the client resolve the key from its secret store or environment when sending the header. Environment-variable syntax is client-specific: `${BOXLITE_API_KEY}` is not a substitution performed by the BoxLite server.
+
+<Note>
+These are connection settings, not a universal configuration file. If your agent supports only local stdio MCP servers, it cannot use this remote configuration directly. It needs Streamable HTTP support or a separately configured transport bridge.
+</Note>
+
+### 3. Verify the connection
+
+Reconnect or restart the client, then ask:
+
+```text
+Use BoxLite to list my boxes. Do not create or change any resources.
+```
+
+The client should discover `listBoxes` and call it with `{}`. A successful result contains a `boxes` array; an empty array is also a successful connection. Some agents prefix tool names, for example `mcp__boxlite__listBoxes`.
+
+A server appearing in your client's configuration does not prove it connected. Verify that tools were discovered and that the tool call succeeded. Check both protocol errors and the tool result's `isError` field.
+
+## Available tools
+
+BoxLite exposes focused tools for common box operations and discovery tools for the wider Cloud API. Read the live input schema before constructing arguments.
+
+| Tool | Operation |
+|---|---|
+| `createBox` | Create an isolated Linux box from a container image or other supported source. |
+| `listBoxes` | List boxes in your organization; supports pagination and a status filter. |
+| `getBox` | Read a box's state, image, resources, and network settings. |
+| `startBox` | Start a stopped box. |
+| `stopBox` | Stop a box while keeping its disk. |
+| `removeBox` | Permanently delete a box and its disk. |
+| `startExecution` | Run a command, starting the box if needed. Wait for output or return an execution ID. |
+| `getExecution` | Read execution status and exit code. |
+| `uploadFiles` | Upload a base64-encoded tar archive into a box. |
+| `downloadFiles` | Download a path as a base64-encoded tar archive. |
+| `list_api_endpoints` | Find API operations by name, path, or summary. |
+| `get_api_endpoint_schema` | Read an operation's description and argument schema. |
+| `read_api_endpoint` | Invoke a read operation identified by its `operationId`. |
+| `write_api_endpoint` | Invoke a modifying operation identified by its `operationId`. |
+
+Tool discovery does not grant additional permissions. Calls use your credential's permissions, and an operation listed in the API catalog may be unavailable to your account.
+
+## Run your first command
+
+Once the read-only check succeeds, ask your agent to run a small task:
+
+```text
+Create a temporary Python box, run Python to print "Hello from BoxLite",
+show me stdout and the exit code, then stop the box. Keep its disk.
+```
+
+The following examples are **tool arguments**, not client configuration or raw HTTP requests.
+
+1. Call `createBox`:
+
+```json
+{
+  "body": {
+    "image": "python:3.12-slim"
+  }
+}
+```
+
+2. Take the returned box ID and call `startExecution`:
+
+```json
+{
+  "box_id": "<RETURNED_BOX_ID>",
+  "wait": true,
+  "body": {
+    "command": "python",
+    "args": ["-c", "print('Hello from BoxLite')"],
+    "timeout_seconds": 30
+  }
+}
+```
+
+Check the tool result for errors before using its output. With `wait: true`, a completed command returns stdout, stderr, and an exit code. A nonzero exit code means the command failed even if the MCP call itself succeeded.
+
+3. Call `stopBox` with the same `box_id`. Stopping preserves the disk; use `removeBox` only when you intend to delete it. See [box lifecycle](/cloud/box-lifecycle) and [cost controls](/cloud/cost-controls).
+
+For a longer task, set `wait: false` on `startExecution` and pass its returned execution ID as `exec_id` to `getExecution`. That tool reports status and exit code; do not assume it returns command output. Save long-running task output to a file when you need to retrieve it later.
+
+Keep identifiers exactly as returned. For list pagination, pass `next_page_token` back as `pageToken` until no next token remains.
+
+## Discover more operations
+
+Use the API discovery tools for capabilities such as [volumes](/cloud/volumes), [images](/cloud/images), [checkpoints](/cloud/checkpoints), [SSH](/cloud/ssh), [network policy](/cloud/network-policy), and [domains](/cloud/domains).
+
+For example, discover volume operations:
+
+```json
+{
+  "search": "volume"
+}
+```
+
+Pass that object to `list_api_endpoints`. Choose the returned operation, call `get_api_endpoint_schema` with its exact `operationId`, and construct arguments from that schema. Invoke the tool named by `invocationTool` in the discovery response.
+
+To inspect the server's enabled capabilities, first request the schema for `getConfig`, then call `read_api_endpoint`:
+
+```json
+{
+  "operationId": "getConfig",
+  "arguments": {}
+}
+```
+
+Check capability flags before selecting a workflow. An API's presence in the catalog does not mean every related feature is enabled. See [Cloud capabilities](/cloud/vs-opensource) for the differences from a local runtime.
+
+## Build MCP support into a new agent
+
+If you are implementing the client yourself, use an MCP SDK with Streamable HTTP support:
+
+1. Resolve the API key in the host process and attach the bearer header to the transport's requests.
+2. Initialize the MCP connection through the SDK and discover tools with `tools/list`, following any pagination.
+3. Expose each tool's name, description, and `inputSchema` to your agent's tool system. Keep the original server name when dispatching calls, even if your UI adds a namespace.
+4. Send tool invocations through `tools/call`. Preserve content blocks and structured results, and surface protocol errors, tool errors, and command exit codes separately.
+5. Refresh discovery after reconnecting or receiving a tool-list change notification. Close the client when the agent shuts down.
+
+Start with `listBoxes` and the `getConfig` discovery sequence above as your acceptance checks. Neither needs a model inference to prove the transport and credential work.
+
+Keep the API key in the transport layer rather than including it in model prompts or tool arguments. Operations that accept `Idempotency-Key` can use a client-generated UUID for safe retries of the same request. After an uncertain write result, reuse that key with the same arguments; do not blindly repeat the action with a new key.
+
+## Troubleshooting
+
+| Symptom | What to check |
+|---|---|
+| HTTP `401` | Confirm the key is valid and the client sends the resolved `Authorization` header. Check the agent process's environment. |
+| HTTP `403` or a permission error in a tool result | Check the key's permissions and the operation's account requirements. Reconnecting does not grant access. |
+| No tools appear | Confirm the URL ends in `/mcp`, the transport is Streamable HTTP, and the client actually connected. |
+| Invalid arguments | Fetch the current tool or operation schema. Use exact field names and put the request body under `body` where specified. |
+| Execution times out | For long tasks, use `wait: false`, poll status, and keep output in a file. An interrupted client request is not proof the command never ran. |
+| File contents are unreadable | File tools transfer tar archives encoded as base64, not plain text or a local file path. Decode and extract the returned archive. |
+
+For credential creation, expiry, and rotation, see [API keys and authentication](/cloud/api-keys).
