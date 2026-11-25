@@ -184,9 +184,8 @@
           {
             "group": "MCP",
             "icon": "plug",
-            "pages": [
-              "cloud/mcp"
-            ]
+            "pages": [],
+            "root": "cloud/mcp"
           },
           {
             "group": "Boxes",
