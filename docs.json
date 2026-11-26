@@ -301,7 +301,7 @@
   },
   "logo": {
     "light": "/logo/light.png",
-    "href": "/",
+    "href": "https://boxlite.ai",
     "dark": "/logo/dark.png"
   },
   "navbar": {
