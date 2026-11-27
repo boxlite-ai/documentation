@@ -1,0 +1,47 @@
+---
+title: "BoxLite CI"
+sidebarTitle: "Overview"
+description: "Run GitHub Actions jobs in temporary Linux boxes with resources selected per job."
+---
+
+BoxLite CI runs jobs from your existing GitHub Actions workflows in temporary Linux boxes. Keep your workflow triggers, Actions, logs, and results in GitHub. BoxLite prepares the execution environment and reclaims it after the runner exits.
+
+Move one job or an entire workflow to BoxLite by changing its `runs-on` label. Choose a separate machine size for each job.
+
+```diff .github/workflows/ci.yml
+ jobs:
+   build:
+-    runs-on: ubuntu-latest
++    runs-on: boxlite
+```
+
+## How jobs run
+
+A **workflow** is a YAML file in `.github/workflows/`. Each **job** runs its steps on a **runner**, the program that executes GitHub Actions. A **box** is the temporary virtual machine that hosts that runner.
+
+```text
+GitHub workflow
+├── build job → runner in box A → build steps → cleanup
+└── test job  → runner in box B → test steps  → cleanup
+```
+
+Steps in one job share a workspace and local Docker environment. Different jobs use separate boxes. Use artifacts to transfer files between jobs; `needs` controls execution order, not filesystem sharing.
+
+## Start here
+
+<CardGroup cols={2}>
+  <Card title="Run your first job" icon="play" href="/cloud/ci/quickstart">
+    Connect GitHub through the console and run a minimal workflow.
+  </Card>
+  <Card title="Resources and environment" icon="microchip" href="/cloud/ci/resources">
+    Choose CPU, memory, and disk. Understand Docker, workspaces, and artifact transfer.
+  </Card>
+  <Card title="Concurrency and billing" icon="gauge" href="/cloud/ci/operations">
+    Set job limits, understand queueing, and estimate usage through cleanup.
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/cloud/ci/troubleshooting">
+    Diagnose jobs that wait, fail, or leave resources awaiting cleanup.
+  </Card>
+</CardGroup>
+
+Prefer terminal setup? Follow [Connect CI with the CLI](/cloud/ci/cli).

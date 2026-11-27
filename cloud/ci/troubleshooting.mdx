@@ -1,0 +1,35 @@
+---
+title: "Troubleshoot CI jobs"
+sidebarTitle: "Troubleshooting"
+description: "Diagnose waiting jobs, resource limits, build failures, and delayed cleanup."
+---
+
+Start with the individual job in GitHub Actions, then check the connection and runner in BoxLite.
+
+| Symptom | What to check |
+| --- | --- |
+| No workflow run appears | Check event triggers, branch filters, and path filters. Commit a manual smoke test to the default branch. |
+| Job is waiting on another job | Check `needs`. The job requests a runner after its prerequisites are satisfied. |
+| **Waiting for a runner** | Follow [Waiting for a runner](#waiting-for-a-runner). |
+| Job waits after a label change | Check `runs-on` in the commit used by this run. Include all resource fields and exactly one BoxLite resource label. |
+| Label is valid but size exceeds limits | Reduce the request to fit your [per-box limits](/cloud/billing#per-box-resource-ceilings). Increasing CI slots does not increase these limits. |
+| Build runs out of memory | Confirm an OOM message, then increase memory or reduce tool parallelism. Exit code `137` alone does not establish OOM. |
+| A command is missing | Install the required tool and version explicitly in the workflow. |
+| A downstream job cannot find a file | Upload and download an artifact. `needs` does not transfer files. |
+| Job ended but its box or slot remains | Check the box ID and state in **CI → Runners**. If it remains stuck, contact support with the details below. |
+
+## Waiting for a runner
+
+Check these in order:
+
+1. In [GitHub connections](https://app.boxlite.ai/dashboard/ci/connects), confirm **Listener** is **Ready** and expand the account to find your repository.
+2. If the repository is missing, check the GitHub app's repository selection. Private repositories also require **Allow private repositories** in BoxLite.
+3. In the GitHub run, check the requested `runs-on` label. Use `boxlite` or one [explicit size](/cloud/ci/resources#explicit-size).
+4. In [CI → Runners](https://app.boxlite.ai/dashboard/ci), check **CI slots**. If paused, an organization owner must raise the limit; if full, wait for a slot.
+5. Check account capacity and per-box limits if slots are available. Other boxes also consume account capacity.
+
+After correcting the connection or capacity, watch the queued job for a runner. If you changed workflow YAML, commit it and start a new run.
+
+## Contact support
+
+When contacting support, include the GitHub run URL, job name, `runs-on` label, box ID if available, and the time of the failure. Do not include API keys, GitHub tokens, or other secrets.

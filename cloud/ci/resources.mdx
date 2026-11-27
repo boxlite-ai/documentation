@@ -1,0 +1,118 @@
+---
+title: "Configure CI resources and environment"
+sidebarTitle: "Resources and environment"
+description: "Choose CPU, memory, and disk for each job, and understand Docker and file isolation."
+---
+
+## Choose job resources
+
+**Job size** controls the CPU, memory, and disk available to one job. **Concurrency** controls how many jobs can run at once.
+
+### Default size
+
+`runs-on: boxlite` uses the service default, currently **2 vCPU, 2 GiB memory, and 10 GiB disk**. Use an explicit label when your workflow requires a fixed size.
+
+### Check the allocated resources
+
+While a job is starting or running, open [CI → Runners](https://app.boxlite.ai/dashboard/ci). The table shows each runner’s Box ID, image, CPU, memory, disk, and status. Click its name to open the box details. Finished runners disappear after cleanup, so inspect this table during the run.
+
+Inside a job, use `nproc`, `free -m`, and `df -h /` to inspect the guest. Guest-visible memory and filesystem capacity can be lower than the requested allocation because of system and filesystem overhead. Available memory and free disk are lower still after the runner, tools, and job data consume resources.
+
+### Explicit size
+
+```yaml
+runs-on: boxlite-2vcpu-4gbmem-10gbdisk
+```
+
+This requests 2 vCPU, 4 GiB memory, and 10 GiB disk. BoxLite creates a box with the requested resources for this job.
+
+| Label field | Meaning | Accepted format |
+| --- | --- | --- |
+| `vcpu` | Virtual CPU count | Integer from 1 to 16 |
+| `gbmem` | Memory in GiB | Integer from 1 to 128 |
+| `gbdisk` | Disk in GiB | Positive integer, subject to organization limits |
+
+All three fields are required. Use positive integers without leading zeros. The requested size must also fit your organization's [per-box resource limits](/cloud/billing#per-box-resource-ceilings). The label format may accept sizes above your account limit.
+
+Each job must specify exactly one BoxLite resource label. Replace `boxlite` with the explicit label; do not include both in a `runs-on` array.
+
+### Different sizes for different jobs
+
+This workflow builds a file on a larger box and checks it on a smaller one. The artifact transfers the file between the isolated workspaces.
+
+```yaml .github/workflows/build-and-verify.yml
+name: Build and verify
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: boxlite-2vcpu-4gbmem-10gbdisk
+    steps:
+      - run: echo "build complete" > result.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result
+          path: result.txt
+
+  verify:
+    needs: build
+    runs-on: boxlite-1vcpu-1gbmem-10gbdisk
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: result
+      - run: grep -Fx "build complete" result.txt
+```
+
+For memory-intensive builds, increase `gbmem` or reduce the build tool's parallelism. For CPU-intensive work, compare total runtime and usage before increasing CPU. Allow enough disk for dependencies, build output, and Docker images.
+
+## Execution environment
+
+### Inspect the environment
+
+Run these commands in a step to check the actual operating system and architecture:
+
+```yaml
+- name: Inspect environment
+  run: |
+    cat /etc/os-release
+    uname -m
+```
+
+Install language versions explicitly. For a repository with `package-lock.json` and an npm `test` script, add this job to your workflow:
+
+```yaml
+jobs:
+  test:
+    runs-on: boxlite
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm test
+```
+
+### Docker and service containers
+
+Docker is available inside each job's box. Use Docker commands and workflow `services` in your workflow; run `docker info` to check availability.
+
+Steps in the job share that Docker environment. Local images and containers are reclaimed with the box; do not depend on them being available to a later job.
+
+### Files, artifacts, and caches
+
+| Data | Where it lives |
+| --- | --- |
+| Workspace files and software installed during a job | In the job's box, reclaimed during cleanup |
+| Local Docker images and containers | In the job's box, reclaimed during cleanup |
+| Uploaded GitHub artifacts | In GitHub, under the artifact retention policy |
+| Job logs and results | In GitHub Actions, under its retention policy |
+
+Upload artifacts for output you need after the job ends. Dependency caches require explicit workflow configuration; installed packages do not persist between boxes.

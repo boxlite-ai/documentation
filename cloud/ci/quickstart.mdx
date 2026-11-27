@@ -1,0 +1,70 @@
+---
+title: "Run your first CI job"
+sidebarTitle: "Quickstart"
+description: "Connect GitHub and run your first job on a BoxLite runner."
+---
+
+Prefer terminal setup? See [Connect CI with the CLI](/cloud/ci/cli).
+
+## Connect your repository
+
+Use a BoxLite organization where you are an owner. The GitHub account completing authorization must own the target personal account or be an owner of the target GitHub organization.
+
+1. Open [CI → GitHub connections](https://app.boxlite.ai/dashboard/ci/connects) in the BoxLite console.
+2. Click **Connect GitHub**. GitHub opens **Authorize BoxLite Runners Connect**, which verifies your GitHub identity. Check the displayed account before authorizing.
+3. Find the personal account or organization that owns your repository.
+4. Enable **Allow private repositories** if you need private repository access.
+5. Click **Install**, select the repositories in GitHub, and confirm the installation. If the app is already installed, follow the **Connect** option.
+6. Return to **GitHub connections**. Wait for **Listener** to change from **Provisioning** to **Ready**, then expand the connected account and confirm that your repository appears.
+
+For a personal account, the installation page is named **BoxLite Runners (Personal)**. Choose **Only select repositories** to grant access only to the repositories you want to run on BoxLite. Repository administration access lets the app manage runners.
+
+<Note>
+You do not need a BoxLite API key in your workflow. GitHub authorization verifies your identity; app installation grants repository access. Complete both steps.
+</Note>
+
+## Change an existing job
+
+Replace the job's `runs-on` value in your workflow:
+
+```diff .github/workflows/ci.yml
+ jobs:
+   build:
+-    runs-on: ubuntu-latest
++    runs-on: boxlite
+```
+
+Commit the change and trigger the workflow as usual. Open the run in your repository's **Actions** tab, then select the job to view its steps and logs.
+
+<Note>
+Changing runners changes the execution environment. Install the toolchain versions your workflow needs explicitly rather than relying on the software preinstalled on a GitHub-hosted runner.
+</Note>
+
+## Verify a new connection
+
+If you do not have a workflow to migrate, commit this file to your repository's default branch:
+
+```yaml .github/workflows/boxlite-smoke.yml
+name: BoxLite connection test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: boxlite
+    timeout-minutes: 5
+    steps:
+      - name: Verify runner
+        run: |
+          echo "BoxLite runner is working"
+          uname -sm
+```
+
+With a GitHub account that has repository write access, open **Actions → BoxLite connection test → Run workflow**. Select **verify → Verify runner** in the new run.
+
+The **Verify runner** step should succeed and print `BoxLite runner is working`. If it stays queued, follow [Waiting for a runner](/cloud/ci/troubleshooting#waiting-for-a-runner). This test consumes billable compute.
+
+<Tip>Need a different machine size? See [Resources and environment](/cloud/ci/resources).</Tip>

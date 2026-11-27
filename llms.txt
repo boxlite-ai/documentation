@@ -142,6 +142,14 @@
 ### Domains
 - [Give your service a fixed public domain](/cloud/domains.md): Reach a service inside a Cloud box through a named HTTPS address, and keep that address when you move to another box.
 
+### CI
+- [BoxLite CI](/cloud/ci/index.md): Run GitHub Actions jobs in temporary Linux boxes with resources selected per job.
+- [Run your first CI job](/cloud/ci/quickstart.md): Connect GitHub and run your first job on a BoxLite runner.
+- [Connect CI with the CLI](/cloud/ci/cli.md): Connect GitHub from the terminal, then run workflows on BoxLite.
+- [Configure CI resources and environment](/cloud/ci/resources.md): Choose CPU, memory, and disk for each job, and understand Docker and file isolation.
+- [Manage CI concurrency and usage](/cloud/ci/operations.md): Control job concurrency, understand queueing, and track billing and resource cleanup.
+- [Troubleshoot CI jobs](/cloud/ci/troubleshooting.md): Diagnose waiting jobs, resource limits, build failures, and delayed cleanup.
+
 ### Pricing
 - [Pricing](/cloud/pricing.md): What BoxLite Cloud charges for: three metered resources billed by the hour, funded by a prepaid wallet or a plan's included quota.
 - [What a box costs](/cloud/box-costs.md): The three metered rates, the formula they combine into, what the standard sizes come to per hour and per month, and exactly which hours are…

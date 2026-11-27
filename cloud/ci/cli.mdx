@@ -1,0 +1,48 @@
+---
+title: "Connect CI with the CLI"
+sidebarTitle: "CLI setup"
+description: "Connect GitHub from the terminal, then run workflows on BoxLite."
+---
+
+Use this path if you prefer terminal setup or connect from an SSH session. GitHub authorization still requires a browser.
+
+For console setup, follow the [Quickstart](/cloud/ci/quickstart).
+
+## Before you start
+
+- [Install the BoxLite CLI](/reference/cli#install-and-verify).
+- Use a BoxLite organization where you are an owner.
+- Use a GitHub account that owns the target personal account or is an owner of the target GitHub organization.
+
+## Sign in
+
+Sign in as an owner of the target BoxLite organization:
+
+```bash
+boxlite --context cloud auth login
+```
+
+## Connect GitHub
+
+Connect the repository owner. For a repository named `octo-labs/demo`, use `octo-labs`:
+
+```bash
+boxlite --context cloud ci connect octo-labs
+```
+
+Follow the browser authorization instructions. If the CLI asks you to install the GitHub app, complete installation and run the connection command again.
+
+| Option | When to use it |
+| --- | --- |
+| `--allow-private-repositories` | Permit private repositories; the GitHub app must also have access to them. |
+| `--no-browser` | Connect from an SSH session and complete browser authorization on another device. |
+
+<Note>
+`BOXLITE_API_KEY` takes precedence over saved login credentials. To use the saved `cloud` identity when that variable is set, run `env -u BOXLITE_API_KEY boxlite --context cloud ci connect octo-labs`.
+</Note>
+
+## Run a job
+
+In [GitHub connections](https://app.boxlite.ai/dashboard/ci/connects), confirm **Listener** is **Ready** and your repository appears under the connected account.
+
+Then [change an existing job](/cloud/ci/quickstart#change-an-existing-job) or run the [connection test](/cloud/ci/quickstart#verify-a-new-connection). The workflow uses the same `runs-on` labels regardless of how you connected GitHub.

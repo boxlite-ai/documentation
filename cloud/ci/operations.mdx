@@ -1,0 +1,43 @@
+---
+title: "Manage CI concurrency and usage"
+sidebarTitle: "Concurrency and billing"
+description: "Control job concurrency, understand queueing, and track billing and resource cleanup."
+---
+
+## Concurrency and queueing
+
+All connected repositories in a BoxLite organization share CI capacity. Open [CI → Runners](https://app.boxlite.ai/dashboard/ci) and inspect **CI slots**.
+
+| Display | Meaning |
+| --- | --- |
+| `2 / 4` | Two slots are occupied out of a limit of four. |
+| `4 / 4` | Capacity is occupied; new jobs wait. |
+| `0 / 0 · Paused` | Starting new jobs is paused. |
+
+Preparation and cleanup can occupy slots as well as job execution. A slot becomes available after its box is cleaned up.
+
+Organization owners can click **Edit limit** and set **Maximum concurrent CI jobs**:
+
+- Enter a positive number to set a CI limit within account capacity.
+- Enter `0` to stop launching new jobs. Running jobs continue.
+- Clear the field or choose **Use account limit** to use the account default. The control reads **Using account limit** when the default is already selected.
+
+Other boxes in the account can also consume available capacity. An unused CI slot alone does not guarantee that another box can start. Increasing slots does not increase any individual job's CPU, memory, or disk.
+
+## Billing and cleanup
+
+CI consumes box resources. Billing follows the box's resource allocation and lifecycle, so the billable runtime can include environment preparation as well as workflow steps.
+
+CPU and memory charges stop when a stop is requested; disk charges stop when deletion is requested. See [Box costs](/cloud/box-costs#how-the-hours-are-counted) for billing boundaries.
+
+### Estimate a run
+
+At the published rates, a `boxlite-2vcpu-4gbmem-10gbdisk` box costs **$0.1602 per running hour**. Ten minutes of running time followed immediately by stop and deletion costs **$0.02670** (`$0.1602 × 10 / 60`).
+
+These are resource-usage estimates before included plan allowance is applied. Multiple jobs contribute separately to total usage. Review [billing](/cloud/billing) for your account's actual charges.
+
+### Success, failure, and cancellation
+
+BoxLite cleans up the box after the runner exits, whether the job succeeded, failed, or was cancelled. GitHub can show a completed job before resource cleanup finishes. Check that the runner disappears from **CI → Runners** and its slot is released. Other jobs may still occupy slots.
+
+Cancellation before box allocation creates no running usage for that box. Once a box has started, charges follow its actual lifecycle. If resources remain after the job ends, see [Troubleshooting](/cloud/ci/troubleshooting).

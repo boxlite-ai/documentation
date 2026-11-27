@@ -263,6 +263,18 @@
             "pages": []
           },
           {
+            "group": "CI",
+            "icon": "code-branch",
+            "root": "cloud/ci/index",
+            "pages": [
+              "cloud/ci/quickstart",
+              "cloud/ci/cli",
+              "cloud/ci/resources",
+              "cloud/ci/operations",
+              "cloud/ci/troubleshooting"
+            ]
+          },
+          {
             "group": "Pricing",
             "icon": "credit-card",
             "root": "cloud/pricing",
@@ -507,6 +519,10 @@
     {
       "source": "/cloud/agent-in-box/http-entrypoint",
       "destination": "/cloud/agent-in-box/hermes#optional-wake-on-a-request"
+    },
+    {
+      "source": "/cloud/ci",
+      "destination": "/cloud/ci/index"
     }
   ]
 }
